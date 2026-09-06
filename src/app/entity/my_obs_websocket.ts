@@ -2,6 +2,20 @@ import {Logger} from "@/app/entity/logger";
 import OBSWebSocket, {EventSubscription, OBSRequestTypes} from "obs-websocket-js";
 import {ObsItem, ObsScene, RawObsItem} from "@/app/entity/entities";
 
+// obs-websocket rejects with an Error for a refused socket and with its own {code, message} shape
+// for a protocol-level refusal (bad password, unsupported RPC version); JSON.stringify of an Error
+// is "{}", which is exactly the useless message this avoids.
+function describeObsError(e: unknown): string {
+    if (e instanceof Error) return e.message
+    if (typeof e === 'object' && e !== null) {
+        const r = e as {code?: unknown; message?: unknown}
+        if (typeof r.message === 'string') {
+            return typeof r.code === 'number' ? `(${r.code}) ${r.message}` : r.message
+        }
+    }
+    return String(e)
+}
+
 interface ObsItemToHide {
     item: ObsItem
     scene: ObsScene
@@ -14,6 +28,12 @@ export class MyOBSWebsocket {
     logger: Logger
     _isConnected: boolean = false
     _setIsConnected: undefined|((isConnected: boolean) => void) = undefined
+    // Why the last failure was, in plain text, for a UI that retries forever. `connect()` swallows
+    // its errors into the logger, which is fine for a manual Connect button (you clicked, nothing
+    // happened, you look at the log) but useless once connecting is automatic: an operator staring
+    // at a permanently amber "reconnecting" needs to know whether OBS is closed, the port is wrong,
+    // or the browser blocked ws:// from an https:// page. Cleared on every success.
+    lastError: string|null = null
     mediaSourcesHideAfterPlayback: ObsItemToHide[] = []
 
     constructor(url: string, log: Logger, setIsConnected: (isConnected: boolean) => void) {
@@ -31,6 +51,7 @@ export class MyOBSWebsocket {
                 eventSubscriptions: EventSubscription.All,
             }).then(_ => {
                 this.log('Connection established')
+                this.lastError = null
                 this.setConnected()
                 this.webSocket.on('ConnectionOpened', () => this.log('Connection opened'))
                 this.webSocket.on('ConnectionClosed', (e) => {
@@ -39,6 +60,7 @@ export class MyOBSWebsocket {
                 })
                 this.webSocket.on('ConnectionError', (e) => {
                     this.setDisconnect()
+                    this.lastError = `(${e.code}) ${e.message}`
                     this.log(`Connection error: (${e.code}) ${e.message}`)
                 })
                 this.webSocket.on('Hello', () => {
@@ -48,8 +70,12 @@ export class MyOBSWebsocket {
                     this.log(`Client is identified, set to connected state`)
                 })
                 this.webSocket.on('MediaInputPlaybackEnded', r => this.mediaSourcePlaybackEnded(r.inputName, r.inputUuid))
-            }).catch(e => this.log(`Connect error: ${JSON.stringify(e)}`))
+            }).catch(e => {
+                this.lastError = describeObsError(e)
+                this.log(`Connect error: ${JSON.stringify(e)}`)
+            })
         } catch (error) {
+            this.lastError = describeObsError(error)
             this.log(`Failed to connect: ${JSON.stringify(error)}`);
             return Promise.resolve()
         }

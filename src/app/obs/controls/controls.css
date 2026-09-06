@@ -37,6 +37,9 @@
     background: #198754;
 }
 
+/* An attempt in flight and the wait between attempts are both "working on it" — same amber, so a
+   retry cycle doesn't strobe between two colours once a second. */
+.ctl-panel-dot--connecting,
 .ctl-panel-dot--reconnecting {
     background: #ffc107;
 }
@@ -94,6 +97,7 @@
     font-size: 0.8rem;
 }
 
+.ctl-conn-status.connecting,
 .ctl-conn-status.reconnecting {
     color: #e0a800;
 }

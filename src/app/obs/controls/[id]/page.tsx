@@ -8,7 +8,6 @@ import {useActiveStream} from '@/app/hooks/useActiveStream'
 import {useOSBWebhook} from '@/app/component/useOSBWebhook'
 import {ComponentLogger} from '@/app/entity/logger'
 import {WebSocketUrlComponent} from '@/app/obs/manage/[id]/web_socket_url_component'
-import {ConnectedComponent} from '@/app/obs/manage/[id]/connected_component'
 import {ApplyResult, useControls} from '@/app/obs/controls/useControls'
 import type {BusPayload, OverlayState, Phase} from '@/app/obs/layout/schema'
 import {isEventActive} from '@/app/obs/layout/config'
@@ -30,6 +29,22 @@ const OBS_WS_URL = 'OBS_WS_URL'
 
 type TransitionPending = { phase: Phase }
 
+/**
+ * Whole seconds until `at`, re-rendering once a second while one is pending. Returns null when
+ * there is nothing to count down to, and the interval is only armed in that case — a page that is
+ * happily connected does not tick.
+ */
+function useCountdown(at: number | null): number | null {
+    const [, setTick] = useState(0)
+    useEffect(() => {
+        if (at === null) return
+        const id = setInterval(() => setTick((t) => t + 1), 1000)
+        return () => clearInterval(id)
+    }, [at])
+    if (at === null) return null
+    return Math.max(0, Math.ceil((at - Date.now()) / 1000))
+}
+
 export default function Page({params}: { params: { id: string } }) {
     const channelId = parseInt(params.id)
     const [channel] = useChannel(channelId)
@@ -37,11 +52,17 @@ export default function Page({params}: { params: { id: string } }) {
     const [breakObj, setBreakObj] = useState<WNBreak | null>(null)
 
     const [url, setUrl] = useState('ws://localhost:4455')
+    // The saved URL arrives in an effect, one render after mount. Auto-connect must wait for it or
+    // it dials the hardcoded default first and builds a second socket when the real URL lands.
+    const [urlRestored, setUrlRestored] = useState(false)
+    // Set in an effect, not read during render: `window` does not exist server-side, and branching
+    // on it in the markup would hand the client a different first render than the server sent.
+    const [pageIsHttps, setPageIsHttps] = useState(false)
     const [logger] = useState(() => new ComponentLogger())
     const [isConnected, setIsConnected] = useState(false)
     const obs = useOSBWebhook(url, logger, setIsConnected)
 
-    const controls = useControls(channelId, obs, isConnected)
+    const controls = useControls(channelId, obs, isConnected, urlRestored)
     const [notice, setNotice] = useState<{ type: 'warning' | 'danger'; message: string } | null>(null)
 
     const [transitionDraft, setTransitionDraft] = useState('')
@@ -57,11 +78,21 @@ export default function Page({params}: { params: { id: string } }) {
 
     useEffect(() => {
         setUrl((old) => localStorage.getItem(OBS_WS_URL) ?? old)
+        setUrlRestored(true)
+        setPageIsHttps(window.location.protocol === 'https:')
     }, [])
 
+    // Gated on the restore above, and NOT because of ordering elegance: without the gate this
+    // effect also runs on mount, where `url` is still the hardcoded default, and writes that
+    // default over the operator's saved URL. React's dev-mode double-invoke then makes the loss
+    // permanent — the second pass of the restore effect re-reads the value this one just
+    // clobbered, so a custom OBS URL silently resets to ws://localhost:4455 on every page load.
+    // Latent before, but auto-connect now dials whatever this stored, so a wrong value is no
+    // longer merely cosmetic.
     useEffect(() => {
+        if (!urlRestored) return
         localStorage.setItem(OBS_WS_URL, url)
-    }, [url])
+    }, [url, urlRestored])
 
     useEffect(() => {
         setTransitionDraft(controls.config.obsBindings.transitionSource ?? '')
@@ -103,10 +134,6 @@ export default function Page({params}: { params: { id: string } }) {
         return () => window.removeEventListener('beforeunload', handler)
     }, [isConnected])
 
-    function connect() {
-        obs.connect()
-    }
-
     async function runApply(next: OverlayState, cue?: BusPayload['cue']): Promise<ApplyResult> {
         const result = await controls.apply(next, cue)
         // Undelivered-to-OBS is NOT a notice: it is a standing condition, shown (and cleared) in
@@ -135,6 +162,36 @@ export default function Page({params}: { params: { id: string } }) {
         setFiredEvent(name)
         setTimeout(() => setFiredEvent((current) => (current === name ? null : current)), ACTION_FEEDBACK_MS)
     }
+
+    // One phrase describing the connection, used on both the collapsed toggle and the OBS tab so
+    // the two can never disagree. The countdown is the point: "reconnecting" alone reads as
+    // possibly-wedged, "retry 3s" reads as working.
+    const retryIn = useCountdown(controls.nextRetryAt)
+    const connectionLabel =
+        controls.connectionStatus === 'connected' ? 'connected'
+        : controls.connectionStatus === 'connecting' ? 'connecting…'
+        : controls.connectionStatus === 'reconnecting'
+            ? `retry ${retryIn ?? 0}s${controls.attempts > 1 ? ` (${controls.attempts} failed)` : ''}`
+            : 'not connected'
+
+    /**
+     * Why the connection is failing, in a form the operator can act on.
+     *
+     * A browser reports NOTHING for a refused WebSocket — no message, no close reason — precisely
+     * so a page cannot use connection failures to scan ports. Verified here: the error event for a
+     * dead port carries an undefined message. So for the commonest case by far (OBS simply not
+     * running) `lastConnectError` is empty and there is nothing to relay, which is why the hint
+     * below is generated rather than reported.
+     *
+     * The mixed-content case is the exception worth calling out by name: an https page may not open
+     * a ws:// socket, the failure is instant, permanent and completely silent, and it is the one
+     * failure whose cause we can determine with certainty rather than guess at.
+     */
+    const connectionHint = isConnected
+        ? null
+        : pageIsHttps && url.startsWith('ws://')
+            ? `Blocked: this page is on https and cannot open a ws:// socket. Open the controls on http://localhost:3000, or point OBS at wss://.`
+            : controls.lastConnectError || `No response from ${url} — is OBS running with obs-websocket enabled on that port?`
 
     // Border of the stage dropdown: green = stage changes reach OBS (connected and the last send
     // succeeded), red = they don't (disconnected, or the last send was not delivered).
@@ -295,9 +352,38 @@ export default function Page({params}: { params: { id: string } }) {
                     <div className="ctl-obs-group">
                         <div className="ctl-conn-block">
                             <WebSocketUrlComponent url={url} setUrl={setUrl}/>
-                            <ConnectedComponent isConnected={isConnected} connect={connect}/>
                             <div className={`ctl-conn-status ${controls.connectionStatus}`}>
-                                status: {controls.connectionStatus}
+                                status: {connectionLabel}
+                            </div>
+                            {/* Why it is failing. `connect()` swallows its errors, so without this
+                                a permanently amber "reconnecting" gives the operator nothing to act
+                                on — OBS closed, wrong port and a browser blocking ws:// from an
+                                https:// page all look identical. */}
+                            {connectionHint && (
+                                <div className="text-secondary" style={{fontSize: '0.75rem'}}>
+                                    {connectionHint}
+                                </div>
+                            )}
+                            <div className="d-flex gap-2">
+                                <button
+                                    className="btn btn-sm btn-outline-secondary"
+                                    onClick={controls.retryNow}
+                                    disabled={isConnected}
+                                >
+                                    Retry now
+                                </button>
+                                {controls.retryEnabled ? (
+                                    <button
+                                        className="btn btn-sm btn-outline-secondary"
+                                        onClick={controls.stopRetrying}
+                                        disabled={isConnected}
+                                        title="Stop reconnecting until Retry now is pressed"
+                                    >
+                                        Stop trying
+                                    </button>
+                                ) : (
+                                    <span className="text-warning small align-self-center">not retrying</span>
+                                )}
                             </div>
                             <button className="btn btn-sm btn-outline-secondary" disabled title="wired in 2.8">
                                 Re-sync OBS
@@ -481,13 +567,14 @@ export default function Page({params}: { params: { id: string } }) {
                         onClick={togglePanel}
                     >
                         {/* Connection state is the one thing in this panel worth seeing at a
-                            glance, and collapsing it would otherwise hide it — so it rides on
-                            the toggle itself. */}
+                            glance, and the panel is collapsed by default — so it rides on the
+                            toggle itself, countdown and all. An operator should never have to open
+                            a panel to find out OBS has gone away. */}
                         <span
                             className={`ctl-panel-dot ctl-panel-dot--${controls.connectionStatus}`}
-                            title={`OBS: ${controls.connectionStatus}`}
+                            title={`OBS: ${connectionLabel}`}
                         />
-                        OBS &amp; Stages {panelOpen ? '▾' : '▸'}
+                        {isConnected ? 'OBS & Stages' : `OBS ${connectionLabel}`} {panelOpen ? '▾' : '▸'}
                     </button>
                 </div>
 

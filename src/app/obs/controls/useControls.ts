@@ -11,7 +11,17 @@ import type {BusPayload, CuePayload, DurableCue, LayoutConfig, OverlayState, Tra
 import {BUS_CUE_EVENT_NAME, BUS_EVENT_NAME, DEV_CHANNEL_NAME, DEV_CUE_CHANNEL_NAME} from '@/app/obs/layout/schema'
 import {defaultConfig, defaultState, migrateConfig, migrateState, validateConfig, validateState} from '@/app/obs/layout/config'
 
-export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected'
+// 'connecting'  — an attempt is in flight right now
+// 'reconnecting' — not connected, waiting out RETRY_MS before the next attempt (`nextRetryAt`)
+// 'disconnected' — not connected and NOT trying, i.e. the operator pressed Stop trying (or the URL
+//                  has not been restored from localStorage yet, which lasts one render)
+export type ConnectionStatus = 'connected' | 'connecting' | 'reconnecting' | 'disconnected'
+
+// Fixed, deliberately — not exponential backoff. The dominant case is "operator opens the controls
+// page, then starts OBS", and backing off would leave them staring at a page that has given up on
+// something they are looking straight at. A short constant interval plus a visible countdown is
+// both cheaper to reason about and more honest than a growing delay nobody can predict.
+const RETRY_MS = 5000
 
 export type ApplyResult = { ok: boolean; warning?: string; error?: string }
 
@@ -46,12 +56,34 @@ function describeError(e: unknown): string {
     }
 }
 
-export function useControls(channelId: number, obs: MyOBSWebsocket | null, isConnected: boolean) {
+/**
+ * @param canConnect gate for the auto-connect loop. The controls page passes `false` until the
+ *   saved OBS URL has been read out of localStorage: `url` starts at its hardcoded default and is
+ *   replaced in an effect, so connecting immediately would dial the default, then build a SECOND
+ *   socket when the real URL arrives.
+ */
+export function useControls(
+    channelId: number,
+    obs: MyOBSWebsocket | null,
+    isConnected: boolean,
+    canConnect: boolean = true
+) {
     const [config, setConfig] = useState<LayoutConfig>(() => defaultConfig())
     const [state, setState] = useState<OverlayState>(() => defaultState())
     const [seq, setSeq] = useState(0)
     const [loading, setLoading] = useState(true)
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
+    // When the next automatic attempt fires (epoch ms), so the UI can count down to it; null while
+    // connected, while an attempt is in flight, or while retrying is switched off.
+    const [nextRetryAt, setNextRetryAt] = useState<number | null>(null)
+    // Consecutive failures since the last success — shown so a long amber spell reads as "still
+    // trying, 40 times now" rather than "possibly wedged".
+    const [attempts, setAttempts] = useState(0)
+    const [lastConnectError, setLastConnectError] = useState<string | null>(null)
+    // The operator's manual off switch. Nothing sets this back to true except them.
+    const [retryEnabled, setRetryEnabled] = useState(true)
+    // Bumped by retryNow() to make the connect effect re-run and attempt immediately.
+    const [retryNonce, setRetryNonce] = useState(0)
     const [lastEmitAt, setLastEmitAt] = useState<Date | null>(null)
 
     // Refs so apply()/pushConfig() always see the latest value without re-creating the callback
@@ -295,6 +327,9 @@ export function useControls(channelId: number, obs: MyOBSWebsocket | null, isCon
     useEffect(() => {
         if (isConnected) {
             setConnectionStatus('connected')
+            setNextRetryAt(null)
+            setAttempts(0)
+            setLastConnectError(null)
         }
         // Rising edge only: catch the layout up on everything applied while the socket was down.
         // Not on every render, and not while still disconnected (emit would no-op anyway).
@@ -305,36 +340,71 @@ export function useControls(channelId: number, obs: MyOBSWebsocket | null, isCon
         }
     }, [isConnected, loading, resendCurrent])
 
+    /**
+     * Keep the socket connected, without anyone having to press anything.
+     *
+     * This used to be two mechanisms: a Connect button for the first connection, and a retry loop
+     * armed by `ConnectionClosed` for later drops. That left a hole — `ConnectionClosed` only fires
+     * for a connection that once existed, so if OBS was not running when the page opened, the click
+     * failed silently and NOTHING retried. The operator had to keep pressing Connect until it took.
+     *
+     * One loop now covers both: attempt -> connected? stop : wait RETRY_MS -> attempt, armed on
+     * mount and re-armed by `ConnectionClosed`. `connect()` resolves either way (it swallows its
+     * own errors), so success is read from `isConnected()` afterwards rather than from the promise.
+     */
     useEffect(() => {
-        if (!obs) return
+        if (!obs || !canConnect || !retryEnabled) return
         let stopped = false
         let timer: ReturnType<typeof setTimeout> | null = null
 
+        function attempt() {
+            if (stopped || !obs) return
+            setConnectionStatus((prev) => (prev === 'connected' ? prev : 'connecting'))
+            setNextRetryAt(null)
+            obs.connect().finally(() => {
+                if (stopped || !obs) return
+                if (obs.isConnected()) return // the isConnected effect above owns the happy path
+                setAttempts((n) => n + 1)
+                setLastConnectError(obs.lastError)
+                scheduleRetry()
+            })
+        }
+
         function scheduleRetry() {
             if (stopped) return
-            timer = setTimeout(() => {
-                if (stopped || !obs) return
-                obs.connect().finally(() => {
-                    if (stopped) return
-                    if (!obs.isConnected()) scheduleRetry()
-                })
-            }, 5000)
+            setConnectionStatus('reconnecting')
+            setNextRetryAt(Date.now() + RETRY_MS)
+            timer = setTimeout(attempt, RETRY_MS)
         }
 
         function onClosed() {
             if (stopped) return
-            setConnectionStatus('reconnecting')
             scheduleRetry()
         }
 
         obs.webSocket.on('ConnectionClosed', onClosed)
+        // Don't dial a socket that is already up: this effect also re-runs on retryNow().
+        if (!obs.isConnected()) attempt()
 
         return () => {
             stopped = true
             if (timer) clearTimeout(timer)
             obs.webSocket.off('ConnectionClosed', onClosed)
         }
-    }, [obs])
+    }, [obs, canConnect, retryEnabled, retryNonce])
+
+    /** Skip the remaining wait and attempt right now. */
+    const retryNow = useCallback(() => {
+        setRetryEnabled(true)
+        setRetryNonce((n) => n + 1)
+    }, [])
+
+    /** Stop the automatic loop until the operator asks for it again (retryNow re-enables it). */
+    const stopRetrying = useCallback(() => {
+        setRetryEnabled(false)
+        setNextRetryAt(null)
+        setConnectionStatus((prev) => (prev === 'connected' ? prev : 'disconnected'))
+    }, [])
 
     return {
         config,
@@ -342,6 +412,12 @@ export function useControls(channelId: number, obs: MyOBSWebsocket | null, isCon
         seq,
         loading,
         connectionStatus,
+        nextRetryAt,
+        attempts,
+        lastConnectError,
+        retryEnabled,
+        retryNow,
+        stopRetrying,
         lastEmitAt,
         undelivered,
         setConfigLocal,
