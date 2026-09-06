@@ -1,12 +1,13 @@
 'use client'
 
-// Settings for `imageBox` (obs-image-box-plan.md §3.7, pan control added in §5): upload an image,
-// pick how it fits its box, and — since `contain`/`cover` both leave slack the operator may want to
-// choose — pan which part of the image shows via `position` (a 0..100 percent pair mapped straight
-// onto CSS `object-position`, see ImageBoxElement.tsx). Both settings live on the element
-// (LayoutConfig) — the upload itself hits its own endpoint (`/api/layout/image/upload`) to get a
-// public URL, then that URL is patched onto the element via `onPatchElement` like any other field,
-// same as TextSettings.
+// Settings for `imageBox` (obs-image-box-plan.md §3.7, pan control added in §5, gallery in §6):
+// upload an image (or reuse one from the Gallery), pick how it fits its box, and — since
+// `contain`/`cover` both leave slack the operator may want to choose — pan which part of the image
+// shows via `position` (a 0..100 percent pair mapped straight onto CSS `object-position`, see
+// ImageBoxElement.tsx). All of these live on the element (LayoutConfig) — the upload itself hits
+// its own endpoint (`/api/layout/image/upload`) to get a public URL (and, since §6, a recorded
+// `LayoutImage` row), then `{url, name}` is patched onto the element via `onPatchElement` like any
+// other field, same as TextSettings.
 //
 // The "Current image" preview doubles as the pan control (§5.4): it is sized to the element's own
 // box aspect ratio (via `resolveBox`) so what the operator sees while dragging matches what OBS
@@ -21,6 +22,8 @@ import {resolveBox} from '@/app/obs/layout/config'
 import {REGISTRY} from '@/app/obs/layout/registry'
 import {getEndpoints, postMultipart} from '@/app/lib/backend'
 import {DEFAULT_IMAGE_FIT, OBJECT_FIT} from '@/app/obs/layout/elements/image-box/ImageBoxElement'
+import type {LayoutImage} from '@/app/entity/entities'
+import LayoutImageGallery from './LayoutImageGallery'
 import type {PatchElement} from './ElementBlock'
 
 const FIT_LABELS: Record<ImageFit, string> = {
@@ -61,13 +64,16 @@ type Props = {
 export default function ImageBoxSettings({elementKey, element, channelId, currentPhase, onPatchElement}: Props) {
     const img = element.kind === 'imageBox' ? element : null
     const url = img?.url ?? ''
+    const name = img?.name ?? ''
     const fit = img?.fit ?? DEFAULT_IMAGE_FIT
     const position: Position = img?.position ?? DEFAULT_IMAGE_POSITION
     const pannable = fit !== 'stretch'
 
+    const nameInputRef = useRef<HTMLInputElement | null>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const [uploading, setUploading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [galleryOpen, setGalleryOpen] = useState(false)
 
     // Natural pixel size of the loaded image — needed to compute per-axis drag slack. Reset
     // whenever the image itself changes so a stale size from the previous upload is never used.
@@ -94,6 +100,7 @@ export default function ImageBoxSettings({elementKey, element, channelId, curren
     if (!img) return null
 
     const fileName = url ? url.split('/').pop() || url : ''
+    const displayName = name || fileName
     const displayed = dragPos ?? position
 
     const box = resolveBox(element, currentPhase) ?? REGISTRY['image-box'].defaultBox
@@ -107,11 +114,15 @@ export default function ImageBoxSettings({elementKey, element, channelId, curren
     const yLocked = !slack || Math.abs(slack.slackY) < 1
 
     function removeImage() {
-        onPatchElement(elementKey, {url: undefined})
+        onPatchElement(elementKey, {url: undefined, name: undefined})
     }
 
     function patchPosition(next: Position) {
         onPatchElement(elementKey, {position: next})
+    }
+
+    function selectFromGallery(selected: LayoutImage) {
+        onPatchElement(elementKey, {url: selected.url, name: selected.name})
     }
 
     async function upload() {
@@ -124,13 +135,27 @@ export default function ImageBoxSettings({elementKey, element, channelId, curren
         setError(null)
         setUploading(true)
         try {
+            let width = 0
+            let height = 0
+            try {
+                const bmp = await createImageBitmap(file)
+                width = bmp.width
+                height = bmp.height
+                bmp.close()
+            } catch {
+                // Measurement failed (unsupported format, etc.) — the backend still accepts 0/0.
+            }
             const form = new FormData()
             form.append('file', file)
             form.append('channel_id', String(channelId))
+            form.append('name', nameInputRef.current?.value ?? '')
+            form.append('width', String(width))
+            form.append('height', String(height))
             const result = await postMultipart(getEndpoints().layout_image_upload, form)
             if (result && typeof result.url === 'string') {
-                onPatchElement(elementKey, {url: result.url})
+                onPatchElement(elementKey, {url: result.url, name: result.name})
                 if (fileInputRef.current) fileInputRef.current.value = ''
+                if (nameInputRef.current) nameInputRef.current.value = ''
             } else {
                 setError('Upload failed.')
             }
@@ -183,6 +208,43 @@ export default function ImageBoxSettings({elementKey, element, channelId, curren
     return (
         <div className="d-flex flex-column gap-2">
             <div>
+                <label className="form-label mb-0 small">Upload</label>
+                <div className="d-flex flex-wrap gap-2">
+                    <input
+                        ref={nameInputRef}
+                        type="text"
+                        placeholder="Name (defaults to file name)"
+                        className="form-control form-control-sm"
+                        style={{maxWidth: 220}}
+                        disabled={uploading}
+                    />
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept={ACCEPT}
+                        className="form-control form-control-sm"
+                        style={{maxWidth: 220}}
+                        disabled={uploading}
+                    />
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary text-nowrap"
+                        disabled={uploading}
+                        onClick={upload}
+                    >
+                        {uploading ? 'Uploading…' : 'Upload'}
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary text-nowrap"
+                        onClick={() => setGalleryOpen(true)}
+                    >
+                        Gallery
+                    </button>
+                </div>
+                {error && <div className="small text-danger">{error}</div>}
+            </div>
+            <div>
                 <label className="form-label mb-0 small">Current image</label>
                 {url ? (
                     <div className="d-flex flex-column gap-1">
@@ -221,8 +283,11 @@ export default function ImageBoxSettings({elementKey, element, channelId, curren
                             />
                         </div>
                         {pannable && <div className="small text-secondary">Drag the image to choose what shows in the box.</div>}
-                        <div className="d-flex align-items-center gap-2">
-                            <span className="small text-secondary text-break">{fileName}</span>
+                        <div className="small text-secondary text-break">
+                            {displayName}
+                            {natural && ` — ${natural.w} × ${natural.h} px`}
+                        </div>
+                        <div>
                             <button type="button" className="btn btn-sm btn-link p-0 text-danger" onClick={removeImage}>
                                 Remove
                             </button>
@@ -232,28 +297,14 @@ export default function ImageBoxSettings({elementKey, element, channelId, curren
                     <div className="small text-secondary">No image uploaded.</div>
                 )}
             </div>
-            <div>
-                <label className="form-label mb-0 small" htmlFor={`ctl-imgbox-file-${elementKey}`}>Upload</label>
-                <div className="d-flex align-items-center gap-2">
-                    <input
-                        id={`ctl-imgbox-file-${elementKey}`}
-                        ref={fileInputRef}
-                        type="file"
-                        accept={ACCEPT}
-                        className="form-control form-control-sm"
-                        disabled={uploading}
-                    />
-                    <button
-                        type="button"
-                        className="btn btn-sm btn-outline-primary text-nowrap"
-                        disabled={uploading}
-                        onClick={upload}
-                    >
-                        {uploading ? 'Uploading…' : 'Upload'}
-                    </button>
-                </div>
-                {error && <div className="small text-danger">{error}</div>}
-            </div>
+            {galleryOpen && (
+                <LayoutImageGallery
+                    channelId={channelId}
+                    currentUrl={url || undefined}
+                    onSelect={selectFromGallery}
+                    onClose={() => setGalleryOpen(false)}
+                />
+            )}
             <div>
                 <label className="form-label mb-0 small" htmlFor={`ctl-imgbox-fit-${elementKey}`}>Fit</label>
                 <select

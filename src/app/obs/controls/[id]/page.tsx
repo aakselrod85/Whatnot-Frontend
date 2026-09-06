@@ -19,6 +19,7 @@ import type {SceneEventName} from '@/app/obs/layout/sceneEvents'
 import {TabsComponent} from '@/app/component/tabsComponent'
 import ElementsPanel from '@/app/obs/controls/elements/ElementsPanel'
 import StagesPanel from '@/app/obs/controls/elements/StagesPanel'
+import PresetsPanel from '@/app/obs/controls/elements/PresetsPanel'
 import '../controls.css'
 
 // How long the "Sent!" flash lasts on an Actions strip button after it fires (obs-layout-plan.md
@@ -412,6 +413,10 @@ export default function Page({params}: { params: { id: string } }) {
         {
             name: 'Stages',
             node: <StagesPanel controls={controls} onPushResult={reportPush}/>,
+        },
+        {
+            name: 'Presets',
+            node: <PresetsPanel controls={controls} channelId={channelId} onPushResult={reportPush}/>,
         },
     ]
 

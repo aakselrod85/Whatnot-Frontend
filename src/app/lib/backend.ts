@@ -86,6 +86,12 @@ export function getEndpoints()  {
         layout_state_get:     "/api/layout/state",
         layout_state_update:  "/api/layout/state/update",
         layout_image_upload:  "/api/layout/image/upload",
+        layout_image_list:    "/api/layout/image/list",
+        layout_image_delete:  "/api/layout/image/delete",
+        layout_preset_list:   "/api/layout/preset/list",
+        layout_preset_create: "/api/layout/preset/create",
+        layout_preset_update: "/api/layout/preset/update",
+        layout_preset_delete: "/api/layout/preset/delete",
     }
 }
 

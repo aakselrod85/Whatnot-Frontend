@@ -55,10 +55,10 @@ export type RegistryEntry = {
     id: RegistryId
     kind: ElementKind
     label: string
-    // Boards share ONE singleton slot across all variants — only one board element allowed in a
-    // config, regardless of which variant it is. Same idea for results/cards/ripbar/reserved
-    // (one each). Widgets are not singletons. `singletonGroup` is the key used to enforce this:
-    // entries that must not coexist share the same group.
+    // results/cards/ripbar/reserved are one-each. Widgets, animations, text and BOARDS are not
+    // singletons: a layout may hold several boards, of the same variant or of different ones, and
+    // place them independently per stage. `singletonGroup` is the key used to enforce this and is
+    // only ever consulted when `singleton` is true — entries that must not coexist share a group.
     singleton: boolean
     singletonGroup: string
     defaultBox: Box
@@ -120,8 +120,10 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         id: 'board:flat',
         kind: 'board',
         label: 'Board — Flat',
-        singleton: true,
-        singletonGroup: 'board',
+        // Not a singleton: several boards may coexist (obs/controls — any number, any mix of
+        // variants), so each variant gets its own group and `singleton: false` is what allows it.
+        singleton: false,
+        singletonGroup: 'board:flat',
         defaultBox: BOARD_BOX,
         // Just the static board background — the per-cell/per-tile skin art is combinatorial
         // (style x tier x piece x variant, resolved from manifest.json at runtime) and not worth
@@ -138,8 +140,10 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         id: 'board:classic',
         kind: 'board',
         label: 'Board — Classic',
-        singleton: true,
-        singletonGroup: 'board',
+        // Not a singleton: several boards may coexist (obs/controls — any number, any mix of
+        // variants), so each variant gets its own group and `singleton: false` is what allows it.
+        singleton: false,
+        singletonGroup: 'board:classic',
         defaultBox: BOARD_BOX,
         preload: [],
         component: Placeholder,
@@ -151,8 +155,10 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         id: 'board:cobra',
         kind: 'board',
         label: 'Board — Cobra',
-        singleton: true,
-        singletonGroup: 'board',
+        // Not a singleton: several boards may coexist (obs/controls — any number, any mix of
+        // variants), so each variant gets its own group and `singleton: false` is what allows it.
+        singleton: false,
+        singletonGroup: 'board:cobra',
         defaultBox: BOARD_BOX,
         preload: [],
         component: CobraBoard,

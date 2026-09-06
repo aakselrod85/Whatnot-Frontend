@@ -186,6 +186,10 @@ export type Element =
     | {
           kind: 'imageBox'
           url?: string
+          // Display label shown in the settings panel (element's own name + `W × H px`), copied
+          // from the gallery row or the upload form's Name field (obs-image-box-plan.md §6). Never
+          // read by the layout page itself.
+          name?: string
           fit?: ImageFit
           // Which part of the image shows when `fit` crops or letterboxes it (obs-image-box-plan.md
           // §5) — a percentage pair, default DEFAULT_IMAGE_POSITION (centred). Ignored by `stretch`.
@@ -210,6 +214,20 @@ export type LayoutConfig = {
         // obs-layout-plan.md §1.7 "Transition as a controls action".
         useTransition?: boolean
     }
+}
+
+// A named, per-channel snapshot of a LayoutConfig (obs-layout-presets-plan.md). Wire shape as
+// stored/returned by the backend, snake_case like every other entity consumed raw (`series_id`,
+// `active_break_id`). `config` is deliberately typed `unknown`, not `LayoutConfig`: it is whatever
+// blob was stored — possibly under an older schema version — and only becomes a trustworthy
+// `LayoutConfig` by passing `migrateConfig` + `validateConfig` on load (see `applyPreset` below).
+export type LayoutPreset = {
+    id: number
+    channel_id: number
+    name: string
+    config: unknown
+    created_at: string
+    updated_at: string
 }
 
 export type OverlayState = {

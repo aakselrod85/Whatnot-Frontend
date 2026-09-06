@@ -234,3 +234,18 @@ export interface CardsBoardSettings {
     show_horizontal_row: boolean
     show_only_available_teams: boolean
 }
+
+// A row recorded by `/api/layout/image/upload` for every image an operator uploads through the
+// `imageBox` element (obs-image-box-plan.md §6) — lets the controls page offer a Gallery of
+// previously-uploaded images instead of re-uploading. `width`/`height` are the image's pixel
+// dimensions (0 if unknown), `size_bytes` the file size.
+export interface LayoutImage {
+    id: number
+    channel_id: number
+    name: string
+    url: string
+    width: number
+    height: number
+    size_bytes: number
+    created_at: string
+}

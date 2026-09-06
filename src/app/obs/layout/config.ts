@@ -340,8 +340,10 @@ function validateTextFields(key: string, rawEl: Record<string, unknown>): string
 
 // `imageBox` field validation: `url` is the public image URL returned by
 // `/api/layout/image/upload` (a plain string, capped well above any realistic Spaces URL length),
-// `fit` one of IMAGE_FITS (schema.ts).
+// `name` a display label (obs-image-box-plan.md §6, capped at the same length as the upload
+// endpoint's `name` field), `fit` one of IMAGE_FITS (schema.ts).
 const MAX_IMAGE_URL_LENGTH = 2048
+const MAX_IMAGE_NAME_LENGTH = 200
 
 function validateImageBoxFields(key: string, rawEl: Record<string, unknown>): string[] {
     const errors: string[] = []
@@ -350,6 +352,13 @@ function validateImageBoxFields(key: string, rawEl: Record<string, unknown>): st
             errors.push(`element "${key}": url must be a string`)
         } else if (rawEl.url.length > MAX_IMAGE_URL_LENGTH) {
             errors.push(`element "${key}": url must be at most ${MAX_IMAGE_URL_LENGTH} characters`)
+        }
+    }
+    if (rawEl.name !== undefined) {
+        if (typeof rawEl.name !== 'string') {
+            errors.push(`element "${key}": name must be a string`)
+        } else if (rawEl.name.length > MAX_IMAGE_NAME_LENGTH) {
+            errors.push(`element "${key}": name must be at most ${MAX_IMAGE_NAME_LENGTH} characters`)
         }
     }
     if (rawEl.fit !== undefined && (typeof rawEl.fit !== 'string' || !(IMAGE_FITS as readonly string[]).includes(rawEl.fit))) {
@@ -630,6 +639,24 @@ export function validateConfig(
             obsBindings: validatedBindings,
         },
     }
+}
+
+// Turns a stored preset (LayoutPreset.config, schema.ts — typed `unknown` on the wire) into the
+// LayoutConfig to push, or a list of reasons it can't be. Two rules, both deliberate:
+//   (a) FAILS rather than half-applies — a preset saved under an older schema that no longer
+//       validates must be reported to the operator, never silently loaded as a partial/broken
+//       layout (obs-layout-presets-plan.md P.2).
+//   (b) The LIVE config's `obsBindings` win over whatever the preset stored. `obsBindings` names
+//       physical OBS scene items (the transition source, the camera item) — not part of "the
+//       layout" the way stages/elements are — and a preset from weeks ago silently repointing them
+//       out from under the operator is exactly the surprise this guards against.
+export function applyPreset(
+    stored: unknown,
+    live: LayoutConfig
+): { ok: true; config: LayoutConfig } | { ok: false; errors: string[] } {
+    const validated = validateConfig(migrateConfig(stored))
+    if (!validated.ok) return validated
+    return { ok: true, config: { ...validated.config, obsBindings: live.obsBindings } }
 }
 
 export function validateState(
