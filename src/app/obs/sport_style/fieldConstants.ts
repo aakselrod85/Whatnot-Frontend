@@ -133,6 +133,7 @@ export const DEFAULT_PATCH: GeneralSettings = {
         logoOutlineWidth: 1,
         logoOutlineColor: 'auto',
         logoOutlineOpacity: 0.9,
+        logoSizedFiles: false,
         logoLift: 1,
         vignette: 0.35,
         edgeShadow: true,

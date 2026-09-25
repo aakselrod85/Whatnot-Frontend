@@ -413,6 +413,8 @@ export default function Page() {
                         </>
                     )}
 
+                    {toggle('Sized logo files', 'logoSizedFiles')}
+
                     <h6 className="mt-3">Logo lift shadow</h6>
                     {slider('Offset X', 'logoShadowX', -10, 10, 0.5)}
                     {slider('Offset Y', 'logoShadowY', -10, 10, 0.5)}
