@@ -9,6 +9,7 @@
 import { useId } from 'react'
 import { RGB, rgbToCss, darken, lighten, mix, toGrey, shade, hexToRgb, StitchMode } from './patchColors'
 import { EdgeTier, TIER_SKINS } from './tierSkins'
+import BOARD_LOGO_SIZES from './boardLogoSizes.json'
 
 export interface PatchStyle {
     // The rendered size is no longer a style field (sport-style-board-plan.md R1 fix 3): whoever
@@ -60,6 +61,9 @@ export interface PatchStyle {
     logoOutlineWidth: number    // crisp only; real screen px, NOT scaled with the patch (0 = off)
     logoOutlineColor: 'auto' | 'light' | 'dark' // crisp only; auto contrasts with the fabric
     logoOutlineOpacity: number  // crisp only, 0..1
+    // Load a logo file pre-resized to the drawn size (scripts/make-board-logos.mjs) instead of the
+    // browser shrinking the 500px original every frame. Independent of logoMode (A/B test).
+    logoSizedFiles: boolean
     vignette: number      // 0..1
     edgeShadow: boolean
     soldRingShade: number       // -1..1, offset from cell grey toward black (-) or white (+)
@@ -114,6 +118,7 @@ export const defaultPatchStyle: PatchStyle = {
     logoOutlineWidth: 1,
     logoOutlineColor: 'auto',
     logoOutlineOpacity: 0.9,
+    logoSizedFiles: false,
     vignette: 0.35,
     edgeShadow: true,
     soldRingShade: 0.30,
@@ -205,6 +210,15 @@ function logoBox(size: number, logoScale: number, logoLift: number) {
     return {left: offset, top: offset - Math.round(logoLift), width: px, height: px}
 }
 
+// logoSizedFiles: the pre-resized file for a logo drawn `px` wide — the smallest generated size
+// that is at least `px`, so the browser only ever shrinks it a little. Falls back to the original
+// for anything make-board-logos.mjs doesn't cover (non-team art, or larger than the biggest size).
+function boardLogoSrc(logoSrc: string, px: number): string {
+    if (!logoSrc.startsWith('/images/teams/') && logoSrc !== '/images/Miscellaneous.webp') return logoSrc
+    const size = BOARD_LOGO_SIZES.find(s => s >= px)
+    return size ? `/images/teams-board/${size}/${logoSrc.split('/').pop()}` : logoSrc
+}
+
 // crisp mode: a hard (zero-blur) outline from four axis-aligned drop-shadows — each one also
 // shadows the previous ones, so together they dilate the logo by `width` px on every side. Whole
 // px only; a fractional width would antialias back into the soft edge this replaces.
@@ -223,7 +237,13 @@ export default function PatchCell({ background: paletteBackground, stitch, logoS
     // TeamIconSrc (src/app/common/teams.ts) paths contain spaces (e.g. "Arizona Cardinals.webp");
     // an unquoted url() with a space is invalid CSS and silently drops the mask, so the sold cell
     // rendered as a plain grey square. Quote + encode once and reuse for both mask properties.
-    const maskUrl = `url("${encodeURI(logoSrc)}")`
+    const sized = s.logoSizedFiles
+    const logoPx = logoBox(size, s.logoScale, 0).width
+    // Sized files escape only spaces (see the <img> srcSet below) so an already-encoded path from
+    // the playground isn't double-encoded; the original path keeps its encodeURI.
+    const maskUrl = sized
+        ? `url("${boardLogoSrc(logoSrc, logoPx).replace(/ /g, '%20')}")`
+        : `url("${encodeURI(logoSrc)}")`
 
     if (sold) {
         const rawGrey = toGrey(background)
@@ -495,7 +515,12 @@ export default function PatchCell({ background: paletteBackground, stitch, logoS
             ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                    src={logoSrc}
+                    src={sized ? boardLogoSrc(logoSrc, logoPx) : logoSrc}
+                    // 2x candidate for high-DPI screens (the playground on a Retina Mac); OBS renders at 1x.
+                    // srcset splits on whitespace and team file names contain spaces. Escape only the
+                    // spaces: callers pass both raw and already-encoded paths, so encodeURI would
+                    // double-encode the latter.
+                    srcSet={sized ? `${boardLogoSrc(logoSrc, logoPx).replace(/ /g, '%20')} 1x, ${boardLogoSrc(logoSrc, logoPx * 2).replace(/ /g, '%20')} 2x` : undefined}
                     alt=""
                     style={{
                         position: 'absolute',
