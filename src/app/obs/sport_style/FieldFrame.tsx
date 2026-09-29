@@ -41,8 +41,11 @@ export const DEFAULT_FRAME: FrameSettings = {
     edgeWidth: 10,
     bannerWidth: 50,
     lineWidth: 3,
-    bodyColor: '#163a8c',
-    lineColor: '#7fb2ff',
+    // Same royal blue as the Stash-or-Pass animation's lane (StashOrPassQuarters.css --sopq-blue),
+    // so the edge reads as that lane at rest. The outline is a deep navy: a dark rim gives the
+    // luma step that keeps the edge crisp against a bright background after compression.
+    bodyColor: '#1f4fd8',
+    lineColor: '#0a1a4a',
     text: 'STASH OR PASS',
     textColor: '#ffffff',
     stars: true,

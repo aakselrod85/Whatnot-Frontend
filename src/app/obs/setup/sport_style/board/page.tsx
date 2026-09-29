@@ -33,7 +33,7 @@ import {wearParamsFor} from '@/app/obs/sport_style/wearRandom'
 import {DEFAULT_PATCH, PATCH_REFERENCE_SIZE} from '@/app/obs/sport_style/fieldConstants'
 import './page.css'
 
-const STORAGE_KEY = 'test-board-field-v10'
+const STORAGE_KEY = 'test-board-field-v11'
 
 const DEFAULTS = {
     boxW: 1080,
