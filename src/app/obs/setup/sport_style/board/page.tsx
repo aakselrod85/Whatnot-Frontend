@@ -33,13 +33,13 @@ import {wearParamsFor} from '@/app/obs/sport_style/wearRandom'
 import {DEFAULT_PATCH, PATCH_REFERENCE_SIZE} from '@/app/obs/sport_style/fieldConstants'
 import './page.css'
 
-const STORAGE_KEY = 'test-board-field-v9'
+const STORAGE_KEY = 'test-board-field-v10'
 
 const DEFAULTS = {
     boxW: 1080,
-    boxH: 440,
-    rows: 4,
-    cols: 10,
+    boxH: 480,
+    rows: 3,
+    cols: 11,
     edgeGap: 60,
     lineWFactor: 0.035,
     tickHFactor: 0.14,
@@ -54,8 +54,8 @@ const DEFAULTS = {
     showStrips: true,
     showTicks: true,
     seamTicks: true,
-    cornerWidth: 120,
-    cornerRoundness: 1,
+    cornerWidth: 0,
+    cornerRoundness: 0,
     borderWidth: 6,
     turfEnabled: true,
     turfDark: '#1e3a08',
