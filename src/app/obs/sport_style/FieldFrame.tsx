@@ -9,8 +9,11 @@
 // which is what shimmers after Whatnot's compression. The bright outline is chosen for LUMA
 // contrast against the dark body (colour-only edges blur away in 4:2:0 chroma subsampling).
 //
-// Painted UNDER the turf: the outer line and the body are two plain rounded rects larger than the
-// field, and the (opaque, field-clipped) turf covers their middle — so there's no ring path to
+// The band is [outer line][body][inner line], all opaque. Each line is capped at 30% of the body
+// width it borders, so it stays a thin rim rather than a second stripe.
+//
+// Painted UNDER the turf: the outer line, the body and the inner line are three plain rounded rects
+// larger than the field, and the (opaque, field-clipped) turf covers their middle — so there's no ring path to
 // build, and the width can animate with an ordinary CSS transition. All coordinates are whole px
 // in the same frame as `field` (fieldGeometry.ts's Rect).
 
@@ -25,7 +28,8 @@ export interface FrameSettings {
     edgeWidth: number
     /** Band thickness while expanded (the banner), px. */
     bannerWidth: number
-    /** Bright outline on the band's outer rim, px (0 = none). */
+    /** Line on BOTH rims of the band (outer and inner), px (0 = none) — capped at 30% of the
+     *  collapsed edge's blue body (see `rimWidth`). */
     lineWidth: number
     bodyColor: string
     lineColor: string
@@ -38,14 +42,13 @@ export interface FrameSettings {
 
 export const DEFAULT_FRAME: FrameSettings = {
     mode: 'edge',
-    edgeWidth: 10,
+    edgeWidth: 12,
     bannerWidth: 50,
-    lineWidth: 3,
+    lineWidth: 2,
     // Same royal blue as the Stash-or-Pass animation's lane (StashOrPassQuarters.css --sopq-blue),
-    // so the edge reads as that lane at rest. The outline is a deep navy: a dark rim gives the
-    // luma step that keeps the edge crisp against a bright background after compression.
+    // so the edge reads as that lane at rest, with an opaque white rim on both sides.
     bodyColor: '#1f4fd8',
-    lineColor: '#0a1a4a',
+    lineColor: '#ffffff',
     text: 'STASH OR PASS',
     textColor: '#ffffff',
     stars: true,
@@ -56,6 +59,13 @@ export const DEFAULT_FRAME: FrameSettings = {
  *  (the element's `margin` / the playground's margin knob) or the banner gets clipped. */
 export function frameReach(frame: FrameSettings): number {
     return frame.mode === 'none' ? 0 : Math.max(frame.edgeWidth, frame.bannerWidth)
+}
+
+/** Rim line width, px: `lineWidth`, capped so each line is at most 30% of the collapsed edge's
+ *  blue body (edge - 2*line). Fixed while expanding, so the rims don't change weight mid-animation. */
+export function rimWidth(frame: FrameSettings): number {
+    const max = Math.floor((0.3 * frame.edgeWidth) / 1.6)
+    return Math.max(0, Math.min(Math.round(frame.lineWidth), max))
 }
 
 type Props = {
@@ -80,7 +90,7 @@ function grown(field: Rect, rx: number, ry: number, by: number): CSSProperties {
 export function FieldFrameBand({field, rx, ry, frame, expanded}: Props) {
     if (frame.mode === 'none') return null
     const w = Math.round(expanded ? frame.bannerWidth : frame.edgeWidth)
-    const line = Math.max(0, Math.min(Math.round(frame.lineWidth), w))
+    const line = rimWidth(frame)
     const transition = `left ${frame.durationMs}ms, top ${frame.durationMs}ms, width ${frame.durationMs}ms, `
         + `height ${frame.durationMs}ms, border-radius ${frame.durationMs}ms`
     const base: CSSProperties = {position: 'absolute', boxSizing: 'border-box', transition, pointerEvents: 'none'}
@@ -88,6 +98,7 @@ export function FieldFrameBand({field, rx, ry, frame, expanded}: Props) {
         <>
             <div style={{...base, ...grown(field, rx, ry, w), background: frame.lineColor}} />
             <div style={{...base, ...grown(field, rx, ry, w - line), background: frame.bodyColor}} />
+            {line > 0 && <div style={{...base, ...grown(field, rx, ry, line), background: frame.lineColor}} />}
         </>
     )
 }
@@ -97,10 +108,10 @@ export function FieldFrameBand({field, rx, ry, frame, expanded}: Props) {
 export function FieldFrameText({field, frame, expanded}: Props) {
     if (frame.mode === 'none' || !frame.text) return null
     const w = frame.bannerWidth
-    const line = Math.min(frame.lineWidth, w)
-    // Centre of the band's body (inside the outline), whole px.
-    const mid = Math.round(line + (w - line) / 2)
-    const fontSize = Math.max(8, Math.round((w - line) * 0.5))
+    const line = rimWidth(frame)
+    // Centre of the band's body (between the two rims), whole px.
+    const mid = Math.round(w / 2)
+    const fontSize = Math.max(8, Math.round((w - 2 * line) * 0.5))
     const cx = Math.round(field.x + field.w / 2)
     const cy = Math.round(field.y + field.h / 2)
     const fade = Math.round(frame.durationMs * 0.5)

@@ -33,7 +33,7 @@ import {wearParamsFor} from '@/app/obs/sport_style/wearRandom'
 import {DEFAULT_PATCH, PATCH_REFERENCE_SIZE} from '@/app/obs/sport_style/fieldConstants'
 import './page.css'
 
-const STORAGE_KEY = 'test-board-field-v13'
+const STORAGE_KEY = 'test-board-field-v14'
 
 const DEFAULTS = {
     boxW: 1080,
@@ -58,7 +58,8 @@ const DEFAULTS = {
     // gets a concentric soft corner.
     cornerWidth: 12,
     cornerRoundness: 0.08,
-    borderWidth: 6,
+    // 0: the frame's own opaque white inner rim is the sideline now.
+    borderWidth: 0,
     turfEnabled: true,
     turfDark: '#1e3a08',
     turfLight: '#8fb457',
@@ -673,7 +674,7 @@ export default function Page() {
                                 <span style={{width: 30, textAlign: 'right'}}>{frame.bannerWidth}</span>
                             </div>
                             <div className="mb-2 d-flex align-items-center gap-2 small">
-                                <span style={{width: 140}}>Outline (px)</span>
+                                <span style={{width: 140}}>White rims (px)</span>
                                 <input type="range" className="form-range" min={0} max={8} step={1}
                                        value={frame.lineWidth} onChange={e => setFrameKey('lineWidth', parseInt(e.target.value))} />
                                 <span style={{width: 30, textAlign: 'right'}}>{frame.lineWidth}</span>
@@ -684,7 +685,7 @@ export default function Page() {
                                     <input type="color" className="form-control form-control-color form-control-sm" style={{width: 40}}
                                            value={frame.bodyColor} onChange={e => setFrameKey('bodyColor', e.target.value)} />
                                 </label>
-                                <label className="d-flex align-items-center gap-1">outline
+                                <label className="d-flex align-items-center gap-1">rims
                                     <input type="color" className="form-control form-control-color form-control-sm" style={{width: 40}}
                                            value={frame.lineColor} onChange={e => setFrameKey('lineColor', e.target.value)} />
                                 </label>
