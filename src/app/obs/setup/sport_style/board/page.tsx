@@ -33,29 +33,31 @@ import {wearParamsFor} from '@/app/obs/sport_style/wearRandom'
 import {DEFAULT_PATCH, PATCH_REFERENCE_SIZE} from '@/app/obs/sport_style/fieldConstants'
 import './page.css'
 
-const STORAGE_KEY = 'test-board-field-v11'
+const STORAGE_KEY = 'test-board-field-v13'
 
 const DEFAULTS = {
     boxW: 1080,
-    boxH: 480,
+    boxH: 410,
     rows: 3,
     cols: 11,
-    edgeGap: 60,
+    edgeGap: 16,
     lineWFactor: 0.035,
     tickHFactor: 0.14,
     seamTickHFactor: 0.14,
     sameAsLine: true,
     tickWOverride: 4,
     ticksPerColumn: 4,
-    ticksAreaHeight: 36,
+    ticksAreaHeight: 16,
     turfMargin: 0,
     opacity: 0.85,
     soldCount: 6,
     showStrips: true,
     showTicks: true,
     seamTicks: true,
-    cornerWidth: 0,
-    cornerRoundness: 0,
+    // A slight rounding (~12px) on the field; the frame's layers grow from it, so every edge
+    // gets a concentric soft corner.
+    cornerWidth: 12,
+    cornerRoundness: 0.08,
     borderWidth: 6,
     turfEnabled: true,
     turfDark: '#1e3a08',
