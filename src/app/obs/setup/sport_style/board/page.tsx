@@ -24,6 +24,7 @@ import {useEffect, useMemo, useRef, useState, type ChangeEvent} from 'react'
 import {Teams, TeamIconSrc} from '@/app/common/teams'
 import {fieldGeometry, type FieldInput} from '@/app/obs/sport_style/fieldGeometry'
 import {renderTurf, type TurfParams} from '@/app/obs/sport_style/turfTexture'
+import {DEFAULT_FRAME, FieldFrameBand, FieldFrameText, frameReach, type FrameSettings} from '@/app/obs/sport_style/FieldFrame'
 import PatchCell from '@/app/obs/sport_style/PatchCell'
 import {mix, resolveStitch, type RGB} from '@/app/obs/sport_style/patchColors'
 import {hasLogo, useTeamPalette} from '@/app/obs/sport_style/teamPalette'
@@ -53,10 +54,12 @@ const DEFAULTS = {
     showStrips: true,
     showTicks: true,
     seamTicks: true,
-    // A slight rounding (~12px) on the field.
+    // A slight rounding (~12px) on the field; the frame's layers grow from it, so every edge
+    // gets a concentric soft corner.
     cornerWidth: 12,
     cornerRoundness: 0.08,
-    borderWidth: 6,
+    // 0: the frame's own opaque white inner rim is the sideline now.
+    borderWidth: 0,
     turfEnabled: true,
     turfDark: '#1e3a08',
     turfLight: '#8fb457',
@@ -74,7 +77,10 @@ const DEFAULTS = {
     turfSpotStrength: 0.18,
     turfSpotLightRatio: 0.6,
     // Transparent band between the preview box and the painted field — the element's `margin`.
+    // The frame below grows into it, so it needs at least `frameReach()`.
     margin: 60,
+    frame: DEFAULT_FRAME,
+    frameExpanded: false,
     cellsMode: 'patch' as 'patch' | 'mock',
     backdrop: 'busy' as Backdrop,
 }
@@ -211,8 +217,12 @@ export default function Page() {
     const [turfSpotLightRatio, setTurfSpotLightRatio] = useState<number>(() => saved.turfSpotLightRatio ?? DEFAULTS.turfSpotLightRatio)
 
     const [margin, setMargin] = useState<number>(() => saved.margin ?? DEFAULTS.margin)
+    const [frame, setFrame] = useState<FrameSettings>(() => ({...DEFAULT_FRAME, ...(saved.frame ?? {})}))
+    const [frameExpanded, setFrameExpanded] = useState<boolean>(() => saved.frameExpanded ?? DEFAULTS.frameExpanded)
     const [cellsMode, setCellsMode] = useState<'patch' | 'mock'>(() => saved.cellsMode ?? DEFAULTS.cellsMode)
     const [backdrop, setBackdrop] = useState<Backdrop>(() => saved.backdrop ?? DEFAULTS.backdrop)
+    const setFrameKey = <K extends keyof FrameSettings>(key: K, value: FrameSettings[K]) =>
+        setFrame(f => ({...f, [key]: value}))
 
     // Seed is deliberately NOT persisted/loaded from `saved` — the spec wants a fresh random seed
     // on every (re)generation, only ever surfaced in the read-out so a liked look can be quoted.
@@ -234,7 +244,7 @@ export default function Page() {
                 turfEnabled, turfDark, turfLight, turfBaseLum, turfStripeStrength, turfStripePeriod, turfPatchScale,
                 turfPatchContrast, turfOctaves, turfAnisotropy, turfGrainStrength,
                 turfSpotCount, turfSpotRadiusMin, turfSpotRadiusMax, turfSpotStrength, turfSpotLightRatio,
-                margin, cellsMode, backdrop,
+                margin, frame, frameExpanded, cellsMode, backdrop,
             }))
         } catch {
             // ignore storage errors
@@ -243,7 +253,7 @@ export default function Page() {
         cornerWidth, cornerRoundness, borderWidth,
         turfEnabled, turfDark, turfLight, turfBaseLum, turfStripeStrength, turfStripePeriod, turfPatchScale, turfPatchContrast, turfOctaves, turfAnisotropy, turfGrainStrength,
         turfSpotCount, turfSpotRadiusMin, turfSpotRadiusMax, turfSpotStrength, turfSpotLightRatio,
-        margin, cellsMode, backdrop])
+        margin, frame, frameExpanded, cellsMode, backdrop])
 
     // Seed regenerates automatically whenever a turf knob OR the geometry (box size, rows, cols,
     // edge gap) changes — but not on the very first render, which already picked a random seed
@@ -298,7 +308,11 @@ export default function Page() {
         spotStrength: turfSpotStrength,
         spotLightRatio: turfSpotLightRatio,
         seed,
-    }), [turfEnabled, edgeGap, ticksAreaHeight, turfMargin, tickHFactor, seamTickHFactor, seamTicks, cornerWidth, cornerRoundness, borderWidth, turfDark, turfLight, turfBaseLum, turfStripeStrength, turfStripePeriod, turfPatchScale,
+        // Board-level, not turf: the element's `margin` and `frame` fields. Exported here so the
+        // frame knobs show up in (and can be pasted back through) the same JSON box.
+        margin,
+        frame,
+    }), [margin, frame, turfEnabled, edgeGap, ticksAreaHeight, turfMargin, tickHFactor, seamTickHFactor, seamTicks, cornerWidth, cornerRoundness, borderWidth, turfDark, turfLight, turfBaseLum, turfStripeStrength, turfStripePeriod, turfPatchScale,
         turfPatchContrast, turfOctaves, turfAnisotropy, turfGrainStrength, turfSpotCount, turfSpotRadiusMin,
         turfSpotRadiusMax, turfSpotStrength, turfSpotLightRatio, seed])
 
@@ -390,6 +404,32 @@ export default function Page() {
         const nextSpotRadiusMax = num('spotRadiusMax', 0.2, 4, turfSpotRadiusMax)
         const nextSpotStrength = num('spotStrength', 0, 0.6, turfSpotStrength)
         const nextSpotLightRatio = num('spotLightRatio', 0, 1, turfSpotLightRatio)
+        const rawFrame = obj['frame']
+        let nextFrame = frame
+        if (typeof rawFrame === 'object' && rawFrame !== null && !Array.isArray(rawFrame)) {
+            const f = rawFrame as Record<string, unknown>
+            const fnum = (key: keyof FrameSettings, min: number, max: number): number => {
+                const v = f[key]
+                return typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(max, Math.max(min, v))) : (frame[key] as number)
+            }
+            const fcolor = (key: keyof FrameSettings): string => {
+                const v = f[key]
+                return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : (frame[key] as string)
+            }
+            nextFrame = {
+                mode: f.mode === 'none' || f.mode === 'edge' ? f.mode : frame.mode,
+                edgeWidth: fnum('edgeWidth', 2, 30),
+                bannerWidth: fnum('bannerWidth', 20, 100),
+                lineWidth: fnum('lineWidth', 0, 8),
+                bodyColor: fcolor('bodyColor'),
+                lineColor: fcolor('lineColor'),
+                text: typeof f.text === 'string' ? f.text : frame.text,
+                textColor: fcolor('textColor'),
+                stars: typeof f.stars === 'boolean' ? f.stars : frame.stars,
+                durationMs: fnum('durationMs', 0, 1500),
+            }
+        }
+        const nextMargin = Math.round(num('margin', 0, 120, margin))
         const rawSeed = obj['seed']
         const nextSeed = typeof rawSeed === 'number' && Number.isFinite(rawSeed) ? Math.floor(rawSeed) : seed
 
@@ -423,6 +463,8 @@ export default function Page() {
         setTurfSpotStrength(nextSpotStrength)
         setTurfSpotLightRatio(nextSpotLightRatio)
         setSeed(nextSeed)
+        setFrame(nextFrame)
+        setMargin(nextMargin)
 
         setSettingsText(JSON.stringify({
             enabled: nextEnabled, edgeGap: nextEdgeGap, ticksAreaHeight: nextTicksAreaHeight, turfMargin: nextTurfMargin, tickHFactor: nextTickHFactor,
@@ -435,6 +477,8 @@ export default function Page() {
             grainStrength: nextGrainStrength, spotCount: nextSpotCount, spotRadiusMin: nextSpotRadiusMin,
             spotRadiusMax: nextSpotRadiusMax, spotStrength: nextSpotStrength, spotLightRatio: nextSpotLightRatio,
             seed: nextSeed,
+            margin: nextMargin,
+            frame: nextFrame,
         }, null, 2))
         setEdited(false)
         setFocused(false)
@@ -497,6 +541,8 @@ export default function Page() {
         setTurfSpotStrength(DEFAULTS.turfSpotStrength)
         setTurfSpotLightRatio(DEFAULTS.turfSpotLightRatio)
         setMargin(DEFAULTS.margin)
+        setFrame(DEFAULT_FRAME)
+        setFrameExpanded(DEFAULTS.frameExpanded)
         setCellsMode(DEFAULTS.cellsMode)
         setBackdrop(DEFAULTS.backdrop)
     }
@@ -612,7 +658,7 @@ export default function Page() {
                         ))}
                     </div>
 
-                    <h6>Stream look</h6>
+                    <h6>Frame &amp; stream look</h6>
                     <div className="mb-2 d-flex align-items-center gap-2 small flex-wrap">
                         <span style={{width: 140}}>Backdrop</span>
                         <div className="btn-group btn-group-sm" role="group">
@@ -633,11 +679,84 @@ export default function Page() {
                         </div>
                     </div>
                     <div className="mb-2 d-flex align-items-center gap-2 small">
+                        <span style={{width: 140}}>Frame</span>
+                        <div className="btn-group btn-group-sm" role="group">
+                            <button type="button" className={`btn btn-outline-secondary${frame.mode === 'edge' ? ' active' : ''}`}
+                                    onClick={() => setFrameKey('mode', 'edge')}>Blue edge</button>
+                            <button type="button" className={`btn btn-outline-secondary${frame.mode === 'none' ? ' active' : ''}`}
+                                    onClick={() => setFrameKey('mode', 'none')}>None</button>
+                        </div>
+                        <button type="button"
+                                className={`btn btn-sm ${frameExpanded ? 'btn-primary' : 'btn-outline-primary'}`}
+                                disabled={frame.mode === 'none'}
+                                onClick={() => setFrameExpanded(v => !v)}>
+                            Stash or Pass {frameExpanded ? 'ON' : 'OFF'}
+                        </button>
+                    </div>
+                    {frame.mode !== 'none' && (
+                        <>
+                            <div className="mb-2 d-flex align-items-center gap-2 small">
+                                <span style={{width: 140}}>Edge width (px)</span>
+                                <input type="range" className="form-range" min={2} max={30} step={1}
+                                       value={frame.edgeWidth} onChange={e => setFrameKey('edgeWidth', parseInt(e.target.value))} />
+                                <span style={{width: 30, textAlign: 'right'}}>{frame.edgeWidth}</span>
+                            </div>
+                            <div className="mb-2 d-flex align-items-center gap-2 small">
+                                <span style={{width: 140}}>Banner width (px)</span>
+                                <input type="range" className="form-range" min={20} max={100} step={1}
+                                       value={frame.bannerWidth} onChange={e => setFrameKey('bannerWidth', parseInt(e.target.value))} />
+                                <span style={{width: 30, textAlign: 'right'}}>{frame.bannerWidth}</span>
+                            </div>
+                            <div className="mb-2 d-flex align-items-center gap-2 small">
+                                <span style={{width: 140}}>White rims (px)</span>
+                                <input type="range" className="form-range" min={0} max={8} step={1}
+                                       value={frame.lineWidth} onChange={e => setFrameKey('lineWidth', parseInt(e.target.value))} />
+                                <span style={{width: 30, textAlign: 'right'}}>{frame.lineWidth}</span>
+                            </div>
+                            <div className="mb-2 d-flex align-items-center gap-2 small flex-wrap">
+                                <span style={{width: 140}}>Colours</span>
+                                <label className="d-flex align-items-center gap-1">body
+                                    <input type="color" className="form-control form-control-color form-control-sm" style={{width: 40}}
+                                           value={frame.bodyColor} onChange={e => setFrameKey('bodyColor', e.target.value)} />
+                                </label>
+                                <label className="d-flex align-items-center gap-1">rims
+                                    <input type="color" className="form-control form-control-color form-control-sm" style={{width: 40}}
+                                           value={frame.lineColor} onChange={e => setFrameKey('lineColor', e.target.value)} />
+                                </label>
+                                <label className="d-flex align-items-center gap-1">text
+                                    <input type="color" className="form-control form-control-color form-control-sm" style={{width: 40}}
+                                           value={frame.textColor} onChange={e => setFrameKey('textColor', e.target.value)} />
+                                </label>
+                            </div>
+                            <div className="mb-2 d-flex align-items-center gap-2 small">
+                                <span style={{width: 140}}>Banner text</span>
+                                <input type="text" className="form-control form-control-sm"
+                                       value={frame.text} onChange={e => setFrameKey('text', e.target.value)} />
+                                <div className="form-check">
+                                    <input className="form-check-input" type="checkbox" id="frameStars" checked={frame.stars}
+                                           onChange={e => setFrameKey('stars', e.target.checked)} />
+                                    <label className="form-check-label" htmlFor="frameStars">★</label>
+                                </div>
+                            </div>
+                            <div className="mb-2 d-flex align-items-center gap-2 small">
+                                <span style={{width: 140}}>Expand time (ms)</span>
+                                <input type="range" className="form-range" min={0} max={1500} step={50}
+                                       value={frame.durationMs} onChange={e => setFrameKey('durationMs', parseInt(e.target.value))} />
+                                <span style={{width: 40, textAlign: 'right'}}>{frame.durationMs}</span>
+                            </div>
+                        </>
+                    )}
+                    <div className="mb-2 d-flex align-items-center gap-2 small">
                         <span style={{width: 140}}>Margin (px)</span>
                         <input type="range" className="form-range" min={0} max={120} step={1}
                                value={margin} onChange={e => setMargin(parseInt(e.target.value))} />
                         <span style={{width: 30, textAlign: 'right'}}>{margin}</span>
                     </div>
+                    {margin < frameReach(frame) && (
+                        <div className="small text-warning mb-2">
+                            Margin {margin}px &lt; banner {frameReach(frame)}px — the expanded banner will be cut off.
+                        </div>
+                    )}
                     <div className="mb-3">
                         <button className="btn btn-sm btn-outline-success" onClick={applyStreamSafeTurf}>
                             Stream-safe turf (no grain/patches/spots)
@@ -886,7 +1005,7 @@ export default function Page() {
                     </div>
 
                     <div className="field-settings">
-                        <label className="small d-block mb-1" htmlFor="turfSettingsTextarea">Turf recipe (JSON)</label>
+                        <label className="small d-block mb-1" htmlFor="turfSettingsTextarea">Board recipe (JSON: turf + margin + frame)</label>
                         <textarea
                             id="turfSettingsTextarea"
                             className="form-control form-control-sm font-monospace field-settings__textarea"
@@ -910,6 +1029,9 @@ export default function Page() {
                     <div className={`field-preview field-preview--${backdrop}`} style={{width: boxW, height: boxH}}>
                       {/* Everything painted lives in the inner box, inset by `margin` (the element's own model). */}
                       <div className="field-inner" style={{left: margin, top: margin, width: innerW, height: innerH}}>
+                        {/* Layer 0 — frame band (outline + body), under the turf. */}
+                        <FieldFrameBand field={geometry.field} rx={fieldRx} ry={fieldRy} frame={frame} expanded={frameExpanded} />
+
                         {/* Layer 1 — clip group A: turf canvas only, clipped to the oval field. */}
                         <div className="field-clip-turf" style={{clipPath: fieldClip, WebkitClipPath: fieldClip}}>
                             <canvas ref={canvasRef} className="field-turf-canvas" width={innerW} height={innerH} />
@@ -983,6 +1105,9 @@ export default function Page() {
                                 borderRadius: `${fieldRx}px / ${fieldRy}px`,
                             }} />
                         )}
+
+                        {/* Layer 5 — banner text on the frame band, above everything. */}
+                        <FieldFrameText field={geometry.field} rx={fieldRx} ry={fieldRy} frame={frame} expanded={frameExpanded} />
 
                         {/* Debug aid (mock cells only) — un-rounded field bounds, never clipped to the oval. */}
                         {cellsMode === 'mock' && (
