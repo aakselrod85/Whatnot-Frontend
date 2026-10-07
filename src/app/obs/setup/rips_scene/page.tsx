@@ -22,7 +22,9 @@ import {
     type Podium,
     type RipsSceneRecipe,
     type SkyCloud,
-    type Sprite,
+    type VideoSprite,
+    VIDEO_SPEED_MAX,
+    VIDEO_SPEED_MIN,
 } from '@/app/obs/rips_scene/recipe'
 import './page.css'
 
@@ -187,7 +189,7 @@ export default function Page() {
     const addGlow = () => setRecipe((r) => ({...r, glows: [...r.glows, {...DEFAULT_GLOW}]}))
     const removeGlow = (i: number) => setRecipe((r) => ({...r, glows: r.glows.filter((_, j) => j !== i)}))
     const setPodium = (patch: Partial<Podium>) => setRecipe((r) => ({...r, podium: {...r.podium, ...patch}}))
-    const setSprite = (key: 'pedestal' | 'flag' | 'vase', patch: Partial<Sprite>) =>
+    const setSprite = (key: 'pedestal' | 'flag' | 'fire' | 'vase', patch: Partial<VideoSprite>) =>
         setRecipe((r) => ({...r, podium: {...r.podium, [key]: {...r.podium[key], ...patch}}}))
     const setPrev = (patch: Partial<Preview>) => setPreview((p) => ({...p, ...patch}))
 
@@ -243,7 +245,7 @@ export default function Page() {
         )
     }
 
-    function spriteSection(key: 'pedestal' | 'flag' | 'vase', title: string) {
+    function spriteSection(key: 'pedestal' | 'flag' | 'fire' | 'vase', title: string) {
         const sp = recipe.podium[key]
         return (
             <Section title={title}>
@@ -252,6 +254,16 @@ export default function Page() {
                 <Num label="Y (from anchor, up is negative)" value={sp.y} min={-2000} max={2000} step={1} onChange={(v) => setSprite(key, {y: v})}/>
                 <Num label="Width" value={sp.width} min={10} max={2000} step={1} onChange={(v) => setSprite(key, {width: v})}/>
                 <Num label="Rotation °" value={sp.rotation} min={-180} max={180} step={0.5} onChange={(v) => setSprite(key, {rotation: v})}/>
+                {key === 'fire' && (
+                    <Num
+                        label="Speed ×"
+                        value={recipe.podium.fire.speed}
+                        min={VIDEO_SPEED_MIN}
+                        max={VIDEO_SPEED_MAX}
+                        step={0.05}
+                        onChange={(v) => setSprite('fire', {speed: v})}
+                    />
+                )}
             </Section>
         )
     }
@@ -324,6 +336,7 @@ export default function Page() {
                     </Section>
                     {spriteSection('pedestal', 'Podium: pedestal')}
                     {spriteSection('flag', 'Podium: flag')}
+                    {spriteSection('fire', 'Podium: fire (video, behind the vase)')}
                     {spriteSection('vase', 'Podium: vase')}
 
                     <Section title="Glows">

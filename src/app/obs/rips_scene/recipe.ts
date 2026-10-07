@@ -66,9 +66,16 @@ export type GlowMode = (typeof GLOW_MODES)[number]
 export type Glow = { x: number; y: number; radius: number; strength: number; color: string; depth: GlowDepth; mode: GlowMode }
 
 // One podium prop. x/y place the sprite's BOTTOM-LEFT corner relative to the podium's anchor, in
-// stage px (so y is usually negative: up from the anchor). Height follows the image aspect;
+// stage px (so y is usually negative: up from the anchor). Height follows the image (or video) aspect;
 // rotation is degrees clockwise about the sprite's centre.
 export type Sprite = { enabled: boolean; x: number; y: number; width: number; rotation: number }
+
+// The fire video: a sprite plus `speed`, its playback rate (1 = as recorded, 2 = twice as fast).
+export type VideoSprite = Sprite & { speed: number }
+
+// Playback rates browsers reliably accept; anything outside is clamped by the renderer.
+export const VIDEO_SPEED_MIN = 0.1
+export const VIDEO_SPEED_MAX = 4
 
 // The podium: pedestal + flag + vase as ONE composition, painted in front of every other layer.
 // `x`/`y` is the anchor (the composition's origin) on the stage; the sprites are placed relative to
@@ -81,8 +88,9 @@ export type Podium = {
     y: number
     scale: number
     mirror: boolean
-    pedestal: Sprite // paint order inside the group: pedestal, flag, vase
+    pedestal: Sprite // paint order inside the group: pedestal, flag, fire, vase
     flag: Sprite
+    fire: VideoSprite // looping video (assets.ts's RIPS_VIDEOS.fire), just behind the vase
     vase: Sprite
 }
 
@@ -126,6 +134,8 @@ export const DEFAULT_RIPS_RECIPE: RipsSceneRecipe = {
         enabled: false, x: 60, y: 640, scale: 1, mirror: true,
         pedestal: { enabled: true, x: 0, y: 0, width: 512, rotation: 0 },
         flag: { enabled: true, x: 276, y: -248, width: 200, rotation: 0 },
+        // Rough first fit: centred over the vase, its bottom sunk into the vase's mouth.
+        fire: { enabled: true, x: -15, y: -380, width: 300, rotation: 0, speed: 1 },
         vase: { enabled: true, x: 30, y: -246, width: 211, rotation: 0 },
     },
 }
@@ -169,6 +179,7 @@ function mergePodium(base: Podium, raw: unknown): Podium {
         ...top,
         pedestal: mergeFields(base.pedestal, r.pedestal),
         flag: mergeFields(base.flag, r.flag),
+        fire: mergeFields(base.fire, r.fire),
         vase: mergeFields(base.vase, r.vase),
     }
 }

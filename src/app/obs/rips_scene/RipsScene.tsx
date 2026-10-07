@@ -11,11 +11,11 @@
 // in front of is enabled (plan §4). React state in here: the middle cloud's per-copy section counter
 // (`MiddleCloudLayer`) and the sky clouds' opaque-pixel masks (`useOpaqueMask`).
 
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import type {CSSProperties} from 'react'
-import {MIDDLE_CLOUD_ARC_CENTRE, RIPS_ASSETS, SKY_CLOUD_ASSETS, type RipsAsset} from './assets'
-import {middlePivot} from './recipe'
-import type {FrontCloud, Glow, GlowDepth, GlowMode, MiddleCloud, Podium, RipsSceneRecipe, SkyCloud, Sprite} from './recipe'
+import {MIDDLE_CLOUD_ARC_CENTRE, RIPS_ASSETS, RIPS_VIDEOS, SKY_CLOUD_ASSETS, type RipsAsset} from './assets'
+import {VIDEO_SPEED_MAX, VIDEO_SPEED_MIN, middlePivot} from './recipe'
+import type {FrontCloud, Glow, GlowDepth, GlowMode, MiddleCloud, Podium, RipsSceneRecipe, SkyCloud, Sprite, VideoSprite} from './recipe'
 import './RipsScene.css'
 
 const STAGE_W = 1080
@@ -478,30 +478,55 @@ function FrontStrip({cfg, w, s, z, timeScale}: FrontStripProps) {
     )
 }
 
-/** One podium prop inside the group's local frame: its bottom-left corner at (x, y) local px,
- *  turned about its own centre. The group's scale is applied by the parent transform. */
+/** Placement of a podium prop inside the group's local frame: its bottom-left corner at (x, y)
+ *  local px, turned about its own centre. The group's scale is applied by the parent transform. */
+function spriteStyle(sp: Sprite, asset: RipsAsset, s: number): CSSProperties {
+    const h = (sp.width * asset.h) / asset.w
+    return {
+        left: sp.x * s,
+        top: (sp.y - h) * s,
+        width: sp.width * s,
+        height: h * s,
+        transform: sp.rotation ? `rotate(${sp.rotation}deg)` : undefined,
+    }
+}
+
 function PodiumSprite({sp, asset, s}: {sp: Sprite; asset: RipsAsset; s: number}) {
     if (!sp.enabled) return null
-    const h = (sp.width * asset.h) / asset.w
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="rps-img" src={asset.src} alt="" draggable={false} style={spriteStyle(sp, asset, s)}/>
+}
+
+/** A podium prop drawn as a muted, looping, autoplaying video. `playbackRate` is not an HTML
+ *  attribute, so it is set on the element after mount and again whenever `speed` changes. */
+function PodiumVideo({sp, asset, s}: {sp: VideoSprite; asset: RipsAsset; s: number}) {
+    const ref = useRef<HTMLVideoElement>(null)
+    const rate = Number.isFinite(sp.speed) ? Math.max(VIDEO_SPEED_MIN, Math.min(VIDEO_SPEED_MAX, sp.speed)) : 1
+    useEffect(() => {
+        if (ref.current) ref.current.playbackRate = rate
+    }, [rate, sp.enabled])
+    if (!sp.enabled) return null
     return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <video
+            ref={ref}
             className="rps-img"
             src={asset.src}
-            alt=""
-            draggable={false}
-            style={{
-                left: sp.x * s,
-                top: (sp.y - h) * s,
-                width: sp.width * s,
-                transform: sp.rotation ? `rotate(${sp.rotation}deg)` : undefined,
+            style={spriteStyle(sp, asset, s)}
+            autoPlay
+            loop
+            muted
+            playsInline
+            disablePictureInPicture
+            // A new source resets playbackRate to 1 once its metadata loads; set it again then.
+            onLoadedMetadata={(e) => {
+                e.currentTarget.playbackRate = rate
             }}
         />
     )
 }
 
 /** The podium composition (recipe.ts's `Podium`): a zero-size anchor at (x, y) on the stage, scaled
- *  about that point, holding the three sprites in paint order. `mirrored` draws the SAME object
+ *  about that point, holding the sprites in paint order (pedestal, flag, fire, vase). `mirrored` draws the SAME object
  *  reflected across the stage's vertical centre line — the anchor moves to 1080 - x and the group
  *  is flipped horizontally about it — so the copy has nothing of its own to fall out of sync. */
 function PodiumGroup({podium, s, mirrored}: {podium: Podium; s: number; mirrored: boolean}) {
@@ -514,6 +539,7 @@ function PodiumGroup({podium, s, mirrored}: {podium: Podium; s: number; mirrored
         >
             <PodiumSprite sp={podium.pedestal} asset={RIPS_ASSETS.pedestal} s={s}/>
             <PodiumSprite sp={podium.flag} asset={RIPS_ASSETS.flag} s={s}/>
+            <PodiumVideo sp={podium.fire} asset={RIPS_VIDEOS.fire} s={s}/>
             <PodiumSprite sp={podium.vase} asset={RIPS_ASSETS.vase} s={s}/>
         </div>
     )

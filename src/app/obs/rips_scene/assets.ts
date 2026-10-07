@@ -35,5 +35,12 @@ export const SKY_CLOUD_ASSETS: RipsAsset[] = [
     RIPS_ASSETS.skyCloudLayer1,
 ]
 
+// Videos are kept out of RIPS_ASSETS on purpose: the layout page preloads every `preload` URL that
+// is not a font through an Image(), which cannot decode a video. FireInTheVase is VP9 with an alpha
+// channel, so its background stays transparent.
+export const RIPS_VIDEOS = {
+    fire: { src: '/videos/rips_scene/FireInTheVase.webm', w: 1348, h: 827 },
+} satisfies Record<string, RipsAsset>
+
 // registry.ts's `preload` list for the `ripsScene` entry.
 export const RIPS_SCENE_PRELOAD: string[] = Object.values(RIPS_ASSETS).map((a) => a.src)
