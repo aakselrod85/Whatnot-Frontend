@@ -65,6 +65,35 @@ export type GlowMode = (typeof GLOW_MODES)[number]
 // x/y = centre; strength 0..1; color "#rrggbb"
 export type Glow = { x: number; y: number; radius: number; strength: number; color: string; depth: GlowDepth; mode: GlowMode }
 
+// One podium prop. x/y place the sprite's BOTTOM-LEFT corner relative to the podium's anchor, in
+// stage px (so y is usually negative: up from the anchor). Height follows the image (or video) aspect;
+// rotation is degrees clockwise about the sprite's centre.
+export type Sprite = { enabled: boolean; x: number; y: number; width: number; rotation: number }
+
+// The fire video: a sprite plus `speed`, its playback rate (1 = as recorded, 2 = twice as fast).
+export type VideoSprite = Sprite & { speed: number }
+
+// Playback rates browsers reliably accept; anything outside is clamped by the renderer.
+export const VIDEO_SPEED_MIN = 0.1
+export const VIDEO_SPEED_MAX = 4
+
+// The podium: pedestal + flag + vase as ONE composition, painted in front of every other layer.
+// `x`/`y` is the anchor (the composition's origin) on the stage; the sprites are placed relative to
+// it and `scale` grows the whole group about it. `mirror` draws a second copy reflected across the
+// stage's vertical centre line (anchor at 1080 - x, same y, flipped horizontally). The copy keeps NO
+// values of its own — it is the same object drawn again — so it can never drift from the original.
+export type Podium = {
+    enabled: boolean
+    x: number
+    y: number
+    scale: number
+    mirror: boolean
+    pedestal: Sprite // paint order inside the group: pedestal, flag, fire, vase
+    flag: Sprite
+    fire: VideoSprite // looping video (assets.ts's RIPS_VIDEOS.fire), just behind the vase
+    vase: Sprite
+}
+
 export type RipsSceneRecipe = {
     background: { enabled: boolean }
     skyClouds: SkyCloud[] // always exactly 4, index = paint order (0 is furthest back)
@@ -73,6 +102,7 @@ export type RipsSceneRecipe = {
     frontBack: FrontCloud // painted behind frontFront
     frontFront: FrontCloud
     glows: Glow[] // any length, including 0
+    podium: Podium
 }
 
 // The rotating layers' numbers are rough estimates from the art, tuned by eye on the setup page
@@ -96,6 +126,18 @@ export const DEFAULT_RIPS_RECIPE: RipsSceneRecipe = {
     frontBack: { enabled: true, width: 1080, y: 430, speed: 20, overlap: 36, offset: 540 },
     frontFront: { enabled: true, width: 1080, y: 470, speed: 28, overlap: 36, offset: 0 },
     glows: [],
+    // Off by default so streams whose recipe predates the podium do not grow one until it is tuned.
+    // Sprite widths are the art's native widths (assets.ts), so scale 1 shows every image at its
+    // original size. The offsets are a rough first fit from the art (the bracket sits ~680 px up the
+    // pedestal, the left step ~250 px up), to be tuned on the setup page.
+    podium: {
+        enabled: false, x: 60, y: 640, scale: 1, mirror: true,
+        pedestal: { enabled: true, x: 0, y: 0, width: 512, rotation: 0 },
+        flag: { enabled: true, x: 276, y: -248, width: 200, rotation: 0 },
+        // Rough first fit: centred over the vase, its bottom sunk into the vase's mouth.
+        fire: { enabled: true, x: -15, y: -380, width: 300, rotation: 0, speed: 1 },
+        vase: { enabled: true, x: 30, y: -246, width: 211, rotation: 0 },
+    },
 }
 
 export const DEFAULT_GLOW: Glow = { x: 540, y: 0, radius: 300, strength: 0.6, color: '#ff5a2a', depth: 'frontFront', mode: 'add' }
@@ -130,6 +172,18 @@ function mergeGlow(raw: unknown): Glow {
     return {...glow, color, depth, mode}
 }
 
+function mergePodium(base: Podium, raw: unknown): Podium {
+    const top = mergeFields(base, raw)
+    const r = isPlainObject(raw) ? raw : {}
+    return {
+        ...top,
+        pedestal: mergeFields(base.pedestal, r.pedestal),
+        flag: mergeFields(base.flag, r.flag),
+        fire: mergeFields(base.fire, r.fire),
+        vase: mergeFields(base.vase, r.vase),
+    }
+}
+
 /** The middle cloud's pivot in stage px, before `tilt`: the art's own arc centre when `autoPivot`
  *  is on, the stored pivotX/pivotY otherwise. Takes the arc centre and image width as arguments so
  *  this file stays free of asset imports. */
@@ -154,5 +208,6 @@ export function mergeRecipe(raw: unknown): RipsSceneRecipe {
         frontBack: mergeFields(d.frontBack, raw.frontBack),
         frontFront: mergeFields(d.frontFront, raw.frontFront),
         glows: Array.isArray(raw.glows) ? raw.glows.filter(isPlainObject).map(mergeGlow) : [],
+        podium: mergePodium(d.podium, raw.podium),
     }
 }

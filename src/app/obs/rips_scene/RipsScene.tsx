@@ -11,11 +11,11 @@
 // in front of is enabled (plan §4). React state in here: the middle cloud's per-copy section counter
 // (`MiddleCloudLayer`) and the sky clouds' opaque-pixel masks (`useOpaqueMask`).
 
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import type {CSSProperties} from 'react'
-import {MIDDLE_CLOUD_ARC_CENTRE, RIPS_ASSETS, SKY_CLOUD_ASSETS, type RipsAsset} from './assets'
-import {middlePivot} from './recipe'
-import type {FrontCloud, Glow, GlowDepth, GlowMode, MiddleCloud, RipsSceneRecipe, SkyCloud} from './recipe'
+import {MIDDLE_CLOUD_ARC_CENTRE, RIPS_ASSETS, RIPS_VIDEOS, SKY_CLOUD_ASSETS, type RipsAsset} from './assets'
+import {VIDEO_SPEED_MAX, VIDEO_SPEED_MIN, middlePivot} from './recipe'
+import type {FrontCloud, Glow, GlowDepth, GlowMode, MiddleCloud, Podium, RipsSceneRecipe, SkyCloud, Sprite, VideoSprite} from './recipe'
 import './RipsScene.css'
 
 const STAGE_W = 1080
@@ -26,6 +26,7 @@ const Z_MIDDLE = 20
 const Z_MOUNTAIN = 30
 const Z_FRONT_BACK = 40
 const Z_FRONT_FRONT = 50
+const Z_PODIUM = 60 // in front of every layer and every glow
 const Z_MARKS = 100
 
 // Glow sits at its layer's z + 5, so it paints directly in front of that layer.
@@ -477,6 +478,73 @@ function FrontStrip({cfg, w, s, z, timeScale}: FrontStripProps) {
     )
 }
 
+/** Placement of a podium prop inside the group's local frame: its bottom-left corner at (x, y)
+ *  local px, turned about its own centre. The group's scale is applied by the parent transform. */
+function spriteStyle(sp: Sprite, asset: RipsAsset, s: number): CSSProperties {
+    const h = (sp.width * asset.h) / asset.w
+    return {
+        left: sp.x * s,
+        top: (sp.y - h) * s,
+        width: sp.width * s,
+        height: h * s,
+        transform: sp.rotation ? `rotate(${sp.rotation}deg)` : undefined,
+    }
+}
+
+function PodiumSprite({sp, asset, s}: {sp: Sprite; asset: RipsAsset; s: number}) {
+    if (!sp.enabled) return null
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="rps-img" src={asset.src} alt="" draggable={false} style={spriteStyle(sp, asset, s)}/>
+}
+
+/** A podium prop drawn as a muted, looping, autoplaying video. `playbackRate` is not an HTML
+ *  attribute, so it is set on the element after mount and again whenever `speed` changes. */
+function PodiumVideo({sp, asset, s}: {sp: VideoSprite; asset: RipsAsset; s: number}) {
+    const ref = useRef<HTMLVideoElement>(null)
+    const rate = Number.isFinite(sp.speed) ? Math.max(VIDEO_SPEED_MIN, Math.min(VIDEO_SPEED_MAX, sp.speed)) : 1
+    useEffect(() => {
+        if (ref.current) ref.current.playbackRate = rate
+    }, [rate, sp.enabled])
+    if (!sp.enabled) return null
+    return (
+        <video
+            ref={ref}
+            className="rps-img"
+            src={asset.src}
+            style={spriteStyle(sp, asset, s)}
+            autoPlay
+            loop
+            muted
+            playsInline
+            disablePictureInPicture
+            // A new source resets playbackRate to 1 once its metadata loads; set it again then.
+            onLoadedMetadata={(e) => {
+                e.currentTarget.playbackRate = rate
+            }}
+        />
+    )
+}
+
+/** The podium composition (recipe.ts's `Podium`): a zero-size anchor at (x, y) on the stage, scaled
+ *  about that point, holding the sprites in paint order (pedestal, flag, fire, vase). `mirrored` draws the SAME object
+ *  reflected across the stage's vertical centre line — the anchor moves to 1080 - x and the group
+ *  is flipped horizontally about it — so the copy has nothing of its own to fall out of sync. */
+function PodiumGroup({podium, s, mirrored}: {podium: Podium; s: number; mirrored: boolean}) {
+    const anchorX = mirrored ? STAGE_W - podium.x : podium.x
+    const sx = mirrored ? -podium.scale : podium.scale
+    return (
+        <div
+            className="rps-group"
+            style={{left: anchorX * s, top: podium.y * s, zIndex: Z_PODIUM, transformOrigin: '0 0', transform: `scale(${sx}, ${podium.scale})`}}
+        >
+            <PodiumSprite sp={podium.pedestal} asset={RIPS_ASSETS.pedestal} s={s}/>
+            <PodiumSprite sp={podium.flag} asset={RIPS_ASSETS.flag} s={s}/>
+            <PodiumVideo sp={podium.fire} asset={RIPS_VIDEOS.fire} s={s}/>
+            <PodiumSprite sp={podium.vase} asset={RIPS_ASSETS.vase} s={s}/>
+        </div>
+    )
+}
+
 function glowBackground(g: Glow): string {
     const r = parseInt(g.color.slice(1, 3), 16)
     const gr = parseInt(g.color.slice(3, 5), 16)
@@ -488,7 +556,7 @@ function glowBackground(g: Glow): string {
 export function RipsScene({w, h, recipe, debug}: Props) {
     const s = w / STAGE_W
     const timeScale = debug?.timeScale && debug.timeScale > 0 ? debug.timeScale : 1
-    const {background, skyClouds, middleCloud: mc, mountain, frontBack, frontFront, glows} = recipe
+    const {background, skyClouds, middleCloud: mc, mountain, frontBack, frontFront, glows, podium} = recipe
 
     // Sky cloud pivots in stage px, for the debug markers.
     const skyPivots = skyClouds.map((c, i) => skyGeometry(c, SKY_CLOUD_ASSETS[i]).pivot)
@@ -537,6 +605,9 @@ export function RipsScene({w, h, recipe, debug}: Props) {
                     }}
                 />
             ))}
+
+            {podium.enabled && <PodiumGroup podium={podium} s={s} mirrored={false}/>}
+            {podium.enabled && podium.mirror && <PodiumGroup podium={podium} s={s} mirrored/>}
 
             {debug?.showPivots && (
                 <>

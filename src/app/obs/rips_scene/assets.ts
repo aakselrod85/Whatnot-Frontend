@@ -14,6 +14,10 @@ export const RIPS_ASSETS = {
     skyCloudLayer2: { src: '/images/rips_scene/TopCloudLayer2.png', w: 2149, h: 2105 },
     skyCloudLayer3: { src: '/images/rips_scene/TopCloudLayer3.png', w: 1677, h: 1745 },
     skyCloudLayer4: { src: '/images/rips_scene/TopCloudLayer4.png', w: 1672, h: 2121 },
+    // Podium props (recipe.ts's `Podium`), drawn in front of everything else.
+    pedestal: { src: '/images/rips_scene/BasePedestal.png', w: 512, h: 846 },
+    flag: { src: '/images/rips_scene/Flag.png', w: 200, h: 440 },
+    vase: { src: '/images/rips_scene/Vase.png', w: 211, h: 182 },
 } satisfies Record<string, RipsAsset>
 
 // Centre of the circle the cloud band in MiddleCloud.png is drawn on, in the image's own px —
@@ -30,6 +34,13 @@ export const SKY_CLOUD_ASSETS: RipsAsset[] = [
     RIPS_ASSETS.skyCloudLayer2,
     RIPS_ASSETS.skyCloudLayer1,
 ]
+
+// Videos are kept out of RIPS_ASSETS on purpose: the layout page preloads every `preload` URL that
+// is not a font through an Image(), which cannot decode a video. FireInTheVase is VP9 with an alpha
+// channel, so its background stays transparent.
+export const RIPS_VIDEOS = {
+    fire: { src: '/videos/rips_scene/FireInTheVase.webm', w: 1348, h: 827 },
+} satisfies Record<string, RipsAsset>
 
 // registry.ts's `preload` list for the `ripsScene` entry.
 export const RIPS_SCENE_PRELOAD: string[] = Object.values(RIPS_ASSETS).map((a) => a.src)

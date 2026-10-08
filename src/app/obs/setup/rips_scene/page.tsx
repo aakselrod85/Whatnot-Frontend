@@ -19,8 +19,12 @@ import {
     type GlowDepth,
     type GlowMode,
     type MiddleCloud,
+    type Podium,
     type RipsSceneRecipe,
     type SkyCloud,
+    type VideoSprite,
+    VIDEO_SPEED_MAX,
+    VIDEO_SPEED_MIN,
 } from '@/app/obs/rips_scene/recipe'
 import './page.css'
 
@@ -184,6 +188,9 @@ export default function Page() {
         setRecipe((r) => ({...r, glows: r.glows.map((g, j) => (j === i ? {...g, ...patch} : g))}))
     const addGlow = () => setRecipe((r) => ({...r, glows: [...r.glows, {...DEFAULT_GLOW}]}))
     const removeGlow = (i: number) => setRecipe((r) => ({...r, glows: r.glows.filter((_, j) => j !== i)}))
+    const setPodium = (patch: Partial<Podium>) => setRecipe((r) => ({...r, podium: {...r.podium, ...patch}}))
+    const setSprite = (key: 'pedestal' | 'flag' | 'fire' | 'vase', patch: Partial<VideoSprite>) =>
+        setRecipe((r) => ({...r, podium: {...r.podium, [key]: {...r.podium[key], ...patch}}}))
     const setPrev = (patch: Partial<Preview>) => setPreview((p) => ({...p, ...patch}))
 
     function applyJson() {
@@ -238,9 +245,33 @@ export default function Page() {
         )
     }
 
+    function spriteSection(key: 'pedestal' | 'flag' | 'fire' | 'vase', title: string) {
+        const sp = recipe.podium[key]
+        return (
+            <Section title={title}>
+                <Enabled value={sp.enabled} onChange={(v) => setSprite(key, {enabled: v})}/>
+                <Num label="X (from anchor)" value={sp.x} min={-2000} max={2000} step={1} onChange={(v) => setSprite(key, {x: v})}/>
+                <Num label="Y (from anchor, up is negative)" value={sp.y} min={-2000} max={2000} step={1} onChange={(v) => setSprite(key, {y: v})}/>
+                <Num label="Width" value={sp.width} min={10} max={2000} step={1} onChange={(v) => setSprite(key, {width: v})}/>
+                <Num label="Rotation °" value={sp.rotation} min={-180} max={180} step={0.5} onChange={(v) => setSprite(key, {rotation: v})}/>
+                {key === 'fire' && (
+                    <Num
+                        label="Speed ×"
+                        value={recipe.podium.fire.speed}
+                        min={VIDEO_SPEED_MIN}
+                        max={VIDEO_SPEED_MAX}
+                        step={0.05}
+                        onChange={(v) => setSprite('fire', {speed: v})}
+                    />
+                )}
+            </Section>
+        )
+    }
+
     if (!mounted) return null
 
     const mc = recipe.middleCloud
+    const podium = recipe.podium
 
     return (
         <div className="rsp-page container-fluid p-3">
@@ -292,6 +323,22 @@ export default function Page() {
                 </div>
 
                 <div className="col-xl-5">
+                    <Section title="Podium (in front of everything)">
+                        <Enabled value={podium.enabled} onChange={(v) => setPodium({enabled: v})}/>
+                        <label className="small d-flex align-items-center gap-1">
+                            <input type="checkbox" checked={podium.mirror} onChange={(e) => setPodium({mirror: e.target.checked})}/>
+                            Mirror copy (reflected across the stage centre, anchor at {1080 - podium.x})
+                        </label>
+                        <div className="w-100 small text-muted">Anchor: the composition&apos;s origin; the pedestal&apos;s bottom-left corner sits there at X 0, Y 0.</div>
+                        <Num label="Anchor X" value={podium.x} min={-1080} max={2160} step={1} onChange={(v) => setPodium({x: v})}/>
+                        <Num label="Anchor Y" value={podium.y} min={-1000} max={2000} step={1} onChange={(v) => setPodium({y: v})}/>
+                        <Num label="Scale" value={podium.scale} min={0.05} max={5} step={0.05} onChange={(v) => setPodium({scale: v})}/>
+                    </Section>
+                    {spriteSection('pedestal', 'Podium: pedestal')}
+                    {spriteSection('flag', 'Podium: flag')}
+                    {spriteSection('fire', 'Podium: fire (video, behind the vase)')}
+                    {spriteSection('vase', 'Podium: vase')}
+
                     <Section title="Glows">
                         <button type="button" className="btn btn-sm btn-outline-light" onClick={addGlow}>Add glow</button>
                         {recipe.glows.map((g, i) => (
