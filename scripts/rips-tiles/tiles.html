@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rips Marble Tiles</title>
+<style>
+  :root { --bg: #14110d; --panel: #1f1a14; --ink: #f2e8d8; --muted: #b9a98f; --gold: #d9b25c; --line: #3a3024; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 Georgia, 'Times New Roman', serif; }
+  header { padding: 24px 24px 8px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: .04em; color: var(--gold); font-weight: normal; }
+  header p { margin: 0; color: var(--muted); }
+  .bar { position: sticky; top: 0; z-index: 5; background: rgba(20,17,13,.94); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+  .bar .in { max-width: 1200px; margin: 0 auto; padding: 10px 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 14px; }
+  .chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+  .bar label { color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-items: center; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px 24px 60px; }
+  .scene { position: relative; width: 100%; max-width: 1080px; aspect-ratio: 1080 / 640; margin: 8px auto 28px; border-radius: 10px; overflow: hidden;
+           background: #f6a54a url('../../public/images/rips_scene/Back.png') center / cover; border: 1px solid var(--line); }
+  .scene .mtn { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; background: url('../../public/images/rips_scene/Mountain.png') center bottom / cover no-repeat; }
+  #sceneBoard { position: absolute; left: 0; right: 0; bottom: 6%; }
+  .board { position: relative; background: url('../../public/images/rips_board/board.png') 0 0 / 100% 100% no-repeat; }
+  .board canvas.tile { position: absolute; }
+  .boardwrap { overflow-x: auto; padding-bottom: 4px; }
+  .ctl { display: flex; gap: 14px; margin-left: auto; flex-wrap: wrap; }
+  select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 13px; padding: 2px 4px; }
+  section { margin: 0 0 40px; }
+  section h2 { font-weight: normal; font-size: 22px; margin: 0; color: var(--gold); }
+  section .why { margin: 2px 0 12px; color: var(--muted); max-width: 820px; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; border-radius: 10px; background: linear-gradient(180deg, #2a2219, #17130e); border: 1px solid var(--line); }
+  canvas.tile { display: block; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Rips Marble Tiles</h1>
+  <p>Five marble and stone team tiles for the Greek theme. On the real rips board at its live grid (66 px cells, 61 px tiles), with the main board&rsquo;s crisp logo outline. Marble is procedural, so every tile is cut from a different part of the slab.</p>
+</header>
+<div class="bar"><div class="in" id="chips"></div></div>
+<main>
+  <div class="scene" id="scene"><div class="mtn"></div><div id="sceneBoard"></div></div>
+  <div id="sections"></div>
+</main>
+<script>
+(() => {
+  const IMG = '../../public/images/';
+  const TEAMS = ['Arizona Cardinals','Atlanta Falcons','Baltimore Ravens','Buffalo Bills','Carolina Panthers','Chicago Bears','Cincinnati Bengals','Cleveland Browns',
+    'Dallas Cowboys','Denver Broncos','Detroit Lions','Green Bay Packers','Houston Texans','Indianapolis Colts','Jacksonville Jaguars','Kansas City Chiefs',
+    'Las Vegas Raiders','Los Angeles Chargers','Los Angeles Rams','Miami Dolphins','Minnesota Vikings','New England Patriots','New Orleans Saints','New York Giants',
+    'New York Jets','Philadelphia Eagles','Pittsburgh Steelers','San Francisco 49ers','Seattle Seahawks','Tampa Bay Buccaneers','Tennessee Titans','Washington Commanders'];
+
+  // ---------------- noise + marble slabs ----------------
+  function rng(seed) { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function makeNoise(seed) {
+    const r = rng(seed), p = new Uint8Array(512), g = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { p[i] = i; g[i] = r(); }
+    for (let i = 255; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+    for (let i = 0; i < 256; i++) p[i + 256] = p[i];
+    const val = (x, y) => g[p[p[x & 255] + (y & 255)]];
+    const sm = t => t * t * (3 - 2 * t);
+    const n = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = sm(xf), v = sm(yf);
+      const a = val(xi, yi), b = val(xi + 1, yi), c = val(xi, yi + 1), d = val(xi + 1, yi + 1);
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+    return (x, y, oct = 5) => { let s = 0, amp = .5, f = 1, norm = 0; for (let o = 0; o < oct; o++) { s += amp * n(x * f, y * f); norm += amp; amp *= .5; f *= 2.03; } return s / norm; };
+  }
+  const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const MARBLES = {
+    cream: { base0: '#f4eee4', base1: '#e1d2bb', v1: '#b07d47', v1a: .72, v2: '#8c8378', v2a: .32, flecks: null },
+    lapis: { base0: '#0a1840', base1: '#1d3d8c', v1: '#4cb2ea', v1a: .38, v2: '#d6ecff', v2a: .22, flecks: '#ecc768' },
+    board: { base0: '#f6ece2', base1: '#e7d3c1', v1: '#c86f28', v1a: .78, v2: '#a8907c', v2a: .22, flecks: null },   // board.png's outer marble
+    nero:  { base0: '#0d0d0f', base1: '#211f24', v1: '#ebe7df', v1a: .82, v2: '#cfa64e', v2a: .42, flecks: null },
+  };
+  function makeSlab(kind, size, seed) {
+    const M = MARBLES[kind], fb = makeNoise(seed), fb2 = makeNoise(seed + 77), r = rng(seed + 5);
+    const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d'), img = x.createImageData(size, size), d = img.data;
+    const b0 = hex(M.base0), b1 = hex(M.base1), c1 = hex(M.v1), c2 = hex(M.v2), fl = M.flecks && hex(M.flecks);
+    const ang = r() * Math.PI, ca = Math.cos(ang), sa = Math.sin(ang), ang2 = ang + .9 + r() * .6, cb = Math.cos(ang2), sb = Math.sin(ang2);
+    for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
+      const u = i / size, v = j / size, n = fb(u * 4, v * 4), n2 = fb2(u * 9, v * 9, 4);
+      const t1 = (u * ca + v * sa) * 7 + n * 5.2, v1 = Math.pow(1 - Math.abs(Math.sin(t1 * Math.PI)), 22);
+      const t2 = (u * cb + v * sb) * 11 + n2 * 5, v2 = Math.pow(1 - Math.abs(Math.sin(t2 * Math.PI)), 16);
+      let col = mix(b0, b1, Math.min(1, Math.max(0, (n - .3) * 1.8)));
+      col = mix(col, c2, v2 * M.v2a); col = mix(col, c1, v1 * M.v1a);
+      if (fl && n2 > .6 && (((i >> 1) * 73856093 ^ (j >> 1) * 19349663) >>> 0) % 1000 < 5) col = fl;   // pyrite flecks in lapis, 2px blocks
+      const k = (j * size + i) * 4; d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = 255;
+    }
+    x.putImageData(img, 0, 0); return c;
+  }
+
+  // ---------------- drawing helpers ----------------
+  // Stream safety (OBS → Whatnot → phone): nothing thinner than 2 stream px, no dense repeats, coarse veins.
+  let DP = 1;                                   // canvas px per stream px for the tile being drawn
+  const lw = (frac, S) => Math.max(2 * DP, S * frac);
+  function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function gold(ctx, x0, y0, x1, y1) {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    [[0, '#6f4b14'], [.18, '#e9c46a'], [.35, '#fff0b8'], [.5, '#b98a2d'], [.68, '#f3d27c'], [.85, '#8a6220'], [1, '#d9b25c']].forEach(([o, c]) => g.addColorStop(o, c));
+    return g;
+  }
+  function deepGold(ctx, x0, y0, x1, y1) {                         // richer, darker gold: reads against cream marble
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    [[0, '#5e3a08'], [.2, '#c98f22'], [.38, '#ffd86a'], [.52, '#a8690f'], [.7, '#e9b23a'], [.86, '#7a4a0a'], [1, '#c48a1e']].forEach(([o, c]) => g.addColorStop(o, c));
+    return g;
+  }
+  function slabFill(ctx, slab, x, y, w, h, r) {                    // a random cut of the slab, randomly rotated
+    const s = Math.max(w, h) * 1.5, src = s * .55, sx = r() * (slab.width - src), sy = r() * (slab.height - src);
+    ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(Math.floor(r() * 4) * Math.PI / 2);
+    ctx.drawImage(slab, sx, sy, src, src, -s / 2, -s / 2, s, s); ctx.restore();
+  }
+  function bevel(ctx, x, y, w, h, b, hi = .55, lo = .5) {          // light from the top-left, carved edge
+    const parts = [
+      [[x, y], [x + w, y], [x + w - b, y + b], [x + b, y + b], `rgba(255,250,240,${hi})`],
+      [[x, y], [x + b, y + b], [x + b, y + h - b], [x, y + h], `rgba(255,250,240,${hi * .6})`],
+      [[x + w, y], [x + w, y + h], [x + w - b, y + h - b], [x + w - b, y + b], `rgba(20,12,4,${lo * .7})`],
+      [[x, y + h], [x + b, y + h - b], [x + w - b, y + h - b], [x + w, y + h], `rgba(20,12,4,${lo})`],
+    ];
+    for (const [a, b2, c, d, col] of parts) { ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b2); ctx.lineTo(...c); ctx.lineTo(...d); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); }
+  }
+  function rrPath(p, x, y, w, h, r) { p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + h, r); p.arcTo(x + w, y + h, x, y + h, r); p.arcTo(x, y + h, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); }
+  function innerShadow(ctx, x, y, w, h, r, size, alpha) {          // shadow cast inward from the field's edge only
+    const clipP = new Path2D(); rrPath(clipP, x, y, w, h, r);
+    const ring = new Path2D(); ring.rect(x - 300, y - 300, w + 600, h + 600); rrPath(ring, x, y, w, h, r);
+    ctx.save(); ctx.clip(clipP);
+    ctx.shadowColor = `rgba(0,0,0,${alpha})`; ctx.shadowBlur = size; ctx.shadowOffsetX = size * .25; ctx.shadowOffsetY = size * .35;
+    ctx.fillStyle = '#000'; ctx.fill(ring, 'evenodd'); ctx.restore();
+  }
+  function sheen(ctx, x, y, w, h, a = .16) {
+    const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(.45, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,.08)');
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  }
+  // Logo treatment mirrors the main board's crisp mode (sport_style/PatchCell.tsx logoOutlineFilter):
+  // a hard zero-blur outline = the silhouette dilated by whole stream px (4 chained axis shadows = a
+  // square dilation), colour auto-contrasting with the field, then the soft drop shadow on top of that.
+  const OUT = { w: 1, color: 'auto', opacity: .9 };
+  let FIELD_DARK = true;                                          // set per style before drawing its logo
+  function logoLayer(im, size, gilded) {                          // the bare logo (or gold leaf) on a size x size canvas
+    const S = Math.ceil(size), k = size / Math.max(im.width, im.height), w = im.width * k, h = im.height * k;
+    const a = document.createElement('canvas'); a.width = a.height = S; const ax = a.getContext('2d');
+    if (!gilded) { ax.drawImage(im, (S - w) / 2, (S - h) / 2, w, h); return a; }
+    // gold leaf: tone follows the logo's own luminance, so inner details survive as darker/lighter gold
+    ax.filter = 'grayscale(1) contrast(.6) brightness(1.75)'; ax.drawImage(im, (S - w) / 2, (S - h) / 2, w, h); ax.filter = 'none';
+    const g = document.createElement('canvas'); g.width = g.height = S; const gx = g.getContext('2d');
+    gx.fillStyle = gold(gx, 0, 0, S, S); gx.fillRect(0, 0, S, S); gx.globalCompositeOperation = 'destination-in'; gx.drawImage(im, (S - w) / 2, (S - h) / 2, w, h);
+    ax.globalCompositeOperation = 'multiply'; ax.drawImage(g, 0, 0); ax.globalCompositeOperation = 'destination-in'; ax.drawImage(im, (S - w) / 2, (S - h) / 2, w, h);
+    return a;
+  }
+  function outlined(L) {                                          // L plus a hard outline; returns {c, pad}
+    const w = Math.round(OUT.w) * Math.round(DP); if (w <= 0) return { c: L, pad: 0 };
+    const light = OUT.color === 'light' || (OUT.color === 'auto' && FIELD_DARK);
+    const sil = document.createElement('canvas'); sil.width = L.width; sil.height = L.height; const sx = sil.getContext('2d');
+    sx.drawImage(L, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = light ? '#fff' : '#000'; sx.fillRect(0, 0, L.width, L.height);
+    const c = document.createElement('canvas'); c.width = L.width + 2 * w; c.height = L.height + 2 * w; const cx = c.getContext('2d');
+    const dil = document.createElement('canvas'); dil.width = c.width; dil.height = c.height; const dx = dil.getContext('2d');
+    for (const ox of [-w, 0, w]) for (const oy of [-w, 0, w]) dx.drawImage(sil, w + ox, w + oy);
+    cx.globalAlpha = OUT.opacity; cx.drawImage(dil, 0, 0); cx.globalAlpha = 1; cx.drawImage(L, w, w);
+    return { c, pad: w };
+  }
+  function placeLogo(ctx, L, cx, cy, size, shadow) {
+    const { c, pad } = outlined(L), S = L.width;
+    ctx.save(); ctx.shadowColor = `rgba(0,0,0,${shadow})`; ctx.shadowBlur = Math.max(DP, size * .06); ctx.shadowOffsetY = Math.max(DP, size * .03);
+    ctx.drawImage(c, cx - S / 2 - pad, cy - S / 2 - pad); ctx.restore();
+  }
+  function logo(ctx, im, cx, cy, size, shadow = .55) { placeLogo(ctx, logoLayer(im, size, false), cx, cy, size, shadow); }
+  function gildedLogo(ctx, im, cx, cy, size) {
+    const a = logoLayer(im, size, true), S = a.width;
+    placeLogo(ctx, a, cx, cy, size, .7);
+    ctx.save(); ctx.globalAlpha = .45; ctx.globalCompositeOperation = 'screen';                 // top-left rim light
+    ctx.filter = `blur(${size * .006}px)`; ctx.drawImage(a, cx - S / 2 - size * .008, cy - S / 2 - size * .008); ctx.restore();
+  }
+  function cornerKeys(ctx, x, y, w, h, band, col) {               // double gold line + one bold Greek key per corner
+    const lwk = Math.max(2 * DP, band * .16), k = band * .78;
+    ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = lwk; ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
+    const a = band * .18, b = band * .82;
+    ctx.strokeRect(x + a, y + a, w - 2 * a, h - 2 * a); ctx.strokeRect(x + b, y + b, w - 2 * b, h - 2 * b);
+    const key = (cx, cy, sx, sy) => { const P = (u, v) => [cx + sx * u * k, cy + sy * v * k];
+      ctx.beginPath(); ctx.moveTo(...P(0, 1)); ctx.lineTo(...P(0, 0)); ctx.lineTo(...P(1, 0)); ctx.lineTo(...P(1, .62)); ctx.lineTo(...P(.42, .62)); ctx.lineTo(...P(.42, .3)); ctx.stroke(); };
+    const o = band * .5 - k * .5;
+    key(x + a + o * .3 + band * .12, y + a + o * .3 + band * .12, 1, 1); key(x + w - a - o * .3 - band * .12, y + a + o * .3 + band * .12, -1, 1);
+    key(x + a + o * .3 + band * .12, y + h - a - o * .3 - band * .12, 1, -1); key(x + w - a - o * .3 - band * .12, y + h - a - o * .3 - band * .12, -1, -1);
+    ctx.restore();
+  }
+  function meander(ctx, x, y, w, h, band, col) {                  // Greek key along a square border band
+    const u = band / 3.6, lwm = Math.max(2 * DP, u * .95);
+    ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = lwm; ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
+    const unit = (px, py, dx, dy, nx, ny) => {                     // one key unit, 5u long along (dx,dy), 4u deep along (nx,ny)
+      const P = (a, b) => [px + dx * a * u + nx * b * u, py + dy * a * u + ny * b * u];
+      const pts = [P(0, .6), P(4, .6), P(4, 3.4), P(1.6, 3.4), P(1.6, 2)];       // simplified key: reads at small sizes
+      ctx.beginPath(); ctx.moveTo(...pts[0]); for (const q of pts.slice(1)) ctx.lineTo(...q); ctx.moveTo(...P(4, .5)); ctx.lineTo(...P(5, .5)); ctx.stroke();
+    };
+    const side = (sx, sy, dx, dy, nx, ny, len) => { const n = Math.max(1, Math.floor(len / (5 * u))), step = len / n / u;
+      for (let i = 0; i < n; i++) unit(sx + dx * i * step * u, sy + dy * i * step * u, dx, dy, nx, ny); };
+    side(x, y, 1, 0, 0, 1, w); side(x + w, y, 0, 1, -1, 0, h); side(x + w, y + h, -1, 0, 0, -1, w); side(x, y + h, 0, -1, 1, 0, h);
+    ctx.restore();
+  }
+
+  // ---------------- the five styles ----------------
+  let SLABS, BOARD_IMG, CLEAN = false;
+  const STYLES = [
+    { id: 'octagon', dark: false, board: true, name: 'Pentelic Octagon',
+      why: 'Pentelic v2: each team is its own octagonal stone cut from the board\'s own outer marble (real crops of board.png), the current icons\' cut-corner shape. Each tile is one self-contained image (same light on every stone, nothing drawn for its neighbours): marble, a contrasting gold octagon inlay and a big logo. Stones touch edge to edge; the board shows through the cut corners. No hairlines: every edge is a solid shape at least 2 stream px wide.',
+      drawBoard(ctx, L, k, n) {                                    // just places the per-team tiles; nothing depends on neighbours
+        const C = L.cell * k * DPR, X = c => (L.padL + c * L.cell) * k * DPR, Y = r => (L.padT + r * L.cell) * k * DPR;
+        for (let i = 0; i < n; i++) { if (!logos[i]) continue; const s = L.slots[i];
+          ctx.save(); ctx.translate(X(s.c), Y(s.r)); this.tile(ctx, C, logos[i], rng(1000 + i)); ctx.restore(); }
+      },
+      tile(ctx, S, im, r) {                                       // one self-contained tile image (what gets exported per team)
+        const cut = S * .2;
+        const pts = m => { const c = Math.max(0, cut - m * .586); return [[m + c, m], [S - m - c, m], [S - m, m + c], [S - m, S - m - c], [S - m - c, S - m], [m + c, S - m], [m, S - m - c], [m, m + c]]; };
+        const oct = m => { const p = new Path2D(), q = pts(m); p.moveTo(...q[0]); for (const v of q.slice(1)) p.lineTo(...v); p.closePath(); return p; };
+        // the stone: its own cut of marble, coarse veins (~2x magnification)
+        // the stone: a random cut of board.png's own outer marble (side panels), at the board's scale, randomly turned/flipped
+        ctx.save(); ctx.clip(oct(0));
+        const side = r() < .5 ? [2, 130] : [962, 1078], cs = 66;
+        const sx = side[0] + r() * (side[1] - side[0] - cs), sy = 14 + r() * (238 - 14 - cs), rot = Math.floor(r() * 4), flip = r() < .5;
+        ctx.save(); ctx.translate(S / 2, S / 2); ctx.rotate(rot * Math.PI / 2); if (flip) ctx.scale(-1, 1);
+        ctx.drawImage(BOARD_IMG, sx, sy, cs, cs, -S / 2, -S / 2, S, S); ctx.restore();
+        if (CLEAN) {                                                // clean set: veins blurred out inside the gold octagon, ring keeps the real marble
+          const f = oct(Math.max(2 * DP, S * .06)); ctx.save(); ctx.clip(f); ctx.filter = `blur(${S * .07}px)`;
+          ctx.translate(S / 2, S / 2); ctx.rotate(rot * Math.PI / 2); if (flip) ctx.scale(-1, 1);
+          ctx.drawImage(BOARD_IMG, sx, sy, cs, cs, -S * .6, -S * .6, S * 1.2, S * 1.2); ctx.restore();
+          ctx.save(); ctx.clip(f); ctx.fillStyle = 'rgba(244,232,220,.45)'; ctx.fillRect(0, 0, S, S); ctx.restore();
+        }
+        // whole-stone light, same on every tile: brighter top-left, deeper bottom-right (soft, no edge lines)
+        const sh = ctx.createLinearGradient(0, 0, S, S); sh.addColorStop(0, 'rgba(255,252,245,.32)'); sh.addColorStop(.5, 'rgba(255,252,245,0)'); sh.addColorStop(1, 'rgba(70,40,15,.3)');
+        ctx.fillStyle = sh; ctx.fillRect(0, 0, S, S);
+        ctx.restore();
+        // slim gold octagon inlay
+        const g0 = Math.max(2 * DP, S * .06), g1 = g0 + Math.max(3 * DP, S * .06);
+        const band = oct(g0); band.addPath(oct(g1));
+        ctx.save(); ctx.shadowColor = 'rgba(45,22,0,.85)'; ctx.shadowBlur = S * .045; ctx.shadowOffsetY = S * .018;
+        ctx.fillStyle = deepGold(ctx, 0, 0, S, S); ctx.fill(band, 'evenodd'); ctx.restore();
+        // softly sunken field
+        const field = oct(g1); ctx.save(); ctx.clip(field);
+        const ring = new Path2D(); ring.rect(-S, -S, 3 * S, 3 * S); ring.addPath(field);
+        ctx.shadowColor = 'rgba(40,22,6,.4)'; ctx.shadowBlur = S * .06; ctx.shadowOffsetX = S * .01; ctx.shadowOffsetY = S * .02; ctx.fillStyle = '#000'; ctx.fill(ring, 'evenodd'); ctx.restore();
+        logo(ctx, im, S / 2, S / 2, S * .68, .45);
+      } },
+  ];
+
+  // ---------------- page ----------------
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  function tileCanvas(style, im, size, seed) {
+    const S = Math.round(size * DPR), c = document.createElement('canvas'); c.width = c.height = S; c.className = 'tile';
+    c.style.width = c.style.height = size + 'px'; c.title = style.name;
+    DP = Math.max(DPR * .5, DPR * size / 61);                     // canvas px per stream px: the live tile is 61 px (66 px cell x 92%)
+    FIELD_DARK = style.dark; style.draw(c.getContext('2d'), S, im, rng(seed)); return c;
+  }
+  const load = name => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = IMG + 'teams/' + encodeURIComponent(name) + '.webp'; });
+
+  // board:rips_flat geometry (RipsFlatBoard.tsx): board.png 1080x250, blue inset, 11 columns, rows from
+  // splitRows (32 -> 11/11/10), integer cell px rounded down to a multiple of 3, short row starts at col 0.
+  const INSET = { left: .136, right: .13, top: .108, bottom: .1 }, MAX_COLS = 11;
+  function boardLayout(w, h, n) {
+    const rows = Math.ceil(n / MAX_COLS), base = Math.floor(n / rows), extra = n % rows;
+    const sizes = Array.from({ length: rows }, (_, i) => base + (i < extra ? 1 : 0));
+    const iL = Math.round(w * INSET.left), iR = Math.round(w * INSET.right), iT = Math.round(h * INSET.top), iB = Math.round(h * INSET.bottom);
+    const iW = w - iL - iR, iH = h - iT - iB;
+    let cell = Math.min(Math.floor(iW / MAX_COLS), Math.floor(iH / rows)); cell -= cell % 3;
+    const padL = iL + Math.floor((iW - MAX_COLS * cell) / 2), padT = iT + Math.floor((iH - rows * cell) / 2);
+    const slots = []; sizes.forEach((len, r) => { const off = Math.floor((MAX_COLS - len) / 2); for (let c = 0; c < len; c++) slots.push({ r, c: c + off }); });
+    return { cell, padL, padT, slots };
+  }
+  function makeBoard(style, k) {                                  // k = display px per board px (1 = native 1080x250)
+    const w = Math.round(1080 * k), h = Math.round(250 * k), L = boardLayout(1080, 250, logos.length);
+    const el = document.createElement('div'); el.className = 'board'; el.style.width = w + 'px'; el.style.height = h + 'px';
+    if (style.board) {
+      const c = document.createElement('canvas'); c.className = 'tile'; c.width = Math.round(w * DPR); c.height = Math.round(h * DPR);
+      c.style.left = c.style.top = '0px'; c.style.width = w + 'px'; c.style.height = h + 'px';
+      DP = Math.max(DPR * .5, DPR * k); FIELD_DARK = style.dark; style.drawBoard(c.getContext('2d'), L, k, logos.length);
+      el.appendChild(c); return el;
+    }
+    const tile = L.cell * .92 * k;
+    logos.forEach((im, i) => { if (!im) return; const s = L.slots[i];
+      const c = tileCanvas(style, im, tile, 1000 + i);
+      c.style.left = ((L.padL + s.c * L.cell + L.cell * .04) * k) + 'px'; c.style.top = ((L.padT + s.r * L.cell + L.cell * .04) * k) + 'px';
+      el.appendChild(c); });
+    return el;
+  }
+
+  let current = 'octagon', logos = [];
+  function renderScene() {
+    const sc = document.getElementById('scene'), st = STYLES.find(s => s.id === current), slot = document.getElementById('sceneBoard');
+    slot.innerHTML = ''; slot.appendChild(makeBoard(st, sc.clientWidth / 1080));
+  }
+  function renderBoards() {
+    const secs = document.getElementById('sections'), zoom = +document.getElementById('zoom').value; secs.innerHTML = '';
+    const fit = Math.min(1, (secs.clientWidth - 2) / 1080);
+    [false, true].forEach(clean => { const s = STYLES[0], sec = document.createElement('section'); CLEAN = clean;
+      sec.innerHTML = `<h2>${clean ? 'Clean' : 'Veined'}</h2><p class="why">${clean ? 'public/images/rips_tiles/clean/: the veins are blurred out inside the gold octagon so nothing runs behind the logo; the outer ring keeps the board marble.' : 'public/images/rips_tiles/veined/: the board\'s real marble runs across the whole stone, veins included.'}</p>`;
+      const wrap = document.createElement('div'); wrap.className = 'boardwrap'; wrap.appendChild(makeBoard(s, zoom === 1 ? fit : zoom)); sec.appendChild(wrap); secs.appendChild(sec); });
+    CLEAN = false;
+  }
+  function rerender() { renderScene(); renderBoards(); }
+  async function main() {
+    const chips = document.getElementById('chips');
+    STYLES.forEach(s => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = s.name; b.dataset.id = s.id;
+      b.onclick = () => { current = s.id; [...chips.querySelectorAll('.chip')].forEach(c => c.setAttribute('aria-pressed', c.dataset.id === current)); renderScene(); document.getElementById('scene').scrollIntoView({behavior: 'smooth', block: 'center'}); };
+      chips.appendChild(b); });
+    const ctl = document.createElement('div'); ctl.className = 'ctl';
+    ctl.innerHTML = `<label>Outline <select id="ow"><option value="0">off</option><option value="1" selected>1 px</option><option value="2">2 px</option></select></label>
+      <label>Colour <select id="oc"><option value="auto" selected>auto</option><option value="light">light</option><option value="dark">dark</option></select></label>
+      <label>Boards <select id="zoom"><option value="1" selected>stream size</option><option value="2">2x zoom</option></select></label>`;
+    chips.appendChild(ctl);
+    const q = new URLSearchParams(location.search);
+    if (q.has('outline')) document.getElementById('ow').value = q.get('outline');
+    if (q.has('zoom')) document.getElementById('zoom').value = q.get('zoom');
+    if (q.has('style')) current = q.get('style');
+    [...chips.querySelectorAll('.chip')].forEach(c => c.setAttribute('aria-pressed', c.dataset.id === current));
+    const sync = () => { OUT.w = +document.getElementById('ow').value; OUT.color = document.getElementById('oc').value; rerender(); };
+    ['ow', 'oc', 'zoom'].forEach(id => document.getElementById(id).onchange = sync);
+    SLABS = { board: makeSlab('board', 900, 53), cream: makeSlab('cream', 900, 11), lapis: makeSlab('lapis', 900, 23), nero: makeSlab('nero', 900, 37) };
+    logos = await Promise.all(TEAMS.map(load));
+    BOARD_IMG = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = IMG + 'rips_board/board.png'; });
+    if (q.has('export')) {                                          // ?export=264&set=veined|clean -> one data URL per team in the #export pre
+      const E = +q.get('export'), st = STYLES[0], out = {};
+      CLEAN = q.get('set') === 'clean'; DP = E / 66; FIELD_DARK = st.dark; OUT.w = 1;
+      // the Miscellaneous slot has no logo file: the "MISC" wordmark of new_teams/Miscellaneous.png, drawn here
+      const misc = document.createElement('canvas'); misc.width = misc.height = 500; const mx = misc.getContext('2d');
+      mx.font = '900 165px "Arial Black", Impact, sans-serif'; mx.textAlign = 'center'; mx.textBaseline = 'middle'; mx.lineJoin = 'round';
+      mx.lineWidth = 34; mx.strokeStyle = '#232a5c'; mx.strokeText('MISC', 250, 255, 470); mx.fillStyle = '#fff'; mx.fillText('MISC', 250, 255, 470);
+      out['Miscellaneous'] = (() => { const c = document.createElement('canvas'); c.width = c.height = E; st.tile(c.getContext('2d'), E, misc, rng(1000 + TEAMS.length)); return c.toDataURL('image/png'); })();
+      TEAMS.forEach((t, i) => { if (!logos[i]) return; const c = document.createElement('canvas'); c.width = c.height = E; st.tile(c.getContext('2d'), E, logos[i], rng(1000 + i)); out[t] = c.toDataURL('image/png'); });
+      const pre = document.createElement('pre'); pre.id = 'export'; pre.textContent = JSON.stringify(out); document.body.appendChild(pre); window.__ready = true; return;
+    }
+    OUT.w = +document.getElementById('ow').value;
+    rerender(); addEventListener('resize', renderScene);
+    document.title = 'Rips Marble Tiles';
+    window.__ready = true;
+  }
+  main();
+})();
+</script>
+</body>
+</html>
