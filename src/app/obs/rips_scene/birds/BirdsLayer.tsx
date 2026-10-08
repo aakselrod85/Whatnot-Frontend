@@ -1,7 +1,7 @@
 'use client'
 
-// `birds` effect (obs-scene-element-plan.md §1.2/§6) — periodic flocks of birds flying the full
-// width of the box inside a `yMin..yMax` band (art layer, z 40 — effectRegistry.ts's `LAYER_Z`).
+// `birds` layer (rips-scene-birds-plan.md §1.3, moved from the retired `scene` element's BirdsEffect; its "§N" refs below are to that element's old plan) — periodic flocks of birds flying the full
+// width of the box inside a `yMin..yMax` band (RipsScene.tsx's `Z_BIRDS`).
 //
 // Separation: each bird's (y, spawn-stagger) is chosen by rejection sampling (`tryPlaceBird`)
 // against every currently-live bird (`liveBirdsRef`) and every bird already placed earlier in the
@@ -9,14 +9,14 @@
 // `SEPARATION_Y`/`SEPARATION_X` px of each other — a bird that can't find a clear slot within
 // `PLACEMENT_TRIES` tries is skipped rather than placed overlapping (§3).
 //
-// Sprite sheet (obs-scene-element-plan.md §3/§6): `birds.png` is a rebuilt sheet of `frames`
+// Sprite sheet (rips-scene-birds-plan.md §1.3): `birds.png` is a rebuilt sheet of `frames`
 // equal cells (assets.ts — the raw AI delivery was not on a uniform grid; see the comment there).
 // `assets.ts`'s `birds.frames` (read here — never hard-coded) is combined with PERCENTAGE
 // `background-position-x` stepping: percentages address "cell i of n" as a fraction of the sheet's
 // own width, with no dependency on the cell being an integer number of pixels wide.
 //
-// The frame math, worked out for n = 8 (BirdsEffect.css's `--scene-bird-frames`/
-// `--scene-bird-flap-steps` custom properties, set below):
+// The frame math, worked out for n = 8 (BirdsLayer.css's `--rps-bird-frames`/
+// `--rps-bird-flap-steps` custom properties, set below):
 //   - `background-size: calc(n * 100%) 100%` = 800% 100% — the sheet is stretched to 8x the div's
 //     own width (so each of the 8 equal-width slices of the STRETCHED image is exactly one frame),
 //     height untouched.
@@ -39,14 +39,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { Box, SceneEffect } from '../../../../schema'
-import type { EffectProps } from '../../effectRegistry'
-import { SCENE_ASSETS } from '../../assets'
-import './BirdsEffect.css'
+import type { Birds } from '../recipe'
+import { RIPS_ASSETS } from '../assets'
+import './BirdsLayer.css'
 
-type BirdsEffectProps = EffectProps<Extract<SceneEffect, { id: 'birds' }>>
+// The element's REAL px box (not stage px): birds are sized from `box.w` and flown across it.
+type Box = { w: number; h: number }
 
-// Same custom-property escape hatch every other scene effect stylesheet uses — CSSProperties'
+type BirdsLayerProps = { birds: Birds; box: Box; s: number }
+
+// Flight band as percentages of `box.h` — what the (unchanged) placement math works in.
+type Band = { yMin: number; yMax: number }
+
+// Same custom-property escape hatch the old scene effect stylesheets used — CSSProperties'
 // index signature doesn't allow arbitrary `--*` keys.
 type Style = CSSProperties & Record<string, string | number>
 
@@ -65,7 +70,7 @@ const FLAP_SEC_MAX = 1.6
 const FLIGHT_SEC_MIN = 12
 const FLIGHT_SEC_MAX = 20
 
-// Speed modulation (obs-scene-element-plan.md §6 "Speed modulation" note): forward speed along the
+// Speed modulation (old plan §6 "Speed modulation" note): forward speed along the
 // flight path is slaved to the wing-flap cycle instead of being constant. `SPEED_MIN_FACTOR` is the
 // trough speed (as a fraction of base) reached at the end of the glide; `SPEED_RESTORE_FRAME` is
 // the 0-based sprite-sheet frame index (out of `assets.ts`'s `birds.frames`) at which speed snaps
@@ -152,7 +157,7 @@ const FLIGHT_POINT_MAX_ITERATIONS = 1000
 /**
  * Builds a WAAPI keyframe timeline — as abstract `{offset (time fraction 0..1), position (path
  * fraction 0..1)}` points, `easing` on a point describing the segment INTO the NEXT point — for one
- * bird's whole flight, per the "Speed modulation" behaviour (obs-scene-element-plan.md §6): full
+ * bird's whole flight, per the "Speed modulation" behaviour (old plan §6): full
  * speed at the start of every flap cycle, decelerating to `SPEED_MIN_FACTOR` * base by the
  * `SPEED_RESTORE_FRAME`-th frame, then snapping back to full speed for the rest of the cycle.
  * `phaseOffsetSec` is the SAME offset used for the flap's negative `animation-delay` (0..flapSec,
@@ -290,8 +295,8 @@ type BirdPhysicals = {
 }
 
 function rollBirdPhysicals(box: Box, direction: Direction): BirdPhysicals {
-    const asset = SCENE_ASSETS.birds
-    const frames = asset.frames ?? 1
+    const asset = RIPS_ASSETS.birds
+    const frames = asset.frames
     const cellAspect = asset.w / frames / asset.h // width:height of one sprite-sheet cell
 
     // Depth cue (§6): 0.5..1.0 scale, smaller birds read as farther away.
@@ -443,9 +448,9 @@ function finalizeBird(box: Box, physicals: BirdPhysicals, yMin: number, yMax: nu
     }
 
     const innerStyle: Style = {
-        backgroundImage: `url(${SCENE_ASSETS.birds.src})`,
-        '--scene-bird-frames': frames,
-        '--scene-bird-flap-steps': Math.max(1, frames),
+        backgroundImage: `url(${RIPS_ASSETS.birds.src})`,
+        '--rps-bird-frames': frames,
+        '--rps-bird-flap-steps': Math.max(1, frames),
         animationDuration: `${flapSec}s`,
         animationDelay: `${flapPhaseDelaySec}s`,
         transform: `scaleX(${direction === 'left' ? -1 : 1})`,
@@ -463,17 +468,30 @@ function finalizeBird(box: Box, physicals: BirdPhysicals, yMin: number, yMax: nu
     }
 }
 
-export function BirdsEffect({ box, effect, quality }: BirdsEffectProps) {
+export function BirdsLayer({ birds: cfg, box, s }: BirdsLayerProps) {
     const [birds, setBirds] = useState<Bird[]>([])
 
-    // Latest-value refs (obs-scene-element-plan.md §5's `LightningEffect` pattern extended): the
-    // spawn timer chain below only RESTARTS on `intervalSec`/`countMin`/`countMax`/`quality` change (§6), but a
+    // Recipe -> effect inputs (rips-scene-birds-plan.md §1.3). The recipe stores the band in stage px
+    // from the top; the placement math wants percentages of the real box height, so convert once
+    // here. Clamping/ordering replaces what the old element's config validator guaranteed.
+    const clampInt = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)))
+    const pctA = clamp((cfg.yMin * s) / box.h * 100, 0, 100)
+    const pctB = clamp((cfg.yMax * s) / box.h * 100, 0, 100)
+    const band: Band = { yMin: Math.min(pctA, pctB), yMax: Math.max(pctA, pctB) }
+    const countA = clampInt(cfg.countMin, 1, 12)
+    const countB = clampInt(cfg.countMax, 1, 12)
+    const countMin = Math.min(countA, countB)
+    const countMax = Math.max(countA, countB)
+    const intervalSec = Math.min(600, Math.max(5, cfg.intervalSec))
+
+    // Latest-value refs (the old scene effects' latest-value-ref pattern): the
+    // spawn timer chain below only RESTARTS on `intervalSec`/`countMin`/`countMax` change, but a
     // live `yMin`/`yMax`/box-resize edit must still be picked up by the NEXT scheduled spawn
     // without tearing down the whole chain (which would also reset the 2s "just mounted" delay).
     const boxRef = useRef(box)
     boxRef.current = box
-    const effectRef = useRef(effect)
-    effectRef.current = effect
+    const bandRef = useRef(band)
+    bandRef.current = band
 
     const removalTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
@@ -492,7 +510,7 @@ export function BirdsEffect({ box, effect, quality }: BirdsEffectProps) {
     const spawnFlock = useCallback(
         (flockCount: number, direction: Direction) => {
             const currentBox = boxRef.current
-            const { yMin, yMax } = effectRef.current
+            const { yMin, yMax } = bandRef.current
             const nowMs = performance.now()
 
             // §3 Placement by rejection sampling: each bird is rolled (physicals), then placed against
@@ -542,7 +560,7 @@ export function BirdsEffect({ box, effect, quality }: BirdsEffectProps) {
     )
 
     // The spawn timer chain (§6: "spawn timer as a setTimeout chain with jitter … cleared on
-    // unmount and when intervalSec/countMin/countMax/quality change"). A plain `setTimeout` chain (not
+    // unmount and when intervalSec/countMin/countMax change"). A plain `setTimeout` chain (not
     // `setInterval`) so re-jittering after every flock never drifts onto a fixed grid.
     useEffect(() => {
         let cancelled = false
@@ -552,18 +570,15 @@ export function BirdsEffect({ box, effect, quality }: BirdsEffectProps) {
         function scheduleNext(delayMs: number) {
             timeoutId = setTimeout(() => {
                 if (cancelled) return
-                // Flock size re-rolled per flock, integer in [countMin, countMax] inclusive; `reduced`
-                // halves it (rounded up, so a 1-bird flock stays 1).
-                const lo = Math.min(effect.countMin, effect.countMax)
-                const hi = Math.max(effect.countMin, effect.countMax)
-                const rolled = lo + Math.floor(Math.random() * (hi - lo + 1))
-                const flockCount = quality === 'reduced' ? Math.ceil(rolled / 2) : rolled
+                // Flock size re-rolled per flock, integer in [countMin, countMax] inclusive
+                // (the old element's `quality: reduced` halving is dropped — plan Decisions).
+                const flockCount = countMin + Math.floor(Math.random() * (countMax - countMin + 1))
                 // Alternate flock direction (§6); a left-flying flock's path is built right-to-left
                 // and its sprite mirrored, both handled inside `rollBirdPhysicals`/`finalizeBird`.
                 const direction: Direction = flockIndex % 2 === 0 ? 'right' : 'left'
                 flockIndex += 1
                 spawnFlock(flockCount, direction)
-                scheduleNext(effect.intervalSec * 1000 * randRange(INTERVAL_JITTER_MIN, INTERVAL_JITTER_MAX))
+                scheduleNext(intervalSec * 1000 * randRange(INTERVAL_JITTER_MIN, INTERVAL_JITTER_MAX))
             }, delayMs)
         }
 
@@ -573,7 +588,7 @@ export function BirdsEffect({ box, effect, quality }: BirdsEffectProps) {
             cancelled = true
             if (timeoutId !== null) clearTimeout(timeoutId)
         }
-    }, [effect.intervalSec, effect.countMin, effect.countMax, quality, spawnFlock])
+    }, [intervalSec, countMin, countMax, spawnFlock])
 
     // Unmount-only cleanup for every still-pending per-bird removal timeout — the spawn effect's
     // own cleanup above only ever cancels the SPAWN chain, never these. The ref's Set object
@@ -632,10 +647,10 @@ function BirdView({ bird, onDone }: { bird: Bird; onDone: (key: string) => void 
     }, [bird, onDone])
 
     return (
-        <div ref={elRef} className="scene-bird" style={bird.outerStyle}>
-            <div className="scene-bird-sprite" style={bird.innerStyle} />
+        <div ref={elRef} className="rps-bird" style={bird.outerStyle}>
+            <div className="rps-bird-sprite" style={bird.innerStyle} />
         </div>
     )
 }
 
-export default BirdsEffect
+export default BirdsLayer

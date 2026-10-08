@@ -1,5 +1,5 @@
 // Static asset manifest for the `priceSign` element (obs-price-sign-plan.md §2), mirroring
-// `../scene/assets.ts`'s convention: every art layer reads its own `{src, w, h}` from here.
+// the other elements' asset manifests' convention: every art layer reads its own `{src, w, h}` from here.
 // All numbers below were measured on the images after `scripts/trim_canvas.py --solidify 200`
 // and MUST be re-measured (sizes and the badge square) if the art is replaced.
 

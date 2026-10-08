@@ -16,6 +16,7 @@ import type {CSSProperties} from 'react'
 import {MIDDLE_CLOUD_ARC_CENTRE, RIPS_ASSETS, RIPS_VIDEOS, SKY_CLOUD_ASSETS, type RipsAsset} from './assets'
 import {VIDEO_SPEED_MAX, VIDEO_SPEED_MIN, middlePivot} from './recipe'
 import type {FrontCloud, Glow, GlowDepth, GlowMode, MiddleCloud, Podium, RipsSceneRecipe, SkyCloud, Sprite, VideoSprite} from './recipe'
+import {BirdsLayer} from './birds/BirdsLayer'
 import './RipsScene.css'
 
 const STAGE_W = 1080
@@ -24,6 +25,10 @@ const Z_BACKGROUND = 0
 const Z_SKY_BASE = 10 // sky clouds 0..3 -> 10..13
 const Z_MIDDLE = 20
 const Z_MOUNTAIN = 30
+// Birds sit in the middle distance: over the mountain, behind the front cloud strips (rips-scene-birds-plan.md
+// §1.4). A plain layer, not a glow depth — GLOW_DEPTHS is unchanged. The debug `timeScale` does not apply:
+// flights are WAAPI, not CSS keyframes, and the old element had no equivalent.
+const Z_BIRDS = 35
 const Z_FRONT_BACK = 40
 const Z_FRONT_FRONT = 50
 const Z_PODIUM = 60 // in front of every layer and every glow
@@ -556,7 +561,7 @@ function glowBackground(g: Glow): string {
 export function RipsScene({w, h, recipe, debug}: Props) {
     const s = w / STAGE_W
     const timeScale = debug?.timeScale && debug.timeScale > 0 ? debug.timeScale : 1
-    const {background, skyClouds, middleCloud: mc, mountain, frontBack, frontFront, glows, podium} = recipe
+    const {background, skyClouds, middleCloud: mc, mountain, frontBack, frontFront, glows, podium, birds} = recipe
 
     // Sky cloud pivots in stage px, for the debug markers.
     const skyPivots = skyClouds.map((c, i) => skyGeometry(c, SKY_CLOUD_ASSETS[i]).pivot)
@@ -585,6 +590,12 @@ export function RipsScene({w, h, recipe, debug}: Props) {
                     draggable={false}
                     style={{width: mountain.width * s, left: (w - mountain.width * s) / 2 + mountain.x * s, bottom: mountain.bottom * s, zIndex: Z_MOUNTAIN}}
                 />
+            )}
+
+            {birds.enabled && (
+                <div className="rps-layer" style={{zIndex: Z_BIRDS}}>
+                    <BirdsLayer birds={birds} box={{w, h}} s={s}/>
+                </div>
             )}
 
             {frontBack.enabled && <FrontStrip cfg={frontBack} w={w} s={s} z={Z_FRONT_BACK} timeScale={timeScale}/>}

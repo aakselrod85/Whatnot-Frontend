@@ -2,8 +2,8 @@
 
 ## build_bird_sheet.py
 
-Builds the bird sprite sheet used by the OBS scene element (`BirdsEffect.tsx`,
-`src/app/obs/layout/elements/scene/assets.ts`) from the raw AI-delivered
+Builds the bird sprite sheet used by the `ripsScene` birds layer
+(`src/app/obs/rips_scene/birds/BirdsLayer.tsx`, `src/app/obs/rips_scene/assets.ts`) from the raw AI-delivered
 artwork.
 
 The raw delivery (`birds_original.png`, kept at the monorepo root) has all
@@ -49,7 +49,7 @@ documented below in case a future delivery ISN'T pre-aligned to a grid and needs
 frames spliced in from another file.
 
 Whenever this command changes, update `frames`/`w`/`h` in
-`src/app/obs/layout/elements/scene/assets.ts` to the printed numbers.
+`src/app/obs/rips_scene/assets.ts` to the printed numbers.
 
 ### Run with defaults (base sheet only)
 
@@ -60,7 +60,8 @@ python3 scripts/build_bird_sheet.py
 ```
 
 This reads `<monorepo root>/birds_original.png` and writes
-`public/images/scene/birds.png`. On success it prints:
+`public/images/rips_scene/birds.png` (the script's built-in default since the `scene` element was
+retired — rips-scene-birds-plan.md §1.1). On success it prints:
 
 ```
 width height frames cellW cellH
