@@ -502,6 +502,71 @@ function PodiumSprite({sp, asset, s}: {sp: Sprite; asset: RipsAsset; s: number})
     return <img className="rps-img" src={asset.src} alt="" draggable={false} style={spriteStyle(sp, asset, s)}/>
 }
 
+// The flag's cloth moving in a light wind. The art is drawn row by row into a canvas, each row shifted
+// sideways: a slow pendulum sway plus two ripples travelling down the cloth, all growing from zero
+// at the rod (rows above FLAG_PIN, native px) to full at the hem, so the rod and the cloth's top edge
+// stay put and the tassels move most. Rows also get a faint light/dark tint from how steeply the
+// cloth is bent there, so the motion reads as folds rather than a skewed picture. Frequencies are
+// whole cycles per FLAG_LOOP seconds: the motion repeats exactly. Mirrored copies get it for free
+// through the group's scale(-1, 1).
+const FLAG_PIN = 80
+const FLAG_LOOP = 6
+const FLAG_AMP = 7 // native px at the hem, at flagWind 1
+
+function WavingFlag({sp, asset, s, wind}: {sp: Sprite; asset: RipsAsset; s: number; wind: number}) {
+    const ref = useRef<HTMLCanvasElement>(null)
+    const style = spriteStyle(sp, asset, s)
+    const cssW = sp.width * s, cssH = (sp.width * asset.h / asset.w) * s
+    useEffect(() => {
+        const cv = ref.current
+        if (!cv || !sp.enabled) return
+        const dpr = Math.min(2, window.devicePixelRatio || 1)
+        cv.width = Math.max(1, Math.round(cssW * dpr))
+        cv.height = Math.max(1, Math.round(cssH * dpr))
+        const ctx = cv.getContext('2d')
+        if (!ctx) return
+        const img = new Image()
+        img.src = asset.src
+        let raf = 0
+        const t0 = performance.now()
+        const k = cv.width / asset.w // canvas px per native px
+        const draw = () => {
+            const t = ((performance.now() - t0) / 1000) % FLAG_LOOP
+            const th = (2 * Math.PI * t) / FLAG_LOOP
+            ctx.clearRect(0, 0, cv.width, cv.height)
+            const shift = (y: number) => {
+                if (y <= FLAG_PIN) return 0
+                const f = Math.pow((y - FLAG_PIN) / (asset.h - FLAG_PIN), 1.35)
+                const sway = 0.55 * Math.sin(th + 0.4)
+                const r1 = 0.32 * Math.sin(2 * th - y * 0.028)
+                const r2 = 0.13 * Math.sin(3 * th - y * 0.05 + 1.7)
+                return FLAG_AMP * wind * f * (sway + r1 + r2)
+            }
+            // rows are 1 native px tall, laid on exact canvas-pixel bands (no overlap: an overlapping
+            // semi-transparent edge would show as a faint line every row)
+            for (let y = 0; y < asset.h; y++) {
+                const y0 = Math.round(y * k), y1 = Math.round((y + 1) * k)
+                if (y1 > y0) ctx.drawImage(img, 0, y, asset.w, 1, shift(y + 0.5) * k, y0, cv.width, y1 - y0)
+            }
+            // fold shading: tint each row by the cloth's bend there, only where the cloth is (source-atop)
+            ctx.globalCompositeOperation = 'source-atop'
+            for (let y = FLAG_PIN; y < asset.h; y += 2) {
+                const slope = (shift(y + 2) - shift(y)) / 2
+                const a = Math.max(-0.16, Math.min(0.16, slope * 0.9))
+                ctx.fillStyle = a > 0 ? `rgba(255,240,210,${a.toFixed(3)})` : `rgba(10,6,30,${(-a).toFixed(3)})`
+                const y0 = Math.round(y * k), y1 = Math.round((y + 2) * k)
+                ctx.fillRect(0, y0, cv.width, y1 - y0)
+            }
+            ctx.globalCompositeOperation = 'source-over'
+            raf = requestAnimationFrame(draw)
+        }
+        img.onload = () => { raf = requestAnimationFrame(draw) }
+        return () => cancelAnimationFrame(raf)
+    }, [asset, cssW, cssH, wind, sp.enabled])
+    if (!sp.enabled) return null
+    return <canvas ref={ref} className="rps-img" style={style}/>
+}
+
 /** A podium prop drawn as a muted, looping, autoplaying video. `playbackRate` is not an HTML
  *  attribute, so it is set on the element after mount and again whenever `speed` changes. */
 function PodiumVideo({sp, asset, s}: {sp: VideoSprite; asset: RipsAsset; s: number}) {
@@ -543,7 +608,9 @@ function PodiumGroup({podium, s, mirrored}: {podium: Podium; s: number; mirrored
             style={{left: anchorX * s, top: podium.y * s, zIndex: Z_PODIUM, transformOrigin: '0 0', transform: `scale(${sx}, ${podium.scale})`}}
         >
             <PodiumSprite sp={podium.pedestal} asset={RIPS_ASSETS.pedestal} s={s}/>
-            <PodiumSprite sp={podium.flag} asset={RIPS_ASSETS.flag} s={s}/>
+            {podium.flagWind > 0
+                ? <WavingFlag sp={podium.flag} asset={RIPS_ASSETS.flag} s={s} wind={Math.min(3, podium.flagWind)}/>
+                : <PodiumSprite sp={podium.flag} asset={RIPS_ASSETS.flag} s={s}/>}
             <PodiumVideo sp={podium.fire} asset={RIPS_VIDEOS.fire} s={s}/>
             <PodiumSprite sp={podium.vase} asset={RIPS_ASSETS.vase} s={s}/>
         </div>

@@ -255,6 +255,9 @@ export default function Page() {
                 <Num label="Y (from anchor, up is negative)" value={sp.y} min={-2000} max={2000} step={1} onChange={(v) => setSprite(key, {y: v})}/>
                 <Num label="Width" value={sp.width} min={10} max={2000} step={1} onChange={(v) => setSprite(key, {width: v})}/>
                 <Num label="Rotation °" value={sp.rotation} min={-180} max={180} step={0.5} onChange={(v) => setSprite(key, {rotation: v})}/>
+                {key === 'flag' && (
+                    <Num label="Wind (0 = still)" value={recipe.podium.flagWind} min={0} max={3} step={0.1} onChange={(v) => setPodium({flagWind: v})}/>
+                )}
                 {key === 'fire' && (
                     <Num
                         label="Speed ×"
