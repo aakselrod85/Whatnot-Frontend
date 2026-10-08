@@ -38,7 +38,7 @@ The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone 
 | `veined` (default) | `public/images/rips_tiles/veined/` | The board's marble across the whole stone, veins included |
 | `clean` | `public/images/rips_tiles/clean/` | Veins softened away inside the gold octagon, so nothing runs behind the logo |
 
-Both marble sets also swap the board backdrop to `public/images/rips_board/board_tiles.png`: the same board with the gold frame around the blue inset redrawn in the tiles' gold, with the same cut corners.
+Both marble sets also swap the board backdrop to `public/images/rips_board/board_tiles.png`: the same board with the gold frame around the blue inset redrawn in the tiles' gold, with the same cut corners and a three-face moulding. See "Change the board edge" below.
 
 `icons` brings back the previous `new_teams` octagon icons and the original `board.png`.
 
@@ -56,6 +56,31 @@ python3 scripts/rips-tiles/export.py
 ```
 
 Run it from `Whatnot-Frontend/`; it needs Google Chrome installed. To preview the design on the board, serve the repo (`python3 -m http.server` from `Whatnot-Frontend/`) and open `http://localhost:8000/scripts/rips-tiles/tiles.html`.
+
+**Change the board edge**
+
+The gold edge around the blue inset is part of `board_tiles.png`. It is drawn in code, so nothing is hand-edited: change the code, then re-export. The code is `drawBoardBackdrop` in `scripts/rips-tiles/tiles.html`. All sizes are in board pixels (the board is 1080x250).
+
+| What | Where | Now |
+|---|---|---|
+| Thickness | `bw` on the `const F = …` line | `10` |
+| Corner cut size | `cut` on the same line | `21` |
+| Outer position | `F` (`x0`, `y0`, `x1`, `y1`) on the same line | `132, 18, 959, 237` |
+| Shadow on the outer slope | first `quad(O…, S1…)` line, `rgba(40,18,0,…)` | `.45` |
+| Highlight face | second `quad(S1…, M…)` line, `rgba(255,246,215,…)` | `.32` |
+| Shade on the inner face | third `quad(M…, I…)` line, `rgba(45,22,0,…)` | `.32` |
+| Gold colours | `DEEP_GOLD` (shared with the tile edges, so it changes both) | |
+
+The edge has three faces of equal width: a shadowed outer slope, a highlighted face and a shaded inner face. In each `rgba(…)` the first number is the strength; the `± 0.1 * d` after it is how much the top-left light brightens the top and left sides and darkens the bottom and right.
+
+Keep `F` covering the original frame (x 133-957, y 20-234), otherwise the old frame shows around the new one. A thinner `bw` is fine: whatever is left of the old frame inside the new edge is filled with the blue inset automatically.
+
+To apply a change:
+
+1. Edit the values.
+2. Check the result in the preview page (see above).
+3. Run `python3 scripts/rips-tiles/export.py`. It rewrites `board_tiles.png` and both tile sets.
+4. Commit the changed PNGs.
 
 ## Deploy on Vercel
 
