@@ -23,7 +23,7 @@
 
   Stage 1  crack():   flash at the hit point, cracks race out to a moderate radius, the glass shakes, then holds.
   Stage 2  shatter(): a second jolt: the crack runs to the screen edges in 0.2 s while the glass shakes, and every
-                      piece bursts off the moment the crack front reaches it, then tumbles out of the bottom. Stage 2 starts from exactly the held frame (same object in memory).
+                      piece bursts off the moment the crack front reaches it: blown outward (near ones fly past the camera), then falls. Stage 2 starts from exactly the held frame (same object in memory).
 
   JS API (window.ScreenCrack):
     crack({x, y, seed})   start stage 1; x/y default to the ball strike point (643, 851) with ±70 px jitter
@@ -296,10 +296,14 @@
           for (const sp of parts) {
             const [sx0, sy0, sx1, sy1] = bbox(sp), [scx, scy] = centroid(sp), sd = Math.hypot(scx - HX, scy - HY), sa = Math.atan2(scy - HY, scx - HX);
             const sPath = new Path2D(); sPath.moveTo(sp[0][0], sp[0][1]); for (let i = 1; i < sp.length; i++) sPath.lineTo(sp[i][0], sp[i][1]); sPath.closePath();
-            const blast = 520 * Math.exp(-sd / 260), spd = U(40, 150) + blast * U(.6, 1.1);
+            // real burst: everything is blown outward from the hit first (hard near it), then gravity takes over;
+            // shards near the hit also fly at the camera (vz: depth speed), growing and spreading until they pass it
+            const near = Math.exp(-sd / 420), blast = 1100 * near, spd = U(140, 380) + blast * U(.7, 1.3);
+            const toCam = r() < .25 + .55 * near;
             shardPolys.push({ path: sPath, bx: Math.floor(sx0) - 6, by: Math.floor(sy0) - 6, bw: Math.ceil(sx1 - sx0) + 12, bh: Math.ceil(sy1 - sy0) + 12,
-              cx: scx, cy: scy, vx: Math.cos(sa) * spd + U(-60, 60), vy: Math.sin(sa) * spd - U(30, 140), om: U(-2.4, 2.4) * (1 + blast / 700),
-              flip: U(2, 7) * (r() < .5 ? -1 : 1), fph: U(0, Math.PI), grow: .45 * Math.exp(-sd / 320), jit: U(0, .02), sprite: null });
+              cx: scx, cy: scy, vx: Math.cos(sa) * spd + U(-80, 80), vy: Math.sin(sa) * spd - U(60, 220), om: U(-3, 3) * (1 + blast / 900),
+              vz: toCam ? U(.7, 1.9) * (.5 + near) : U(0, .25),
+              flip: U(2, 8) * (r() < .5 ? -1 : 1), fph: U(0, Math.PI), jit: U(0, .03), sprite: null });
           }
         }
         pieces.push({ path, edges, branches: brs, shards: shardPolys, bx: Math.floor(bx0) - 6, by: Math.floor(by0) - 6, bw: Math.ceil(bx1 - bx0) + 12, bh: Math.ceil(by1 - by0) + 12, cx, cy, d,
@@ -399,18 +403,23 @@
       if (tt < 0) { drawPiece(ctx, pc, vis, false); continue; }
       for (const sh of pc.shards) falling.push([pc, sh, tt - sh.jit]);
     }
-    const G = 3000;
+    const G = 2400;
+    // far-to-near: shards heading at the camera draw on top
+    falling.sort((a, b) => (a[1].vz * a[2]) - (b[1].vz * b[2]));
     for (const [pc, sh, tt] of falling) {
       if (tt < 0) continue;
+      const z = Math.min(.8, sh.vz * tt), k = 1 / (1 - z);                 // perspective: k grows as the shard nears the camera
+      if (k > 4.2) continue;                                              // gone past the viewer
       if (!sh.sprite) sh.sprite = makeShardSprite(pc, sh);
-      const drag = (1 - Math.exp(-tt * 3)) / 3;                          // the blast slows a little in the air
-      const dx = sh.vx * drag, dy = sh.vy * drag + .5 * G * tt * tt;
-      if (sh.by + dy > H + 250 && dy > 0) continue;
-      const grow = 1 + sh.grow * easeOut(tt / .5, 2);                        // near shards fly toward the camera
+      const drag = (1 - Math.exp(-tt * 2.2)) / 2.2;                      // the blast slows in the air
+      const wx = sh.cx + sh.vx * drag, wy = sh.cy + sh.vy * drag + .5 * G * tt * tt;
+      const px = g.HX + (wx - g.HX) * k, py = g.HY + (wy - g.HY) * k;     // projected about the hit point
+      if (py - sh.bh * k > H + 50 || px + sh.bw * k < -300 || px - sh.bw * k > W + 300) continue;
       const fx = Math.cos(sh.fph + sh.flip * tt), flip = Math.sign(fx || 1) * Math.max(.12, Math.abs(fx));   // tumbling edge-on
       ctx.setTransform(1, 0, 0, 1, sx, sy);
-      ctx.translate(sh.cx + dx, sh.cy + dy); ctx.rotate(sh.om * tt); ctx.scale(grow * flip, grow); ctx.translate(-sh.cx, -sh.cy);
-      ctx.globalAlpha = (.75 + .25 * Math.abs(fx)) * (1 - smooth((tt - 1.1) / .4));
+      ctx.translate(px, py); ctx.rotate(sh.om * tt); ctx.scale(k * flip, k); ctx.translate(-sh.cx, -sh.cy);
+      const pass = 1 - smooth((k - 2.2) / 1.8);                           // fades as it flies past the camera
+      ctx.globalAlpha = (.75 + .25 * Math.abs(fx)) * pass * (1 - smooth((tt - 1.25) / .4));
       ctx.drawImage(sh.sprite, sh.bx, sh.by);
     }
     ctx.globalAlpha = 1;
