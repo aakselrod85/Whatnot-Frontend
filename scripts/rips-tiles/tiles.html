@@ -109,7 +109,7 @@
   // The board backdrop for the marble sets (rips_board/board_tiles.png): board.png with its inset frame
   // redrawn in the tiles' deepGold and with the tiles' cut corners. K = output px per board px.
   function drawBoardBackdrop(ctx, K) {
-    const F = { x0: 132, y0: 18, x1: 959, y1: 237 }, bw = 11, cut = 21;  // just over board.png's frame (133-957 x 20-234), so it is fully covered
+    const F = { x0: 132, y0: 18, x1: 959, y1: 237 }, bw = 7, cut = 21;  // just over board.png's frame (133-957 x 20-234), so it is fully covered
     const poly = (m, c) => { const x0 = F.x0 + m, y0 = F.y0 + m, x1 = F.x1 - m, y1 = F.y1 - m, p = new Path2D();
       p.moveTo(x0 + c, y0); p.lineTo(x1 - c, y0); p.lineTo(x1, y0 + c); p.lineTo(x1, y1 - c); p.lineTo(x1 - c, y1); p.lineTo(x0 + c, y1); p.lineTo(x0, y1 - c); p.lineTo(x0, y0 + c); p.closePath(); return p; };
     ctx.save(); ctx.scale(K, K); ctx.imageSmoothingQuality = 'high';
@@ -117,16 +117,35 @@
     // cream marble into the four corner triangles outside the chamfer: the marble beside each corner
     // mirrored across the frame's outer edge, so the veins run on through the seam
     const ring = new Path2D();
-    ring.moveTo(F.x0, F.y0); ring.lineTo(F.x1, F.y0); ring.lineTo(F.x1, F.y1); ring.lineTo(F.x0, F.y1); ring.closePath();
+    ring.moveTo(F.x0 - 1, F.y0 - 1); ring.lineTo(F.x1 + 1, F.y0 - 1); ring.lineTo(F.x1 + 1, F.y1 + 1); ring.lineTo(F.x0 - 1, F.y1 + 1); ring.closePath();
     ring.moveTo(F.x0 + cut, F.y0); ring.lineTo(F.x0, F.y0 + cut); ring.lineTo(F.x0, F.y1 - cut); ring.lineTo(F.x0 + cut, F.y1);
     ring.lineTo(F.x1 - cut, F.y1); ring.lineTo(F.x1, F.y1 - cut); ring.lineTo(F.x1, F.y0 + cut); ring.lineTo(F.x1 - cut, F.y0); ring.closePath();
-    for (const [x, w, edge] of [[0, 540, F.x0], [540, 540, F.x1]]) {
+    for (const [x, w, edge] of [[0, 540, F.x0 - 3], [540, 540, F.x1 + 3]]) {
       ctx.save(); ctx.clip(ring, 'nonzero'); ctx.beginPath(); ctx.rect(x, 0, w, 250); ctx.clip();
       ctx.translate(2 * edge, 0); ctx.scale(-1, 1); ctx.drawImage(BOARD_IMG, 0, 0, 1080, 250); ctx.restore(); }
-    // the frame: the tiles' gold and shadow, one diagonal sweep across the whole frame (as on each tile)
-    const band = poly(0, cut); band.addPath(poly(bw, cut - bw * .586));
-    ctx.save(); ctx.shadowColor = 'rgba(45,22,0,.85)'; ctx.shadowBlur = 3 * K; ctx.shadowOffsetY = 1.2 * K;
-    ctx.fillStyle = deepGold(ctx, F.x0, F.y0, F.x1, F.y1); ctx.fill(band, 'evenodd'); ctx.restore();
+    // the new frame is thinner than the old one (133-143 x 20-226): fill the old frame left inside it with
+    // the blue inset mirrored across the clean inset edge on each side, so the art runs on without a seam
+    const C = { x0: 145, y0: 29, x1: 947, y1: 224 }, inner = poly(bw, cut - bw * .586);
+    for (const [hx, hy, w, h, mx, my] of [[0, 0, C.x0, 250, C.x0, null], [C.x1, 0, 1080 - C.x1, 250, C.x1, null], [0, 0, 1080, C.y0, null, C.y0], [0, C.y1, 1080, 250 - C.y1, null, C.y1]]) {
+      ctx.save(); ctx.clip(inner); ctx.beginPath(); ctx.rect(hx, hy, w, h); ctx.clip();
+      if (mx !== null) { ctx.translate(2 * mx, 0); ctx.scale(-1, 1); } else { ctx.translate(0, 2 * my); ctx.scale(1, -1); }
+      ctx.drawImage(BOARD_IMG, 0, 0, 1080, 250); ctx.restore(); }
+    // the frame: the tiles' gold as a chiselled bevel. Each of the 8 sides has an outer and an inner facet
+    // (crisp split, mitred corners), gold running along the side, each facet lit or shaded by how it faces
+    // the light (top-left), so the metal has depth instead of one flat sweep.
+    const P = (m, c) => { const x0 = F.x0 + m, y0 = F.y0 + m, x1 = F.x1 - m, y1 = F.y1 - m;
+      return [[x0 + c, y0], [x1 - c, y0], [x1, y0 + c], [x1, y1 - c], [x1 - c, y1], [x0 + c, y1], [x0, y1 - c], [x0, y0 + c]]; };
+    const O = P(0, cut), M = P(bw / 2, cut - bw / 2 * .586), I = P(bw, cut - bw * .586);
+    ctx.save(); ctx.shadowColor = 'rgba(30,15,0,.7)'; ctx.shadowBlur = 1.5 * K; ctx.shadowOffsetY = .8 * K;
+    const band = poly(0, cut); band.addPath(poly(bw, cut - bw * .586)); ctx.fillStyle = '#8a5a14'; ctx.fill(band, 'evenodd'); ctx.restore();
+    const quad = (a, b, c, d) => { ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.lineTo(...c); ctx.lineTo(...d); ctx.closePath(); };
+    for (let i = 0; i < 8; i++) { const j = (i + 1) % 8, dx = O[j][0] - O[i][0], dy = O[j][1] - O[i][1], L = Math.hypot(dx, dy);
+      const nx = dy / L, ny = -dx / L;                                  // outward normal (clockwise outline)
+      const g = deepGold(ctx, O[i][0], O[i][1], O[i][0] + dx * Math.min(1, 260 / L), O[i][1] + dy * Math.min(1, 260 / L));
+      for (const [A, B, tilt] of [[O, M, 1], [M, I, -1]]) {           // outer facet leans outward, inner leans inward
+        const lit = (nx * tilt) * -.6 + (ny * tilt) * -.8;               // facing . light from the top-left
+        quad(A[i], A[j], B[j], B[i]); ctx.fillStyle = g; ctx.fill();
+        ctx.fillStyle = lit > 0 ? `rgba(255,248,220,${(lit * .45).toFixed(3)})` : `rgba(40,20,0,${(-lit * .5).toFixed(3)})`; ctx.fill(); } }
     ctx.restore();
   }
   function slabFill(ctx, slab, x, y, w, h, r) {                    // a random cut of the slab, randomly rotated
