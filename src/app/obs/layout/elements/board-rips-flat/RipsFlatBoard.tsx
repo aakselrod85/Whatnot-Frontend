@@ -237,7 +237,7 @@ export function RipsFlatBoard({box}: ElementProps) {
     }
 
     return (
-        <div className="rfb-root" ref={wrapRef} style={{...(layoutVars ?? {}), '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
+        <div className={tileSet === 'icons' ? 'rfb-root' : 'rfb-root rfb-root-stone'} ref={wrapRef} style={{...(layoutVars ?? {}), '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
             {layoutVars && (
                 <>
                     <div className="rfb-grid">

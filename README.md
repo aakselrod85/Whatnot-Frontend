@@ -38,7 +38,9 @@ The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone 
 | `veined` (default) | `public/images/rips_tiles/veined/` | The board's marble across the whole stone, veins included |
 | `clean` | `public/images/rips_tiles/clean/` | Veins softened away inside the gold octagon, so nothing runs behind the logo |
 
-`icons` brings back the previous `new_teams` octagon icons.
+Both marble sets also swap the board backdrop to `public/images/rips_board/board_tiles.png`: the same board with the gold frame around the blue inset redrawn in the tiles' gold, with the same cut corners.
+
+`icons` brings back the previous `new_teams` octagon icons and the original `board.png`.
 
 **Pick a set**
 
@@ -47,7 +49,7 @@ The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone 
 
 **Change or regenerate the tiles**
 
-The tiles are drawn by `scripts/rips-tiles/tiles.html` and exported to PNG (264x264, 4x the 66 px cell) by:
+The tiles and the backdrop are drawn by `scripts/rips-tiles/tiles.html` and exported to PNG (tiles 264x264, 4x the 66 px cell; backdrop 2160x500) by:
 
 ```
 python3 scripts/rips-tiles/export.py

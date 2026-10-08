@@ -294,7 +294,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         singletonGroup: 'board:rips_flat',
         defaultBox: RIPS_FLAT_BOX,
         // Static art only; team icons and tiled skins resolve at render time.
-        preload: ['/images/rips_board/board.png'],
+        preload: ['/images/rips_board/board.png', '/images/rips_board/board_tiles.png'],
         component: RipsFlatBoard,
         available: true,
         hasBox: true,

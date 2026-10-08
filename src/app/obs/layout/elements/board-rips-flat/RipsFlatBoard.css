@@ -9,6 +9,12 @@
     background: url('/images/rips_board/board.png') 0 0 / 100% 100% no-repeat;
 }
 
+/* Marble tile sets: same board with the inset frame redrawn in the tiles' gold and cut corners
+   (scripts/rips-tiles/). Same geometry as board.png, so INSET in RipsFlatBoard.tsx still applies. */
+.rfb-root-stone {
+    background-image: url('/images/rips_board/board_tiles.png');
+}
+
 .rfb-grid {
     position: absolute;
     inset: 0;

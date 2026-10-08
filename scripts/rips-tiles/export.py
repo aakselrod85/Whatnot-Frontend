@@ -1,4 +1,5 @@
-"""Renders the board:rips_flat marble tiles to public/images/rips_tiles/{veined,clean}/<Team>.png.
+"""Renders the board:rips_flat marble tiles to public/images/rips_tiles/{veined,clean}/<Team>.png
+and their backdrop to public/images/rips_board/board_tiles.png.
 
 tiles.html draws every tile on a canvas; this serves the repo over a local HTTP server (a canvas
 fed from file:// images is tainted and cannot be exported), loads tiles.html?export=<size>&set=<set>
@@ -54,6 +55,19 @@ def main():
                 with open(os.path.join(OUT, tile_set, f'{team}.png'), 'wb') as f:
                     f.write(base64.b64decode(data_url.split(',', 1)[1]))
             print(f'{tile_set}: {len(tiles)} tiles at {args.size}px')
+        # the backdrop that goes with them: board.png with the inset frame redrawn to match
+        url = f'http://127.0.0.1:{port}/scripts/rips-tiles/tiles.html?export=board'
+        dom = subprocess.run(
+            [args.chrome, '--headless=new', '--disable-gpu', '--virtual-time-budget=15000', '--dump-dom', url],
+            capture_output=True, text=True, check=True,
+        ).stdout
+        m = re.search(r'<pre id="export">(\{.*?\})</pre>', dom, re.S)
+        if not m:
+            raise SystemExit('board: no export block in the page')
+        data_url = json.loads(html.unescape(m.group(1)))['board_tiles']
+        with open(os.path.join(ROOT, 'public', 'images', 'rips_board', 'board_tiles.png'), 'wb') as f:
+            f.write(base64.b64decode(data_url.split(',', 1)[1]))
+        print('board: rips_board/board_tiles.png')
     finally:
         server.shutdown()
 
