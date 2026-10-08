@@ -97,21 +97,17 @@ function useRipsFlatLayout(rowCount: number) {
     return {wrapRef: setWrapEl, layoutVars}
 }
 
-// `?ripsTiles=veined|clean|icons` on the OBS page URL picks the front-face art for this browser
-// source. Read after mount (not during render) so the server render and hydration agree.
-function useRipsTileSet(): RipsTileSet {
-    const [set, setSet] = useState<RipsTileSet>(DEFAULT_RIPS_TILE_SET)
-    useEffect(() => {
-        const q = new URLSearchParams(window.location.search).get('ripsTiles')
-        if (q && (RIPS_TILE_SETS as readonly string[]).includes(q)) setSet(q as RipsTileSet)
-    }, [])
-    return set
+// The element's `tileSet` (set in /obs/controls) picks the front-face art; anything unknown falls
+// back to the default.
+function tileSetOf(element: ElementProps['element']): RipsTileSet {
+    const v = element.kind === 'board' ? element.tileSet : undefined
+    return v && (RIPS_TILE_SETS as readonly string[]).includes(v) ? v : DEFAULT_RIPS_TILE_SET
 }
 
-export function RipsFlatBoard({box}: ElementProps) {
+export function RipsFlatBoard({box, element}: ElementProps) {
     const {stream, events: rawEvents, series, priceRanges, teamPrices, lastFetched} = useLayoutData()
     const manifest = useManifest()
-    const tileSet = useRipsTileSet()
+    const tileSet = tileSetOf(element)
 
     // Cells whose flip animation has finished — only these join the shared grouping.
     const [settled, setSettled] = useState<Set<number>>(new Set())

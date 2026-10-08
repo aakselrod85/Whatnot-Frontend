@@ -8,7 +8,7 @@ import './RipsFlatCell.css'
 // Front-face art (README "Rips board marble tiles"). 'veined' / 'clean' are the marble stones in
 // public/images/rips_tiles/ (scripts/rips-tiles/): they fill the whole cell so neighbouring stones
 // touch and the board shows through their cut corners. 'icons' is the earlier new_teams octagon at
-// 92% of the cell. The OBS page URL can override the default per source: `?ripsTiles=clean`.
+// 92% of the cell. Chosen per board element in /obs/controls (the element's `tileSet`).
 export const RIPS_TILE_SETS = ['veined', 'clean', 'icons'] as const
 export type RipsTileSet = typeof RIPS_TILE_SETS[number]
 export const DEFAULT_RIPS_TILE_SET: RipsTileSet = 'veined'

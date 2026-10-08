@@ -44,8 +44,7 @@ Both marble sets also swap the board backdrop to `public/images/rips_board/board
 
 **Pick a set**
 
-- Per OBS source: add `?ripsTiles=clean` (or `veined`, `icons`) to the layout browser source URL, e.g. `<frontend-host>/obs/layout/<id>?ripsTiles=clean`. Refresh the source after changing it.
-- Default for every source: change `DEFAULT_RIPS_TILE_SET` in `src/app/obs/layout/elements/board-rips-flat/RipsFlatCell.tsx`.
+In `/obs/controls/<id>`, open the Rips board element's settings and choose **Tiles**: *Marble, veined*, *Marble, clean centre* or *Classic icons*. It is saved with the layout and the stream updates on its own. A board that never had it set shows `DEFAULT_RIPS_TILE_SET` (in `src/app/obs/layout/elements/board-rips-flat/RipsFlatCell.tsx`).
 
 **Change or regenerate the tiles**
 
