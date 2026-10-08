@@ -43,7 +43,7 @@ A procedural cracked-glass overlay for the 1080x1920 stream canvas. Every load g
 
 1. **Crack** (0.6 s): flash, the crack spreads from the hit point, the glass shakes.
 2. **Hold** (1.2 s by default).
-3. **Shatter** (about 1.9 s): a second jolt sweeps the crack across the screen and the glass breaks into shards that fall out of the bottom.
+3. **Shatter** (about 1.9 s): a second jolt sweeps the crack across the screen and the glass bursts: shards blow outward from the hit (the nearest fly past the camera), then fall away.
 
 It is a single self-contained HTML file with no dependencies and no Next.js involvement.
 
