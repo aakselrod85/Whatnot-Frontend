@@ -44,7 +44,6 @@ export type ElementKind =
     | 'imageBox'
     | 'priceRanges'
     | 'priceSign'
-    | 'scene'
     | 'ripsScene'
     | 'ticker'
     | 'cameraShelf'
@@ -90,8 +89,7 @@ export type TickerFont = 'orbitron' | 'handjet'
 export const TICKER_FONTS = ['orbitron', 'handjet'] as const
 
 // Seeded by `makeElement` (registry.ts) for a freshly-placed ticker — all six widgets on, no label/
-// colour overrides. Cloned per element (never shared by reference) the same way `DEFAULT_SCENE_EFFECTS`
-// is cloned in `makeElement`'s `scene` case.
+// colour overrides. Cloned per element (never shared by reference) in `makeElement`'s `ticker` case.
 export const DEFAULT_TICKER_SLOTS: Record<WidgetId, TickerSlot> = Object.fromEntries(
     WIDGET_IDS.map((id) => [id, { enabled: true }])
 ) as Record<WidgetId, TickerSlot>
@@ -137,7 +135,7 @@ export type Reactions = Partial<Record<SceneEventName, boolean>>
 // Single source of truth: the controls page shows the Mirror button only for these kinds, and
 // config.ts's validator refuses a `mirrorOf` whose source is any other kind. Add a kind here to
 // make it mirrorable; nothing else needs to change (`resolveEffective` is kind-agnostic).
-export const MIRRORABLE_KINDS = ['text', 'scene'] as const satisfies readonly ElementKind[]
+export const MIRRORABLE_KINDS = ['text'] as const satisfies readonly ElementKind[]
 export type MirrorableKind = (typeof MIRRORABLE_KINDS)[number]
 
 // Present on every element kind so a mirror can be of any kind the allowlist admits. A mirror
@@ -147,75 +145,6 @@ export type MirrorableKind = (typeof MIRRORABLE_KINDS)[number]
 // never through this field directly. Code elsewhere may read `mirrorOf` only for POLICY ("is
 // this a mirror" / "who mirrors this"), never to itself merge properties.
 export type MirrorFields = { mirrorOf?: string }
-
-// `scene` — a layered 2.5D living background (obs-scene-element-plan.md §1/§2). Delivered in three
-// independent iterations; this file carries iteration 1's three effect ids (sky/mountain/clouds),
-// iteration 2's `rain`/`lightning` (§5), and iteration 3's `birds` (§6) — each appended to
-// `SceneEffect`/`SCENE_EFFECT_IDS`/`DEFAULT_SCENE_EFFECTS` in turn, never reordering or removing
-// what's already here (a stored config's `effects` array survives across iterations on that
-// promise).
-export const SKY_MOODS = ['day', 'dusk', 'night'] as const
-export type SkyMood = (typeof SKY_MOODS)[number]
-
-export const SCENE_QUALITIES = ['full', 'reduced'] as const
-export type SceneQuality = (typeof SCENE_QUALITIES)[number]
-
-// One entry per effect. `enabled` is on every member so the settings panel can render a uniform
-// toggle column. `y`/`yMin`/`yMax` are percentages of the element's own box height (0 = top edge,
-// 100 = bottom edge) — see obs-scene-element-plan.md §1.1 for which edge of each ART layer they
-// anchor (`mountain`'s bottom edge, a `clouds` strip's vertical centre). Fill layers (`sky`) have
-// no `y`. `clouds` may appear twice in one `effects` array (`layer: 'far' | 'near'`, §1.2) — the
-// two copies are otherwise-independent effect instances, not two fields of one effect.
-export type SceneEffect =
-    | { id: 'sky'; enabled: boolean; mood: SkyMood }
-    | { id: 'mountain'; enabled: boolean; y: number } // bottom edge at y
-    | { id: 'clouds'; enabled: boolean; layer: 'far' | 'near'; speed: number; opacity: number; y: number } // centre at y
-    // iteration 2 (obs-scene-element-plan.md §5) — appended, never inserted earlier in the union:
-    // a stored config's `effects` array is order-independent by id, but SCENE_EFFECT_IDS/DEFAULT_
-    // SCENE_EFFECTS below read this union's member order for nothing load-bearing, so keeping new
-    // members at the end is just discipline, not a hard requirement.
-    | { id: 'rain'; enabled: boolean; intensity: number } // 0..1
-    | { id: 'lightning'; enabled: boolean; ambientIntervalSec: number | null } // null = cue-only, no ambient timer
-    // iteration 3 (obs-scene-element-plan.md §6): a flock of a random `countMin..countMax` birds
-    // (integer, inclusive, re-rolled per flock) spawns every `intervalSec` (± jitter) and flies the
-    // box's width inside the `yMin..yMax` band (art layer, z 40 — see effectRegistry.ts's
-    // `LAYER_Z`). A legacy single `count` is migrated to `countMin = countMax = count` by
-    // config.ts's `sanitizeSceneEffects`.
-    | { id: 'birds'; enabled: boolean; countMin: number; countMax: number; intervalSec: number; yMin: number; yMax: number }
-
-export type SceneEffectId = SceneEffect['id']
-
-// Effect ids actually implemented so far — grows in lockstep with the `SceneEffect` union above as
-// §5/§6 append members. Used by config.ts to decide which stored effect ids are "known" (kept) vs.
-// "unknown" (dropped, not rejected — obs-scene-element-plan.md §2.2: a config saved by a newer
-// build must still load on an older one, and vice versa).
-export const SCENE_EFFECT_IDS: readonly SceneEffectId[] = ['sky', 'mountain', 'clouds', 'rain', 'lightning', 'birds']
-
-export function isSceneEffectId(v: unknown): v is SceneEffectId {
-    return typeof v === 'string' && (SCENE_EFFECT_IDS as readonly string[]).includes(v)
-}
-
-// Seeded by `makeElement` (registry.ts) for a freshly-placed scene, and by config.ts's
-// `migrateConfig` whenever a stored `effects` array is missing/empty/entirely-unknown-ids —
-// obs-scene-element-plan.md §2.1/§2.2. Order matches the layer table's back-to-front reading order
-// (sky, clouds-far, mountain, clouds-near) though paint order is actually decided by
-// `elements/scene/effectRegistry.ts`'s `LAYER_Z`, not this array's order.
-export const DEFAULT_SCENE_EFFECTS: SceneEffect[] = [
-    { id: 'sky', enabled: true, mood: 'day' },
-    { id: 'clouds', enabled: true, layer: 'far', speed: 12, opacity: 0.7, y: 35 },
-    { id: 'mountain', enabled: true, y: 100 },
-    { id: 'clouds', enabled: true, layer: 'near', speed: 28, opacity: 0.9, y: 80 },
-    // iteration 2 (obs-scene-element-plan.md §5): both OFF by default — weather is a cue-driven
-    // mood (the 'storm' scene event), not the resting state of the scene. `config.ts`'s
-    // `sanitizeSceneEffects` appends these two (append-if-missing, not substitute-all) onto any
-    // iteration-1 config that predates them.
-    { id: 'rain', enabled: false, intensity: 0.5 },
-    { id: 'lightning', enabled: false, ambientIntervalSec: null },
-    // iteration 3 (obs-scene-element-plan.md §6): on by default — birds are ambient scenery, not a
-    // cue-driven mood like the weather effects above. `config.ts`'s `sanitizeSceneEffects` appends
-    // this (append-if-missing, not substitute-all) onto any iteration-1/2 config that predates it.
-    { id: 'birds', enabled: true, countMin: 2, countMax: 5, intervalSec: 25, yMin: 15, yMax: 45 },
-]
 
 export type Element = (
     // `sport_style` (sport-style-board-plan.md §2, R1 fix 5, R3) carries extra fields, read only by
@@ -439,25 +368,11 @@ export type Element = (
           z?: number
           reactions?: Reactions
       }
-    // Layered 2.5D living background (obs-scene-element-plan.md §1/§2/§4) — a normal boxed element
-    // sized entirely from its own resolved `box`, no reference resolution/aspect assumption (§1.1).
-    // `quality` defaults to 'full' when absent (registry default; see SceneElement.tsx). `effects`
-    // is REQUIRED (unlike most other kinds' optional settings-with-a-component-default pattern)
-    // because it is a list, not a scalar — there is no single sane "leave it unset" for an array of
-    // independently-toggled layers; `makeElement` seeds it from DEFAULT_SCENE_EFFECTS.
-    | {
-          kind: 'scene'
-          quality?: SceneQuality
-          effects: SceneEffect[]
-          placements: Partial<Record<PlacementKey, Box>>
-          z?: number
-          reactions?: Reactions
-      }
     // Curved LED-band text ticker (obs-ticker-plan.md) — a static `curve.png` texture with one line
     // of "label: value" parts compiled from the six circle widgets' data, looped forever along the
     // band's centreline. The circle widgets themselves are not placed; this only reuses their data
     // sources and settings panels (elements/ticker/TickerElement.tsx,
-    // controls/elements/TickerSettings.tsx). `slots` is REQUIRED, like `scene.effects` above — a
+    // controls/elements/TickerSettings.tsx). `slots` is REQUIRED (not optional-with-a-component-default) — a
     // list of six independently-toggled entries has no single sane "leave it unset" default; a
     // freshly-added ticker is seeded with `DEFAULT_TICKER_SLOTS` (all six enabled, no overrides).
     // Every other field is optional — component defaults (TickerElement.tsx's DEFAULT_* constants)

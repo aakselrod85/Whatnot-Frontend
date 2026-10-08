@@ -2,7 +2,7 @@
  * .container/.row/.col, no vh/vw/vmin; every size CameraShelfElement.tsx hands this file is
  * already an absolute px value derived from `box` (same convention as the other boxed elements'
  * CSS, e.g. ../price-sign/PriceSignElement.css). Nothing here animates — the plan's first build
- * has no motion (obs-scene-element-plan.md §1.4's compositor rule is moot with zero animated
+ * has no motion (the compositor-only-animation rule is moot with zero animated
  * layers).
  */
 

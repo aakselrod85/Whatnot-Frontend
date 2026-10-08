@@ -25,8 +25,6 @@ import { PriceRangesElement } from './elements/price-ranges/PriceRangesElement'
 import { PriceSignElement } from './elements/price-sign/PriceSignElement'
 import { RipsSceneElement } from './elements/rips-scene/RipsSceneElement'
 import { RIPS_SCENE_PRELOAD } from '../rips_scene/assets'
-import { SceneElement } from './elements/scene/SceneElement'
-import { SCENE_PRELOAD } from './elements/scene/assets'
 import { FRAME_PRELOAD } from './elements/cards/frameAssets'
 import { SIGN_PRELOAD } from './elements/price-sign/assets'
 import { TickerElement } from './elements/ticker/TickerElement'
@@ -36,7 +34,7 @@ import { SHELF_ASSETS, SHELF_PRELOAD } from './elements/camera-shelf/assets'
 import { ObsToggleElement } from './elements/obs-toggle/ObsToggleElement'
 import { mountObsToggle } from './elements/obs-toggle/mount'
 import type { AnimationId, BoardVariant, Box, Element, ElementKind, FrameVariant, Phase, TickerSlot, WidgetId } from './schema'
-import { ANIMATION_IDS, DEFAULT_FRAME_BORDERS, DEFAULT_FRAME_WIDTH, DEFAULT_SCENE_EFFECTS, DEFAULT_TICKER_SLOTS, WIDGET_IDS } from './schema'
+import { ANIMATION_IDS, DEFAULT_FRAME_BORDERS, DEFAULT_FRAME_WIDTH, DEFAULT_TICKER_SLOTS, WIDGET_IDS } from './schema'
 import type { SceneEventName } from './sceneEvents'
 import type { MountFn } from './stageHooks'
 // `registryIdOf` moved to elementId.ts (obs-layout-adding-elements-plan.md §A.1) — that module has
@@ -74,7 +72,6 @@ export type RegistryId =
     | 'image-box'
     | 'priceRanges'
     | 'priceSign'
-    | 'scene'
     | 'ripsScene'
     | 'ticker'
     | 'cameraShelf'
@@ -193,10 +190,6 @@ const IMAGE_BOX: Box = { x: 300, y: 720, w: 480, h: 480 }
 const PRICE_RANGES_BOX: Box = { x: 40, y: 130, w: 560, h: 400 }
 // obs-price-sign-plan.md §3: the pedestal sits on the box's bottom edge, tablos stack upward.
 const PRICE_SIGN_BOX: Box = { x: 240, y: 1100, w: 600, h: 500 }
-// obs-scene-element-plan.md §1.1: the stage is the box itself, no reference aspect assumed — this
-// is a starting point only (roughly the "upper third" the plan's intro describes replacing), same
-// as every other registry default box; the operator resizes it in the builder like any other.
-const SCENE_BOX: Box = { x: 0, y: 0, w: 1080, h: 640 }
 // obs-ticker-plan.md §4: full canvas width, texture aspect (361 = 1080 * 725 / 2170) — same
 // starting-point convention as every other registry default box; the operator resizes/repositions
 // it in the builder like anything else.
@@ -649,7 +642,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         id: 'ripsScene',
         kind: 'ripsScene',
         label: 'Rips scene',
-        // Own group: independent of the older `scene` element (rips-scene-plan.md), one per config.
+        // Own group, one per config (rips-scene-plan.md).
         singleton: true,
         singletonGroup: 'ripsScene',
         defaultBox: { x: 0, y: 0, w: 1080, h: 640 },
@@ -660,25 +653,6 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // The settings panel is a JSON textarea — too wide for a narrow controls column.
         wideBlock: true,
         reactsTo: [],
-    },
-    scene: {
-        id: 'scene',
-        kind: 'scene',
-        label: 'Scene',
-        // One living background per config, like `results`/`cards`/`priceRanges` — there's no use
-        // case for two stacked on the same canvas.
-        singleton: true,
-        singletonGroup: 'scene',
-        defaultBox: SCENE_BOX,
-        preload: SCENE_PRELOAD,
-        component: SceneElement,
-        available: true,
-        hasBox: true,
-        // obs-scene-element-plan.md §5: 'storm' latches rain + ambient lightning on (via
-        // SceneElement.tsx's storm-override, read through the same `useEventActive` context
-        // StashOrPassWrap.tsx uses); 'thunder' is a momentary single strike, relayed to the
-        // lightning effect as a `strike` SceneCue.
-        reactsTo: ['storm', 'thunder'],
     },
     ticker: {
         id: 'ticker',
@@ -696,7 +670,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         hasBox: true,
         // The settings panel mounts all six widgets' own settings panels (Pick2Settings,
         // StashOrPassSettings, NameSettings, BoxesPerBreakSettings, CountSettings) plus its own
-        // line/slot controls — same reasoning as `cards`/`board:cobra`/`scene`: a narrow column
+        // line/slot controls — same reasoning as `cards`/`board:cobra`: a narrow column
         // would squash it.
         wideBlock: true,
         reactsTo: [],
@@ -835,15 +809,8 @@ export function makeElement(registryId: RegistryId): Element {
         case 'ripsScene':
             // `recipe` left unset — the component's DEFAULT_RIPS_RECIPE applies (rips-scene-plan.md §5).
             return { kind: 'ripsScene', placements }
-        case 'scene':
-            // Unlike text/imageBox's "leave it unset, the component's own default applies"
-            // convention, `effects` is a REQUIRED array (schema.ts's Element union) — there is no
-            // single sane "unset" for a list of independently-toggled layers, so a freshly-added
-            // scene is seeded with its own copy of DEFAULT_SCENE_EFFECTS. `quality` is left unset
-            // (SceneElement.tsx's own default, 'full', applies).
-            return { kind: 'scene', placements, effects: DEFAULT_SCENE_EFFECTS.map((e) => ({ ...e })) }
         case 'ticker':
-            // `slots` is REQUIRED (schema.ts, same reasoning as `scene.effects` above) — a
+            // `slots` is REQUIRED (schema.ts, a list has no single sane "unset") — a
             // freshly-added ticker is seeded with its own copy of DEFAULT_TICKER_SLOTS (all six
             // widgets enabled, no label/colour overrides). separator/fontSize/speed/direction are
             // left unset — TickerElement.tsx's own DEFAULT_* constants apply.

@@ -94,11 +94,23 @@ export type Podium = {
     vase: Sprite
 }
 
+// Flying birds (rips-scene-birds-plan.md §1.2). Ported from the retired `scene` element; the layer
+// (birds/BirdsLayer.tsx) clamps and orders the min/max pairs itself, so mergeRecipe does not.
+export type Birds = {
+    enabled: boolean
+    countMin: number // birds per flock, inclusive range, integers 1..12, re-rolled per flock
+    countMax: number
+    intervalSec: number // seconds between flocks (± the effect's own jitter), 5..600
+    yMin: number // flight band, stage px from the TOP edge
+    yMax: number
+}
+
 export type RipsSceneRecipe = {
     background: { enabled: boolean }
     skyClouds: SkyCloud[] // always exactly 4, index = paint order (0 is furthest back)
     middleCloud: MiddleCloud
     mountain: { enabled: boolean; width: number; x: number; bottom: number }
+    birds: Birds
     frontBack: FrontCloud // painted behind frontFront
     frontFront: FrontCloud
     glows: Glow[] // any length, including 0
@@ -123,6 +135,8 @@ export const DEFAULT_RIPS_RECIPE: RipsSceneRecipe = {
         secondOffsetX: 0, secondOffsetY: 0,
     },
     mountain: { enabled: true, width: 1080, x: 0, bottom: 0 },
+    // The old scene element's default, its percentage band turned into px for a 640-tall box (plan §1.2).
+    birds: { enabled: true, countMin: 2, countMax: 5, intervalSec: 25, yMin: 96, yMax: 288 },
     frontBack: { enabled: true, width: 1080, y: 430, speed: 20, overlap: 36, offset: 540 },
     frontFront: { enabled: true, width: 1080, y: 470, speed: 28, overlap: 36, offset: 0 },
     glows: [],
@@ -205,6 +219,7 @@ export function mergeRecipe(raw: unknown): RipsSceneRecipe {
         skyClouds: d.skyClouds.map((def, i) => mergeFields(def, storedSky[i])),
         middleCloud: mergeFields(d.middleCloud, raw.middleCloud),
         mountain: mergeFields(d.mountain, raw.mountain),
+        birds: mergeFields(d.birds, raw.birds),
         frontBack: mergeFields(d.frontBack, raw.frontBack),
         frontFront: mergeFields(d.frontFront, raw.frontFront),
         glows: Array.isArray(raw.glows) ? raw.glows.filter(isPlainObject).map(mergeGlow) : [],

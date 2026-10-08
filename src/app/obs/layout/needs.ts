@@ -52,9 +52,6 @@ export const NEEDS_BY_ID = {
     // Same data source as `priceRanges` — a second skin over the same series ranges list
     // (obs-price-sign-plan.md §3).
     priceSign: ['needsSeriesPriceRanges', 'needsSeries'],
-    // Reads no break/stream data (obs-scene-element-plan.md §2.2) — everything it renders comes
-    // from its own element config.
-    scene: [],
     // Reads no data either — everything comes from its own `recipe` (rips-scene-plan.md §5).
     ripsScene: [],
     // The UNION of every one of the six widgets' flags (obs-ticker-plan.md §4): the operator can

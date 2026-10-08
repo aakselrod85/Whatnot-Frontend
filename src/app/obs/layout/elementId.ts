@@ -37,8 +37,6 @@ export function registryIdOf(element: Element): RegistryId {
             return 'priceRanges'
         case 'priceSign':
             return 'priceSign'
-        case 'scene':
-            return 'scene'
         case 'ripsScene':
             return 'ripsScene'
         case 'ticker':

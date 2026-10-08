@@ -181,6 +181,7 @@ export default function Page() {
 
     const setMiddle = (patch: Partial<MiddleCloud>) => setRecipe((r) => ({...r, middleCloud: {...r.middleCloud, ...patch}}))
     const setFront = (key: 'frontBack' | 'frontFront', patch: Partial<FrontCloud>) => setRecipe((r) => ({...r, [key]: {...r[key], ...patch}}))
+    const setBirds = (patch: Partial<RipsSceneRecipe['birds']>) => setRecipe((r) => ({...r, birds: {...r.birds, ...patch}}))
     const setMountain = (patch: Partial<RipsSceneRecipe['mountain']>) => setRecipe((r) => ({...r, mountain: {...r.mountain, ...patch}}))
     const setSky = (i: number, patch: Partial<SkyCloud>) =>
         setRecipe((r) => ({...r, skyClouds: r.skyClouds.map((c, j) => (j === i ? {...c, ...patch} : c))}))
@@ -382,6 +383,21 @@ export default function Page() {
                         <Num label="Bottom" value={recipe.mountain.bottom} min={-600} max={600} step={1} onChange={(v) => setMountain({bottom: v})}/>
                         <Num label="X" value={recipe.mountain.x} min={-1080} max={1080} step={1} onChange={(v) => setMountain({x: v})}/>
                         <Num label="Width" value={recipe.mountain.width} min={200} max={4000} step={1} onChange={(v) => setMountain({width: v})}/>
+                    </Section>
+
+                    {/* Min/max pairs are kept ordered by moving the other end along (rips-scene-birds-plan.md §1.5). */}
+                    <Section title="Birds">
+                        <Enabled value={recipe.birds.enabled} onChange={(v) => setBirds({enabled: v})}/>
+                        <Num label="Flock min" value={recipe.birds.countMin} min={1} max={12} step={1}
+                             onChange={(v) => setBirds({countMin: v, countMax: Math.max(v, recipe.birds.countMax)})}/>
+                        <Num label="Flock max" value={recipe.birds.countMax} min={1} max={12} step={1}
+                             onChange={(v) => setBirds({countMax: v, countMin: Math.min(v, recipe.birds.countMin)})}/>
+                        <Num label="Interval s" value={recipe.birds.intervalSec} min={5} max={600} step={1} onChange={(v) => setBirds({intervalSec: v})}/>
+                        <Num label="Y min" value={recipe.birds.yMin} min={-400} max={960} step={1}
+                             onChange={(v) => setBirds({yMin: v, yMax: Math.max(v, recipe.birds.yMax)})}/>
+                        <Num label="Y max" value={recipe.birds.yMax} min={-400} max={960} step={1}
+                             onChange={(v) => setBirds({yMax: v, yMin: Math.min(v, recipe.birds.yMin)})}/>
+                        <div className="w-100 small text-muted">Flocks spawn every Interval ± 30 % and fly the full width inside the Y band.</div>
                     </Section>
 
                     <Section title="Middle cloud">

@@ -30,7 +30,6 @@ import TextSettings from './TextSettings'
 import ImageBoxSettings from './ImageBoxSettings'
 import PriceRangesSettings from './PriceRangesSettings'
 import PriceSignSettings from './PriceSignSettings'
-import SceneSettings from './SceneSettings'
 import RipsSceneSettings from './RipsSceneSettings'
 import TickerSettings from './TickerSettings'
 import CameraShelfSettings from './CameraShelfSettings'
@@ -155,9 +154,6 @@ const SETTINGS_PANELS = {
     ),
     ripsScene: ({elementKey, element, onPatchElement}) => (
         <RipsSceneSettings elementKey={elementKey} element={element} onPatchElement={onPatchElement}/>
-    ),
-    scene: ({elementKey, element, onPatchElement}) => (
-        <SceneSettings elementKey={elementKey} element={element} onPatchElement={onPatchElement}/>
     ),
     // Full props set (obs-ticker-plan.md §6): it needs both the layout-config path
     // (`onPatchElement`, for its own line/slot fields) and the backend path (`channelId`/

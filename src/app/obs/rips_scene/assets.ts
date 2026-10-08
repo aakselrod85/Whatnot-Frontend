@@ -1,9 +1,9 @@
 // Static asset manifest for the `ripsScene` element (rips-scene-plan.md §2). Same `{src, w, h}`
-// shape as layout/elements/scene/assets.ts: the renderer reads each layer's aspect ratio from here
+// shape as the other elements' asset manifests: the renderer reads each layer's aspect ratio from here
 // rather than waiting on an image-load round trip. When art is replaced, `w`/`h` MUST be updated to
 // match the delivered file or the front-cloud strip height and the sky-cloud pivots are off.
 
-export type RipsAsset = { src: string; w: number; h: number }
+export type RipsAsset = { src: string; w: number; h: number; frames?: number }
 
 export const RIPS_ASSETS = {
     background: { src: '/images/rips_scene/Back.png', w: 1930, h: 815 },
@@ -14,6 +14,8 @@ export const RIPS_ASSETS = {
     skyCloudLayer2: { src: '/images/rips_scene/TopCloudLayer2.png', w: 2149, h: 2105 },
     skyCloudLayer3: { src: '/images/rips_scene/TopCloudLayer3.png', w: 1677, h: 1745 },
     skyCloudLayer4: { src: '/images/rips_scene/TopCloudLayer4.png', w: 1672, h: 2121 },
+    // Flying-birds sprite sheet: 10 equal cells (rips-scene-birds-plan.md §1.1); built by scripts/build_bird_sheet.py.
+    birds: { src: '/images/rips_scene/birds.png', w: 2100, h: 301, frames: 10 },
     // Podium props (recipe.ts's `Podium`), drawn in front of everything else.
     pedestal: { src: '/images/rips_scene/BasePedestal.png', w: 512, h: 846 },
     flag: { src: '/images/rips_scene/Flag.png', w: 200, h: 440 },
