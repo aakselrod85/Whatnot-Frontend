@@ -21,6 +21,7 @@ import NameSettings from './NameSettings'
 import CountSettings from './CountSettings'
 import CardsSettings from './CardsSettings'
 import CobraBoardSettings from './CobraBoardSettings'
+import RipsFlatBoardSettings from './RipsFlatBoardSettings'
 import SportStyleBoardSettings from './SportStyleBoardSettings'
 import FrameSettings from './FrameSettings'
 import StashOrPassWrapSettings from './StashOrPassWrapSettings'
@@ -85,10 +86,10 @@ const SETTINGS_PANELS = {
     // Price" card the panel also carries is irrelevant to cobra_flat but harmless.
     'board:cobra': ({channelId, seriesId, onFireCue}) => <CobraBoardSettings channelId={channelId} seriesId={seriesId} onFireCue={onFireCue}/>,
     'board:cobra_flat': ({channelId, seriesId, onFireCue}) => <CobraBoardSettings channelId={channelId} seriesId={seriesId} onFireCue={onFireCue}/>,
-    // No panel: the prices controls were removed on request (2026-10-07). The board still orders
-    // by tier, reading the channel-wide thresholds set from a cobra/cobra_flat block (or the
+    // Tile art only: the prices controls were removed on request (2026-10-07). The board still
+    // orders by tier, reading the channel-wide thresholds set from a cobra/cobra_flat block (or the
     // pricing.ts defaults when none were ever set).
-    'board:rips_flat': null,
+    'board:rips_flat': ({elementKey, element, onPatchElement}) => <RipsFlatBoardSettings elementKey={elementKey} element={element} onPatchElement={onPatchElement}/>,
     'board:sport_style': ({elementKey, element, currentPhase, channelId, seriesId, onPatchElement, onEmitCue, onFireCue}) => (
         <SportStyleBoardSettings elementKey={elementKey} element={element} currentPhase={currentPhase} channelId={channelId} seriesId={seriesId} onPatchElement={onPatchElement} onEmitCue={onEmitCue} onFireCue={onFireCue}/>
     ),

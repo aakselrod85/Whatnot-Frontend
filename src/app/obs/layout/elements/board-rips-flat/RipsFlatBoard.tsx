@@ -27,7 +27,7 @@ import {cellExposure} from '../board-flat/tiles/exposure'
 import {styleForGroup} from '../board-flat/tiles/manifest'
 import {useManifest} from '../board-flat/tiles/useManifest'
 import {Group} from '../board-flat/tiles/types'
-import {RipsFlatCell} from './RipsFlatCell'
+import {DEFAULT_RIPS_TILE_SET, RIPS_TILE_SETS, RipsFlatCell, type RipsTileSet} from './RipsFlatCell'
 import './RipsFlatBoard.css'
 
 // The blue inset of /images/rips_board/board.png as fractions of the image (147/1080, 140/1080,
@@ -97,9 +97,17 @@ function useRipsFlatLayout(rowCount: number) {
     return {wrapRef: setWrapEl, layoutVars}
 }
 
-export function RipsFlatBoard({box}: ElementProps) {
+// The element's `tileSet` (set in /obs/controls) picks the front-face art; anything unknown falls
+// back to the default.
+function tileSetOf(element: ElementProps['element']): RipsTileSet {
+    const v = element.kind === 'board' ? element.tileSet : undefined
+    return v && (RIPS_TILE_SETS as readonly string[]).includes(v) ? v : DEFAULT_RIPS_TILE_SET
+}
+
+export function RipsFlatBoard({box, element}: ElementProps) {
     const {stream, events: rawEvents, series, priceRanges, teamPrices, lastFetched} = useLayoutData()
     const manifest = useManifest()
+    const tileSet = tileSetOf(element)
 
     // Cells whose flip animation has finished — only these join the shared grouping.
     const [settled, setSettled] = useState<Set<number>>(new Set())
@@ -225,7 +233,7 @@ export function RipsFlatBoard({box}: ElementProps) {
     }
 
     return (
-        <div className="rfb-root" ref={wrapRef} style={{...(layoutVars ?? {}), '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
+        <div className={tileSet === 'icons' ? 'rfb-root' : 'rfb-root rfb-root-stone'} ref={wrapRef} style={{...(layoutVars ?? {}), '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
             {layoutVars && (
                 <>
                     <div className="rfb-grid">
@@ -248,6 +256,7 @@ export function RipsFlatBoard({box}: ElementProps) {
                                     alreadySettled={settled.has(e.id)}
                                     onFlipComplete={handleFlipComplete}
                                     style={{gridRow: it.row + 1, gridColumn: it.col + 1}}
+                                    tileSet={tileSet}
                                 />
                             )
                         })}
