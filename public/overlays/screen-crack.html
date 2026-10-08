@@ -103,15 +103,14 @@
   }
 
   // ---------- generation ----------
-  // Structure varies per seed, not just details: one of four families (web / star / shard / dense), uneven ray
-  // spacing and lengths with a directional lean, a random stretch axis, wobbly partial rings, an offset messy
-  // centre and optional secondary stars. Stage 1 shows each crack only up to its own visible length; the full
+  // A drawn, controlled look (bold white strokes): long smooth rays from the hit, several running off-screen,
+  // joined by webs of mostly straight segments. Structure still varies per seed: one of three families
+  // (spoke / web / lattice), uneven ray spacing and lengths with a slight lean, partial webs, a mild stretch. Stage 1 shows each crack only up to its own visible length; the full
   // partition to the screen edges is used by the stage-2 run-out and the shatter.
   const STYLES = {
-    web:   { ray: [7, 11],  rv: [250, 420], rings: [2, 4], arcP: .78, wig: [.18, .38], noise: .24, br: [1, 3], long: .12 },
-    star:  { ray: [4, 7],   rv: [300, 520], rings: [0, 2], arcP: .5,  wig: [.15, .30], noise: .28, br: [1, 3], long: .35 },
-    shard: { ray: [3, 5],   rv: [380, 640], rings: [0, 1], arcP: .45, wig: [.25, .50], noise: .30, br: [2, 4], long: .45 },
-    dense: { ray: [10, 14], rv: [190, 320], rings: [3, 5], arcP: .85, wig: [.14, .28], noise: .20, br: [0, 2], long: .08 },
+    spoke:   { ray: [9, 13], rv: [460, 720], rings: [1, 2], arcP: .75, wig: [.04, .09], noise: .14, br: [0, 1], long: .45, far: [4, 6] },
+    web:     { ray: [8, 11], rv: [420, 640], rings: [2, 3], arcP: .85, wig: [.04, .10], noise: .16, br: [0, 2], long: .35, far: [3, 5] },
+    lattice: { ray: [7, 10], rv: [380, 580], rings: [3, 4], arcP: .9,  wig: [.05, .11], noise: .18, br: [0, 1], long: .3,  far: [3, 4] },
   };
   function polyLen(pts) { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return cum; }
   function mkEdge(pts, d0, vis1) { const cum = polyLen(pts); const len = cum[cum.length - 1]; return { pts, cum, len, d0, vis1: Math.min(vis1, len) }; }
@@ -119,7 +118,7 @@
   function generate(seed, hx, hy) {
     const r = mulberry32(seed), U = (a, b) => a + (b - a) * r(), RI = (a, b) => a + Math.floor(r() * (b - a + 1));
     const HX = hx + U(-CFG.jitter, CFG.jitter), HY = hy + U(-CFG.jitter, CFG.jitter);
-    const roll = r(), style = roll < .36 ? 'web' : roll < .62 ? 'star' : roll < .82 ? 'shard' : 'dense', S = STYLES[style];
+    const roll = r(), style = roll < .34 ? 'spoke' : roll < .72 ? 'web' : 'lattice', S = STYLES[style];
     const nVisRay = RI(...S.ray), RV = U(...S.rv), wig = U(...S.wig);
 
     // uneven angular spacing for the visible cracks
@@ -139,23 +138,23 @@
     for (let k = 0; k < nRay; k++) { const prev = (ang[k] - ang[(k - 1 + nRay) % nRay] + 4 * Math.PI) % (2 * Math.PI), next = (ang[(k + 1) % nRay] - ang[k] + 4 * Math.PI) % (2 * Math.PI); half.push(.42 * Math.min(prev, next)); }
 
     // directional lean + per-ray visible length (hidden rays: 0)
-    const bAng = U(0, 2 * Math.PI), bias = U(0, .7);
-    const rayVis = ang.map((a, k) => hidden[k] ? 0 : RV * (1 + bias * Math.cos(a - bAng)) * U(.5, 1.35) * (r() < S.long ? U(1.5, 2.4) : 1));
-    // 2–3 visible cracks run all the way to the screen edges
+    const bAng = U(0, 2 * Math.PI), bias = U(0, .35);
+    const rayVis = ang.map((a, k) => hidden[k] ? 0 : RV * (1 + bias * Math.cos(a - bAng)) * U(.75, 1.25) * (r() < S.long ? U(1.6, 2.6) : 1));
+    // several visible cracks run all the way off-screen
     { const vis = ang.map((_, k) => k).filter(k => !hidden[k]);
-      for (let n = Math.min(vis.length, RI(2, 3)); n > 0; n--) { const i = Math.floor(r() * vis.length); rayVis[vis[i]] = FAR; vis.splice(i, 1); } }
+      for (let n = Math.min(vis.length, RI(...S.far)); n > 0; n--) { const i = Math.floor(r() * vis.length); rayVis[vis[i]] = FAR; vis.splice(i, 1); } }
 
     // rays from slightly offset origins (messy centre)
     const N = 70, rays = [], origR = [];
     for (let k = 0; k < nRay; k++) {
-      const o = U(0, 16), oa = U(0, 2 * Math.PI), ox = HX + o * Math.cos(oa), oy = HY + o * Math.sin(oa);
+      const o = U(0, 5), oa = U(0, 2 * Math.PI), ox = HX + o * Math.cos(oa), oy = HY + o * Math.sin(oa);
       const pts = [[ox, oy]]; let a = ang[k], av = 0;
       for (let i = 1; i <= N; i++) {
         const rad = FAR * Math.pow(i / N, 1.6); if (rad < o + 8) continue;
         av = av * .55 + U(-1, 1) * wig * .16;                       // smooth turning, with momentum
         const na = a + av;
         if (na < ang[k] - half[k] || na > ang[k] + half[k]) av *= -.3; else a = na;
-        const j = Math.min(3, rad * .03);
+        const j = Math.min(1.2, rad * .01);
         pts.push([HX + rad * Math.cos(a) + U(-j, j), HY + rad * Math.sin(a) + U(-j, j)]);
       }
       rays.push(pts); origR.push(o + 8);
@@ -168,10 +167,10 @@
 
     // rings: visible ones (style-dependent), hidden ones for the shatter partition, then the far edge
     const nr = RI(...S.rings), fr = [];
-    for (let i = 0; i < nr; i++) fr.push(U(.16, .95));
+    for (let i = 0; i < nr; i++) fr.push(U(.22, .95));
     fr.sort((x, y) => x - y);
     const base = [];
-    for (const f of fr) { const R = RV * f; if (!base.length || R - base[base.length - 1] > 45) base.push(R); }
+    for (const f of fr) { const R = RV * f; if (!base.length || R - base[base.length - 1] > 80) base.push(R); }
     const nVis = base.length;
     for (const m of [U(1.5, 1.9), U(2.7, 3.3), U(4.5, 5.5)]) { const R = RV * m; if (R < FAR - 300 && R - (base[base.length - 1] || 0) > 80) base.push(R); }
     if (!base.length || base[0] < 60) base.unshift(Math.max(60, RV * .3));
@@ -190,7 +189,7 @@
         // visible portion: points within this ray's visible radius
         let L = 0; for (let i = 1; i < pts.length; i++) { const rr = Math.hypot(pts[i][0] - HX, pts[i][1] - HY);
           if (rr <= rayVis[k]) L = e.cum[i]; else { const r0 = Math.hypot(pts[i - 1][0] - HX, pts[i - 1][1] - HY); L = e.cum[i - 1] + (e.cum[i] - e.cum[i - 1]) * clamp((rayVis[k] - r0) / (rr - r0)); break; } }
-        e.vis1 = bounds[j] < rayVis[k] ? L : 0; e.canon = pts; segs.push(e);
+        e.vis1 = bounds[j] < rayVis[k] ? L : 0; e.canon = pts; e.w = hidden[k] ? 4 : 6.5 - 2.5 * clamp(bounds[j] / 1100); segs.push(e);
       }
       rayE.push(segs);
     }
@@ -200,11 +199,15 @@
         const R0 = Rk[j][k], R1 = Rk[j][(k + 1) % nRay], [p0] = rayPoint(k, R0), [p1] = rayPoint(k + 1, R1);
         const a0 = Math.atan2(p0[1] - HY, p0[0] - HX); let a1 = Math.atan2(p1[1] - HY, p1[0] - HX);
         while (a1 <= a0) a1 += 2 * Math.PI;
-        const bulge = U(-.12, .12), canon = [p0];
-        for (let q = 1; q < 6; q++) { const u = q / 6, a = a0 + (a1 - a0) * u, rr = (R0 + (R1 - R0) * u) * (1 + bulge * Math.sin(Math.PI * u) + U(-.05, .05));
-          canon.push([HX + rr * Math.cos(a), HY + rr * Math.sin(a)]); }
+        // web segment: usually a straight chord with a slight kink, sometimes a gentle curve (never a circle)
+        const canon = [p0];
+        if (r() < .7) { const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2, L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), k = U(-.035, .035) * L;
+          canon.push([mx + k * (p0[1] - p1[1]) / (L || 1), my + k * (p1[0] - p0[0]) / (L || 1)]); }
+        else { const bulge = U(-.06, .06);
+          for (let q = 1; q < 6; q++) { const u = q / 6, a = a0 + (a1 - a0) * u, rr = (R0 + (R1 - R0) * u) * (1 + bulge * Math.sin(Math.PI * u));
+            canon.push([HX + rr * Math.cos(a), HY + rr * Math.sin(a)]); } }
         canon.push(p1);
-        const e = mkEdge(R1 < R0 ? canon.slice().reverse() : canon, Math.min(R0, R1), 0); e.canon = canon; row.push(e);
+        const e = mkEdge(R1 < R0 ? canon.slice().reverse() : canon, Math.min(R0, R1), 0); e.canon = canon; e.w = 4; row.push(e);
       }
       arcE.push(row);
     }
@@ -224,7 +227,7 @@
         let budget = both ? total : total * U(.3, .85), d = fromA ? Rk[j][ka] : Rk[j][kb];
         for (let c = 0; c < chain.length && budget > 0; c++) {
           const k = chain[c], canon = arcE[k][j].canon, pts = fromA ? canon : canon.slice().reverse();
-          const e = mkEdge(pts, d, Math.min(budget, lens[c])); e.canon = canon; arcE[k][j] = e;
+          const e = mkEdge(pts, d, Math.min(budget, lens[c])); e.canon = canon; e.w = 4; arcE[k][j] = e;
           budget -= lens[c]; d += lens[c];
         }
       }
@@ -237,19 +240,15 @@
       if (rayVis[k] < 70) continue;
       for (let b = RI(...S.br); b > 0; b--) {
         const at = rayVis[k] * U(.2, .85), [st] = rayPoint(k, at);
-        const ba = Math.atan2(st[1] - HY, st[0] - HX) + (r() < .5 ? -1 : 1) * U(.45, 1.0);
-        branches.push({ pts: walk(st[0], st[1], ba, U(40, 160) * (style === 'shard' ? 1.4 : 1), [14, 30], .3), d0: at });
+        const ba = Math.atan2(st[1] - HY, st[0] - HX) + (r() < .5 ? -1 : 1) * U(.35, .8);
+        branches.push({ pts: walk(st[0], st[1], ba, U(50, 150), [18, 32], .12), d0: at });
       }
     }
-    for (let c = RI(3, 7); c > 0; c--) { const a = U(0, 2 * Math.PI), rr = U(4, 18);
-      branches.push({ pts: walk(HX + rr * Math.cos(a), HY + rr * Math.sin(a), a + U(-.8, .8), U(15, 48), [6, 12], .5), d0: rr }); }
-    if (r() < (style === 'web' || style === 'dense' ? .3 : .2)) {
-      const k = RI(0, nRay - 1), at = rayVis[k] * U(.4, .8), [c0] = rayPoint(k, at);
-      for (let q = RI(3, 5); q > 0; q--) branches.push({ pts: walk(c0[0], c0[1], U(0, 2 * Math.PI), U(25, 75), [8, 16], .35), d0: at });
-    }
+    for (let c = RI(2, 4); c > 0; c--) { const a = U(0, 2 * Math.PI), rr = U(4, 12);
+      branches.push({ pts: walk(HX + rr * Math.cos(a), HY + rr * Math.sin(a), a + U(-.5, .5), U(18, 40), [8, 14], .2), d0: rr }); }
 
     // random stretch axis (applied to everything about the hit point)
-    const phi = U(0, Math.PI), sx = U(1, 1.75) * (style === 'shard' ? 1.15 : 1), sy = 1 / Math.sqrt(sx);
+    const phi = U(0, Math.PI), sx = U(1, 1.25), sy = 1 / Math.sqrt(sx);
     const cph = Math.cos(phi), sph = Math.sin(phi);
     const T = ([x, y]) => { const dx = x - HX, dy = y - HY, u = dx * cph + dy * sph, v = -dx * sph + dy * cph, u2 = u * sx, v2 = v * sy;
       return [HX + u2 * cph - v2 * sph, HY + u2 * sph + v2 * cph]; };
@@ -258,7 +257,7 @@
       const ratio = pre > 0 ? e.len / pre : 1; e.vis1 = Math.min(e.len, e.vis1 * ratio);
       const postStart = Math.hypot(e.pts[0][0] - HX, e.pts[0][1] - HY); e.d0 = preStart > 1 ? e.d0 * postStart / preStart : e.d0; };
     rayE.flat().forEach(stretchEdge); arcE.flat().forEach(stretchEdge);
-    const brE = branches.map(b => { const e = mkEdge(b.pts.map(T), b.d0, 1e9); e.d0 = b.d0 * Math.sqrt(sx * sy); return e; });
+    const brE = branches.map(b => { const e = mkEdge(b.pts.map(T), b.d0, 1e9); e.d0 = b.d0 * Math.sqrt(sx * sy); e.w = 3; return e; });
 
     // pieces = cells between rays and rings
     const bbox = pts => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -316,7 +315,7 @@
   }
 
   // ---------- drawing ----------
-  const LIGHT = '245,248,255', LIGHT_A = .95, DARK = '14,18,26', DARK_A = .60;
+  const LIGHT = '255,255,255', LIGHT_A = 1, DARK = '10,14,22', DARK_A = .32, HALO = 5;   // bold white, faint halo for bright backgrounds
   function pointAt(e, s) {
     if (s <= 0) return e.pts[0]; if (s >= e.len) return e.pts[e.pts.length - 1];
     let i = 1; while (e.cum[i] < s) i++;
@@ -344,9 +343,9 @@
   function drawPiece(c, pc, vis, frost) {
     c.save(); c.clip(pc.path); c.lineJoin = 'round'; c.lineCap = 'round';
     if (frost) { c.fillStyle = 'rgba(255,255,255,.05)'; c.fill(pc.path); }
-    for (const [rgb, a, we, wb] of [[DARK, DARK_A, 8, 5], [LIGHT, LIGHT_A, 4.4, 2.4]]) {
-      for (const e of pc.edges) strokePartial(c, e, vis(e), we, rgb, a);
-      for (const e of pc.branches) strokePartial(c, e, vis(e), wb, rgb, a);
+    for (const [rgb, a, extra] of [[DARK, DARK_A, HALO], [LIGHT, LIGHT_A, 0]]) {
+      for (const e of pc.edges) strokePartial(c, e, vis(e), e.w + extra, rgb, a);
+      for (const e of pc.branches) strokePartial(c, e, vis(e), e.w + extra, rgb, a);
     }
     c.restore();
   }
@@ -361,9 +360,10 @@
     const c = s.getContext('2d'); c.setTransform(1, 0, 0, 1, -sh.bx, -sh.by);
     c.save(); c.clip(sh.path); c.lineJoin = 'round'; c.lineCap = 'round';
     c.fillStyle = 'rgba(255,255,255,.07)'; c.fill(sh.path);
-    for (const [rgb, a, we, wb] of [[DARK, DARK_A, 8, 5], [LIGHT, LIGHT_A, 4.4, 2.4]]) {
+    // shard edges are stroked on the clipped outline, so only the inner half shows: 11 px -> ~5.5 px of white
+    for (const [rgb, a, we, extra] of [[DARK, DARK_A, 11 + 2 * HALO, HALO], [LIGHT, LIGHT_A, 11, 0]]) {
       c.lineWidth = we; c.strokeStyle = `rgba(${rgb},${a})`; c.stroke(sh.path);
-      for (const e of pc.branches) strokePartial(c, e, e.len, wb, rgb, a);
+      for (const e of pc.branches) strokePartial(c, e, e.len, e.w + extra, rgb, a);
     }
     c.restore(); return s;
   }
