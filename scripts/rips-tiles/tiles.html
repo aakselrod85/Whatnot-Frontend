@@ -115,7 +115,7 @@
   // The board backdrop for the marble sets (rips_board/board_tiles.png): board.png with its inset frame
   // redrawn in the tiles' deepGold and with the tiles' cut corners. K = output px per board px.
   function drawBoardBackdrop(ctx, K) {
-    const F = { x0: 132, y0: 18, x1: 959, y1: 237 }, bw = 7, cut = 21;  // just over board.png's frame (133-957 x 20-234), so it is fully covered
+    const F = { x0: 132, y0: 18, x1: 959, y1: 237 }, bw = 10, cut = 21;  // just over board.png's frame (133-957 x 20-234), so it is fully covered
     const poly = (m, c) => { const x0 = F.x0 + m, y0 = F.y0 + m, x1 = F.x1 - m, y1 = F.y1 - m, p = new Path2D();
       p.moveTo(x0 + c, y0); p.lineTo(x1 - c, y0); p.lineTo(x1, y0 + c); p.lineTo(x1, y1 - c); p.lineTo(x1 - c, y1); p.lineTo(x0 + c, y1); p.lineTo(x0, y1 - c); p.lineTo(x0, y0 + c); p.closePath(); return p; };
     ctx.save(); ctx.scale(K, K); ctx.imageSmoothingQuality = 'high';
@@ -136,12 +136,12 @@
       ctx.save(); ctx.clip(inner); ctx.beginPath(); ctx.rect(hx, hy, w, h); ctx.clip();
       if (mx !== null) { ctx.translate(2 * mx, 0); ctx.scale(-1, 1); } else { ctx.translate(0, 2 * my); ctx.scale(1, -1); }
       ctx.drawImage(BOARD_IMG, 0, 0, 1080, 250); ctx.restore(); }
-    // the frame: the tiles' gold as an even ridge all the way round. Every side, cut corners included, has
-    // the same profile: a highlighted outer face and a shaded inner face; the top-left light only nudges
-    // their strength. The gold flows continuously around the perimeter (no restart at the corners).
+    // the frame: the tiles' gold as an even moulding all the way round. Every side, cut corners included, has
+    // the same three-face profile: a shadowed outer slope, a highlighted face and a shaded inner face; the
+    // top-left light only nudges their strength. The gold flows continuously around the perimeter (no restart at the corners).
     const P = (m, c) => { const x0 = F.x0 + m, y0 = F.y0 + m, x1 = F.x1 - m, y1 = F.y1 - m;
       return [[x0 + c, y0], [x1 - c, y0], [x1, y0 + c], [x1, y1 - c], [x1 - c, y1], [x0 + c, y1], [x0, y1 - c], [x0, y0 + c]]; };
-    const O = P(0, cut), M = P(bw / 2, cut - bw / 2 * .586), I = P(bw, cut - bw * .586);
+    const O = P(0, cut), S1 = P(bw / 3, cut - bw / 3 * .586), M = P(bw * 2 / 3, cut - bw * 2 / 3 * .586), I = P(bw, cut - bw * .586);
     ctx.save(); ctx.shadowColor = 'rgba(30,15,0,.7)'; ctx.shadowBlur = 1.5 * K; ctx.shadowOffsetY = .8 * K;
     const band = poly(0, cut); band.addPath(poly(bw, cut - bw * .586)); ctx.fillStyle = '#8a5a14'; ctx.fill(band, 'evenodd'); ctx.restore();
     const quad = (a, b, c, d) => { ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.lineTo(...c); ctx.lineTo(...d); ctx.closePath(); };
@@ -152,7 +152,8 @@
       for (let k = 0; k <= n; k++) g.addColorStop(k / n, wave(arc + L * k / n));
       arc += L;
       const d = (dy / L) * -.6 + (-dx / L) * -.8;                          // outward normal . light (top-left), -1..1
-      quad(O[i], O[j], M[j], M[i]); ctx.fillStyle = g; ctx.fill(); ctx.fillStyle = `rgba(255,246,215,${(.32 + .1 * d).toFixed(3)})`; ctx.fill();
+      quad(O[i], O[j], S1[j], S1[i]); ctx.fillStyle = g; ctx.fill(); ctx.fillStyle = `rgba(40,18,0,${(.45 - .08 * d).toFixed(3)})`; ctx.fill();
+      quad(S1[i], S1[j], M[j], M[i]); ctx.fillStyle = g; ctx.fill(); ctx.fillStyle = `rgba(255,246,215,${(.32 + .1 * d).toFixed(3)})`; ctx.fill();
       quad(M[i], M[j], I[j], I[i]); ctx.fillStyle = g; ctx.fill(); ctx.fillStyle = `rgba(45,22,0,${(.32 - .1 * d).toFixed(3)})`; ctx.fill(); }
     ctx.restore();
   }
