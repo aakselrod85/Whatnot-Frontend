@@ -213,3 +213,11 @@ python3 scripts/frame_cut_tool.py
 
 Needs a Python with Tkinter (`python3 -c "import tkinter"`). `--selftest` opens the window, prints
 the TS block and exits.
+
+## rips-tiles/
+
+`tiles.html` draws the `board:rips_flat` marble tiles (one canvas per team: a crop of
+`rips_board/board.png`'s outer marble, gold octagon inlay, logo with a 1 px crisp outline) and
+previews them on the board. `export.py` serves the repo locally, renders the page headless in Chrome
+and writes `public/images/rips_tiles/{veined,clean}/<Team>.png`. See the README section
+"Rips board marble tiles".

@@ -160,6 +160,8 @@ export type Element = (
     // like `cols`. `edgeMode: 'tiered'` draws a per-tier medal edge (tierSkins.ts) instead of
     // today's auto-palette wear; `sortMode: 'centered'` deals cells `board:cobra_flat`'s way
     // (value-centred, sold pushed to the edges) instead of alphabetically.
+    // `tileSet` is read only by `rips_flat` (README "Rips board marble tiles"): which front-face art
+    // the cells show, chosen from RipsFlatBoardSettings; unset = DEFAULT_RIPS_TILE_SET.
     | {
           kind: 'board'
           variant: BoardVariant
@@ -169,6 +171,7 @@ export type Element = (
           margin?: number
           edgeMode?: 'plain' | 'tiered'
           sortMode?: 'alphabetical' | 'centered'
+          tileSet?: 'veined' | 'clean' | 'icons'
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions
