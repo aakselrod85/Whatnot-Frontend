@@ -528,9 +528,16 @@ function WavingFlag({sp, asset, s, wind}: {sp: Sprite; asset: RipsAsset; s: numb
         const img = new Image()
         img.src = asset.src
         let raf = 0
+        // The loop only starts inside `img.onload`, which can fire AFTER this effect has already been
+        // cleaned up (a Wind drag re-runs it several times while the image is still loading). The
+        // cleanup's cancelAnimationFrame can't stop a loop that hasn't started, so every place that
+        // schedules a frame checks this flag — otherwise each stale onload would start one more loop
+        // drawing the old wind onto the same canvas, and they would outlive the component.
+        let cancelled = false
         const t0 = performance.now()
         const k = cv.width / asset.w // canvas px per native px
         const draw = () => {
+            if (cancelled) return
             const t = ((performance.now() - t0) / 1000) % FLAG_LOOP
             const th = (2 * Math.PI * t) / FLAG_LOOP
             ctx.clearRect(0, 0, cv.width, cv.height)
@@ -560,8 +567,13 @@ function WavingFlag({sp, asset, s, wind}: {sp: Sprite; asset: RipsAsset; s: numb
             ctx.globalCompositeOperation = 'source-over'
             raf = requestAnimationFrame(draw)
         }
-        img.onload = () => { raf = requestAnimationFrame(draw) }
-        return () => cancelAnimationFrame(raf)
+        img.onload = () => {
+            if (!cancelled) raf = requestAnimationFrame(draw)
+        }
+        return () => {
+            cancelled = true
+            cancelAnimationFrame(raf)
+        }
     }, [asset, cssW, cssH, wind, sp.enabled])
     if (!sp.enabled) return null
     return <canvas ref={ref} className="rps-img" style={style}/>
