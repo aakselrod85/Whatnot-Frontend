@@ -5,6 +5,7 @@ import type {Event} from '@/app/entity/entities'
 import {IsTeam} from '@/app/common/teams'
 import {getSpotAbbreviation} from '@/app/common/spot_label'
 import type {Tier} from './tiers'
+import type {RipsTierArt} from './ripsStyle'
 import './ResultRow.css'
 
 // Exported so the `resultsThin` element (obs-layout-plan.md §2.4) can reuse the exact same team
@@ -18,12 +19,17 @@ export function getTeamImageSrc(team: string): string {
 export function ResultRow({
     event,
     tier,
+    tierArt,
     highBidTeam,
     giveawayTeam,
     gridColumnStart,
 }: {
     event: Event
     tier: Tier
+    /** The 'rips' style only (ripsStyle.ts): the cell/name-plate art for this cell's tier, handed
+     *  to ResultsRips.css as custom properties. Absent in the default style, which paints the tier
+     *  with CSS alone. */
+    tierArt?: RipsTierArt
     highBidTeam: string
     giveawayTeam: string
     /** Set only on the first cell of a short final row, to centre that row (see ResultsElement). */
@@ -42,8 +48,18 @@ export function ResultRow({
     // Tier colours the FRAME only — tile content stays uniform ivory. That is decision D4 in
     // overlay-1f-plan.md: letting one `currentColor` drive border, icon and name together left
     // grey tiles' content at 2.7:1 while gold ones glowed.
+    const style: React.CSSProperties | undefined =
+        gridColumnStart || tierArt
+            ? ({
+                  ...(gridColumnStart ? {gridColumnStart} : undefined),
+                  ...(tierArt
+                      ? {'--res-cell-art': `url(${tierArt.cell})`, '--res-name-art': `url(${tierArt.name})`}
+                      : undefined),
+              } as React.CSSProperties)
+            : undefined
+
     return (
-        <div className={`res-row-item res-tier-${tier}`} style={gridColumnStart ? {gridColumnStart} : undefined}>
+        <div className={`res-row-item res-tier-${tier}`} style={style}>
             {IsTeam(event.team) ? (
                 <img className="res-image" src={getTeamImageSrc(event.team)} alt={event.team} />
             ) : (

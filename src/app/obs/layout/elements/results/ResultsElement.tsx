@@ -27,13 +27,15 @@
 
 import {useMemo} from 'react'
 import type {ElementProps} from '../../registry'
-import type {ResultsSort} from '../../schema'
+import type {ResultsSort, ResultsStyle} from '../../schema'
 import {useLayoutData} from '../../useLayoutData'
 import {useSceneEvent} from '../../sceneEventBus'
 import {orderResults} from './orderResults'
 import {ResultRow} from './ResultRow'
 import {NO_SERIES_TIER, tiersByEventId} from './tiers'
+import {RIPS_FRAME_SRC, RIPS_GRID_INSETS, RIPS_TIER_ART} from './ripsStyle'
 import './ResultsElement.css'
+import './ResultsRips.css'
 
 // Fixed cosmetic spacing — matches the old route's literal px values (page.css .demo-container:
 // padding 20px / gap 7px, scaled down slightly). These were never viewport-relative to begin
@@ -55,6 +57,7 @@ const TITLE_MIN_PX = 26
 
 export const DEFAULT_COLUMNS = 2 // the fixed value this element used before it was a setting
 export const DEFAULT_SORT: ResultsSort = 'alphabetical'
+export const DEFAULT_STYLE: ResultsStyle = 'default' // the only look this element had before styles
 
 export function ResultsElement({elementKey, element, box}: ElementProps) {
     const {events: rawEvents, breakObject, stream, refetch} = useLayoutData()
@@ -63,6 +66,8 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
     // value so they cannot disagree about the shape they are laying out.
     const columns = element.kind === 'results' ? (element.columns ?? DEFAULT_COLUMNS) : DEFAULT_COLUMNS
     const sort = element.kind === 'results' ? (element.sort ?? DEFAULT_SORT) : DEFAULT_SORT
+    const style = element.kind === 'results' ? (element.style ?? DEFAULT_STYLE) : DEFAULT_STYLE
+    const isRips = style === 'rips'
 
     const {ordered} = useMemo(
         // 'row': .res-grid is a plain grid-auto-flow:row, so it must be handed the sorted order as
@@ -92,12 +97,18 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
 
     // Row height from the box, not `100vh` — see file header. Guarded against rows === 0 (no
     // events yet) to avoid a divide-by-zero.
-    const titleHeightPx = Math.max(TITLE_MIN_PX, Math.round(box.h * TITLE_FRACTION))
+    //
+    // The rips skin has no text title and no frame chrome of its own: its grid field is the part
+    // of the box the frame ART leaves free (RIPS_GRID_INSETS — the painted RESULT header stands in
+    // for the title band), so the rows divide that field instead of the whole box.
+    const titleHeightPx = isRips ? 0 : Math.max(TITLE_MIN_PX, Math.round(box.h * TITLE_FRACTION))
+    const chromePx = isRips ? 0 : FRAME_CHROME * 2
+    const fieldHeight = isRips ? box.h * (1 - RIPS_GRID_INSETS.top - RIPS_GRID_INSETS.bottom) : box.h
     const availableHeight = Math.max(
         0,
-        box.h -
+        fieldHeight -
             titleHeightPx -
-            FRAME_CHROME * 2 -
+            chromePx -
             GRID_PADDING * 2 -
             GRID_GAP * Math.max(0, visualRows - 1)
     )
@@ -120,29 +131,44 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
     const lastRowOffset =
         lastRowCount > 0 && lastRowCount < columns ? columns - lastRowCount : 0
 
+    const rootClass = `res-root res-style-${style}`
+
     if (!stream) {
         return (
-            <div className="res-root">
+            <div className={rootClass}>
                 <div className="res-empty">Active stream is not set</div>
             </div>
         )
     }
 
+    // Art paths reach the CSS as custom properties rather than being written into
+    // ResultsRips.css, so ripsStyle.ts stays the only place that names a file. The grid's `inset`
+    // is the same RIPS_GRID_INSETS the row height above was derived from.
+    const frameStyle = isRips ? ({'--res-frame-art': `url(${RIPS_FRAME_SRC})`} as React.CSSProperties) : undefined
+    const gridInset = isRips
+        ? {
+              inset: `${RIPS_GRID_INSETS.top * 100}% ${RIPS_GRID_INSETS.right * 100}% ${RIPS_GRID_INSETS.bottom * 100}% ${RIPS_GRID_INSETS.left * 100}%`,
+          }
+        : undefined
+
     return (
-        <div className="res-root">
+        <div className={rootClass}>
             <div className="res-dimmed-bg">
-                <div className="res-frame">
-                    <div
-                        className="res-title"
-                        style={{'--res-title-h': `${titleHeightPx}px`} as React.CSSProperties}
-                    >
-                        {TITLE_TEXT}
-                    </div>
+                <div className="res-frame" style={frameStyle}>
+                    {!isRips && (
+                        <div
+                            className="res-title"
+                            style={{'--res-title-h': `${titleHeightPx}px`} as React.CSSProperties}
+                        >
+                            {TITLE_TEXT}
+                        </div>
+                    )}
                     {visualRows > 0 && (
                         <div
                             className="res-grid"
                             style={
                                 {
+                                    ...gridInset,
                                     '--res-rows': visualRows,
                                     '--res-row-h': `${rowHeightPx}px`,
                                     '--res-pad': `${GRID_PADDING}px`,
@@ -152,18 +178,22 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
                                 } as React.CSSProperties
                             }
                         >
-                            {ordered.map((event, i) => (
-                                <ResultRow
-                                    key={event.id}
-                                    event={event}
-                                    gridColumnStart={
-                                        lastRowOffset > 0 && i === lastRowStart ? lastRowOffset + 1 : undefined
-                                    }
-                                    tier={tiers.get(event.id) ?? NO_SERIES_TIER}
-                                    highBidTeam={breakObject?.high_bid_team ?? ''}
-                                    giveawayTeam={breakObject?.giveaway_team ?? ''}
-                                />
-                            ))}
+                            {ordered.map((event, i) => {
+                                const tier = tiers.get(event.id) ?? NO_SERIES_TIER
+                                return (
+                                    <ResultRow
+                                        key={event.id}
+                                        event={event}
+                                        gridColumnStart={
+                                            lastRowOffset > 0 && i === lastRowStart ? lastRowOffset + 1 : undefined
+                                        }
+                                        tier={tier}
+                                        tierArt={isRips ? RIPS_TIER_ART[tier] : undefined}
+                                        highBidTeam={breakObject?.high_bid_team ?? ''}
+                                        giveawayTeam={breakObject?.giveaway_team ?? ''}
+                                    />
+                                )
+                            })}
                         </div>
                     )}
                 </div>
