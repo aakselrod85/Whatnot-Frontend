@@ -126,6 +126,14 @@ export const DEFAULT_IMAGE_POSITION = { x: 50, y: 50 }
 export const RESULTS_SORTS = ['alphabetical', 'customer'] as const
 export type ResultsSort = (typeof RESULTS_SORTS)[number]
 
+// Skin of the `results` element. A field on the element rather than a registry variant (the way
+// boards do it) because a style changes only how the grid is painted — data, settings and the
+// singleton group are identical — and an absent field keeps every pre-existing config on the
+// original look. 'rips' paints the grid over the art in public/images/results/rips (see
+// elements/results/ripsStyle.ts).
+export const RESULTS_STYLES = ['default', 'rips'] as const
+export type ResultsStyle = (typeof RESULTS_STYLES)[number]
+
 // Per-element opt-out of a native reaction its registry entry declares in `reactsTo` (registry.ts)
 // — default (key absent, or `undefined`) is "on"; only `false` turns it off. See config.ts
 // `effectiveReactions()`.
@@ -212,6 +220,7 @@ export type Element = (
           kind: 'results'
           columns?: number
           sort?: ResultsSort
+          style?: ResultsStyle
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions

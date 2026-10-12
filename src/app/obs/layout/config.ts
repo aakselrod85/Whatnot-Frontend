@@ -16,6 +16,7 @@ import {
     IMAGE_FITS,
     MAX_TEXT_LENGTH,
     RESULTS_SORTS,
+    RESULTS_STYLES,
     TICKER_BANDS,
     TICKER_DIRECTIONS,
     TICKER_FONTS,
@@ -255,6 +256,7 @@ const VALID_WIDGET_IDS = WIDGET_IDS
 const VALID_FRAME_VARIANTS = FRAME_VARIANTS
 const VALID_ANIMATION_IDS = ANIMATION_IDS
 const VALID_RESULTS_SORTS = RESULTS_SORTS
+const VALID_RESULTS_STYLES = RESULTS_STYLES
 
 function validatePlacements(key: string, placementsRaw: unknown, regId: RegistryId, stages: Stage[]): string[] {
     const errors: string[] = []
@@ -572,6 +574,12 @@ function validateResultsKind({ key, rawEl, stages }: KindValidatorCtx): { errors
         (typeof rawEl.sort !== 'string' || !(VALID_RESULTS_SORTS as readonly string[]).includes(rawEl.sort))
     ) {
         errors.push(`element "${key}": sort must be one of ${VALID_RESULTS_SORTS.join(', ')}`)
+    }
+    if (
+        rawEl.style !== undefined &&
+        (typeof rawEl.style !== 'string' || !(VALID_RESULTS_STYLES as readonly string[]).includes(rawEl.style))
+    ) {
+        errors.push(`element "${key}": style must be one of ${VALID_RESULTS_STYLES.join(', ')}`)
     }
     return { errors, regId }
 }

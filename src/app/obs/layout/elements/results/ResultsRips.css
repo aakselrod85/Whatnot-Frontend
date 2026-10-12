@@ -1,0 +1,68 @@
+/* The 'rips' skin of the `results` element (ripsStyle.ts). Every rule is scoped under
+   `.res-style-rips`, which ResultsElement.tsx puts on `.res-root` only for that style, so the
+   default look in ResultsElement.css / ResultRow.css is untouched. Image paths are NOT written
+   here: ResultsElement/ResultRow hand them in as custom properties (--res-frame-art,
+   --res-cell-art, --res-name-art) so the per-tier table in ripsStyle.ts is the single source. */
+
+/* The frame art fills the whole box — same fill mode as board:rips_flat's board.png. The
+   default style's panel colour, border and rounding would peek out around the art's transparent
+   corners, so they go. */
+.res-style-rips .res-dimmed-bg {
+    padding: 0;
+    border-radius: 0;
+}
+
+.res-style-rips .res-frame {
+    position: relative;
+    background: var(--res-frame-art) 0 0 / 100% 100% no-repeat;
+    border: none;
+    border-radius: 0;
+}
+
+/* The grid sits in the marble field the frame art leaves inside its header and gilt border —
+   RIPS_GRID_INSETS, applied as `inset` by the .tsx so the two cannot drift apart. */
+.res-style-rips .res-grid {
+    position: absolute;
+    width: auto;
+    height: auto;
+}
+
+/* A cell is its own gilt plaque: the art replaces the tier-coloured border and the lifted panel
+   fill. The rank is still there — it chooses WHICH art (--res-cell-art), see RIPS_TIER_ART. */
+.res-style-rips .res-row-item {
+    background: var(--res-cell-art) 0 0 / 100% 100% no-repeat;
+    border: none;
+    border-radius: 0;
+    /* Keep the content off the plaque's gilt edge. Vertical padding stays in px: a percentage
+       there resolves against the cell WIDTH and would eat most of a short row. */
+    padding: 3px 3%;
+    /* Logo-to-name-plate spacing for this skin only; the default style keeps ResultRow.css's 6px. */
+    gap: 3px;
+}
+
+/* The buyer's name on its own plate. The default style's coloured plates (empty / sold /
+   high-bid / giveaway) are suppressed: the art has one plate and the user asked for no high-bid
+   or giveaway highlight in this skin. An unsold slot is the same plate with an empty name. */
+.res-style-rips .res-customer-text,
+.res-style-rips .res-bg-empty,
+.res-style-rips .res-bg-item,
+.res-style-rips .res-bg-high-bid,
+.res-style-rips .res-bg-giveaway {
+    background: var(--res-name-art) 0 0 / 100% 100% no-repeat;
+}
+
+.res-style-rips .res-customer-text {
+    /* CellNameFrame.png is 751x241; the plate takes a fixed share of the cell so the name stays
+       inside the drawn bevel. Height follows the row, width the cell. */
+    height: 30%;
+    padding: 0 8%;
+    box-sizing: border-box;
+}
+
+.res-style-rips .res-customer-name,
+.res-style-rips .res-bg-empty .res-customer-name {
+    /* Gilt text on blue marble, matching the art's RESULT lettering. */
+    color: #f3e1a6;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}

@@ -17,6 +17,7 @@ import { RipsFlatBoard } from './elements/board-rips-flat/RipsFlatBoard'
 import { SportStyleBoard } from './elements/board-sport-style/SportStyleBoard'
 import { ResultsElement } from './elements/results/ResultsElement'
 import { ThinResults } from './elements/results-thin/ThinResults'
+import { RIPS_RESULTS_PRELOAD } from './elements/results/ripsStyle'
 import { CircleWidget } from './elements/circle/CircleWidget'
 import { CardsElement } from './elements/cards/CardsElement'
 import { TextElement } from './elements/text/TextElement'
@@ -411,7 +412,10 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         singleton: true,
         singletonGroup: 'results',
         defaultBox: FULL_BOX,
-        preload: [],
+        // The 'rips' style's static art (ripsStyle.ts). Preloaded whatever style the element is
+        // on: a style switch is a config edit, and the layout page only preloads on load/stage
+        // change — cheap at three small PNGs. The default style has no art.
+        preload: RIPS_RESULTS_PRELOAD,
         component: ResultsElement,
         available: true,
         hasBox: true,
