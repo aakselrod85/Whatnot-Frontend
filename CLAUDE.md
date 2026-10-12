@@ -53,6 +53,12 @@ BACKEND_HOST=http://localhost:5555
 2. Add or extend the TypeScript interface in `src/app/entity/entities.ts`
 3. The helpers automatically attach the Basic Auth header — no extra setup needed
 
+## OBS layout canvas
+
+The layout canvas is a fixed **1080×1920 portrait** (vertical Full HD), not 16:9.
+`CANVAS` in `src/app/obs/layout/schema.ts` is the source of truth. All element boxes
+are in canvas px on that 1080-wide, 1920-tall surface.
+
 ## Pattern: Adding a layout element
 
 See `src/app/obs/layout/ADDING_AN_ELEMENT.md`.
