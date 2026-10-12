@@ -374,10 +374,11 @@
 
   // ---------- stages ----------
   const ST1 = 0.6, ST2 = 1.9;
+  const SHAKE1 = 0, SHAKE2 = 0;   // glass shake per stage, temporarily off; 1 restores it
   const vis1At = (g, t) => { const F = g.fmax * easeOut(t / .25, 2.2); return e => clamp(F - e.d0, 0, e.vis1); };
   function renderStage1(g, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
-    const amp = 38 * Math.exp(-t * 7) * (1 - smooth((t - .3) / .2));
+    const amp = SHAKE1 * 38 * Math.exp(-t * 7) * (1 - smooth((t - .3) / .2));
     const dx = Math.round(amp * Math.sin(2 * Math.PI * 19 * t)), dy = Math.round(amp * .8 * Math.cos(2 * Math.PI * 27 * t + 1));
     ctx.setTransform(1, 0, 0, 1, dx, dy);
     const vis = vis1At(g, t);
@@ -394,7 +395,7 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
     const F2 = FAR * easeOut(t / RUN, 2);                                  // the second crack sweeps the screen
     const vis = e => Math.max(e.vis1, clamp(F2 - e.d0, 0, e.len));
-    const amp = 52 * Math.exp(-t * 9) * (1 - smooth((t - .3) / .2));      // sharp, short jolt
+    const amp = SHAKE2 * 52 * Math.exp(-t * 9) * (1 - smooth((t - .3) / .2));      // sharp, short jolt
     const sx = Math.round(amp * Math.sin(2 * Math.PI * 23 * t + .5)), sy = Math.round(amp * .8 * Math.cos(2 * Math.PI * 29 * t));
     ctx.setTransform(1, 0, 0, 1, sx, sy);
     const falling = [];
