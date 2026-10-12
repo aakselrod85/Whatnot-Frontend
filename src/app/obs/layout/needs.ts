@@ -65,4 +65,7 @@ export const NEEDS_BY_ID = {
     // Reads no spine data (obs-visibility-toggle-plan.md §5) — it carries only a list of OBS
     // source names and renders nothing.
     obsToggle: [],
+    // Reads `events` and the active break id (always-on spine sources) plus, for the tier filter
+    // (hit-sequence-plan.md §13), the same price sources as `board:sport_style`.
+    hitSequence: ['needsCobra', 'needsSeries'],
 } as const satisfies Record<RegistryId, readonly NeedFlag[]>

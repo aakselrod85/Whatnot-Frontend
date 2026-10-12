@@ -48,6 +48,54 @@ export type ElementKind =
     | 'ticker'
     | 'cameraShelf'
     | 'obsToggle'
+    | 'hitSequence'
+
+// ---- hitSequence (hit-sequence-plan.md §3.1) ---------------------------------------------------
+export type HitStepBase = {
+    id: string // stable, generated once in the settings panel (random 8 chars)
+    label?: string // settings/dev-panel display only
+    startAt: 'prevEnd' | 'prevStart' // relative to the previous step; the first step ignores it
+    delayMs: number // >= 0, added to that instant
+}
+export type VideoVariant = {
+    id: string // stable, generated like a step id
+    label?: string // "from left", "from right"
+    src: string // URL under /public
+    pivot?: { x: number; y: number; d: number } // ball centre + diameter IN THIS FILE'S PIXELS at the key frame; pivot mode only
+    when: 'always' | 'cellLeftOfBall' | 'cellRightOfBall' // eligibility per run
+}
+export type VideoPlacement =
+    | { mode: 'screen' } // stretched to the 1080x1920 canvas
+    | {
+          mode: 'pivot'
+          anchor: 'ball' | 'cell' // which board anchor the pivot lands on
+          match: 'size' | 'none' // 'size': scale so pivot.d == anchor diameter x sizeFactor
+          sizeFactor: number // default 1; 'size' only
+          scale: number // default 1; 'none' only (absolute video scale)
+          offset: { dx: number; dy: number } // canvas px, applied last
+      }
+export type HitStep =
+    | (HitStepBase & {
+          kind: 'video'
+          variants: VideoVariant[] // >= 1; exactly one is chosen per run
+          placement: VideoPlacement // shared by every variant
+          durationMs?: number // override the file's natural length
+          speed?: number // playback rate multiplier, default 1; applies to every variant of the step
+      })
+    | (HitStepBase & {
+          kind: 'obs'
+          // showPlay = show, let OBS autoplay (media source with 'Restart playback when source
+          // becomes active'), wait for playback end, hide. holdMs/waitForEnd are ignored for it.
+          action: 'show' | 'hide' | 'play' | 'showPlay'
+          items: { scene: string; source: string }[] // source may contain `{team}`
+          holdMs?: number // 'show' only: auto-hide after this long
+          waitForEnd?: boolean // 'play' only: step lasts until playback ends
+      })
+    | (HitStepBase & { kind: 'reveal' }) // flips the hit cell to sold (reveal-sold cue)
+    | (HitStepBase & { kind: 'ball'; action: 'hide' | 'show' }) // the board's ball art; duration 0
+    | (HitStepBase & { kind: 'wait'; durationMs: number })
+
+export const HIT_STEP_KINDS = ['video', 'obs', 'reveal', 'ball', 'wait'] as const
 
 export const BOARD_VARIANTS = ['flat', 'classic', 'cobra', 'cobra_flat', 'rips_flat', 'sport_style'] as const
 export type BoardVariant = (typeof BOARD_VARIANTS)[number]
@@ -180,6 +228,16 @@ export type Element = (
           edgeMode?: 'plain' | 'tiered'
           sortMode?: 'alphabetical' | 'centered'
           tileSet?: 'veined' | 'clean' | 'icons'
+          // board:sport_style only (every other variant ignores all three; hit-sequence-plan.md §2.1):
+          // the ball slot — a `hole.cols x hole.rows` block of grid cells at the TOP CENTRE that no
+          // team is dealt into; the ball art renders there and is published as anchor `ball`.
+          hole?: { cols: number; rows: number }
+          // Length of the ball's long axis as a fraction of the hole's DIAGONAL; default 0.95. The
+          // art is rotated -45deg to lie along that diagonal.
+          ballScale?: number
+          // 'gated': a cell that sells AFTER the mount baseline keeps rendering unsold until a
+          // `reveal-sold` cue names its event id, or GATE_TIMEOUT_MS passes. Default 'immediate'.
+          soldReveal?: 'immediate' | 'gated'
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions
@@ -469,6 +527,19 @@ export type Element = (
           z?: number
           reactions?: Reactions
       }
+    // Boxless, invisible except while a sequence plays (hit-sequence-plan.md): on a sale observed on
+    // the layout it plays an ordered step list (videos, OBS scene-item actions, reveal). Not in
+    // MIRRORABLE_KINDS.
+    | {
+          kind: 'hitSequence'
+          target?: string // board element key; default first board:sport_style in config
+          steps?: HitStep[] // empty/absent = detect hits, reveal them immediately, play nothing
+          queueCap?: number // default 3
+          minTier?: 'regular' | 'mid' | 'good' | 'best' // lowest tier that plays; default 'mid', 'regular' = every hit
+          placements: Partial<Record<PlacementKey, Box>>
+          z?: number
+          reactions?: Reactions
+      }
 ) & MirrorFields
 
 export type LayoutConfig = {
@@ -485,6 +556,9 @@ export type LayoutConfig = {
         // Transition is a controls-only action (the layout page never learns about it) — see
         // obs-layout-plan.md §1.7 "Transition as a controls action".
         useTransition?: boolean
+        // The layout page's own obs-websocket URL (hit-sequence-plan.md §4.6); default
+        // ws://localhost:4455. Only dialled when the config contains a `hitSequence` element.
+        layoutObsUrl?: string
     }
 }
 
@@ -547,6 +621,13 @@ export type TransientCue =
     // `highlight-photo`, it means nothing a moment after it fires, so the TRANSIENT bus (never a
     // BusPayload) is the right channel.
     | { kind: 'sport-style-regenerate'; target: 'turf' | 'wear' }
+    // hitSequence (hit-sequence-plan.md §3.1). The first two are emitted IN-PAGE by the hitSequence
+    // element for the board; the last two rehearse / abort a sequence from the controls panel or
+    // the layout dev panel.
+    | { kind: 'reveal-sold'; eventId: number; boardKey?: string }
+    | { kind: 'ball-visible'; visible: boolean; boardKey?: string }
+    | { kind: 'hit-sequence-test'; elementKey: string; eventId: number }
+    | { kind: 'hit-sequence-abort'; elementKey?: string }
 
 export type Cue = DurableCue | TransientCue
 

@@ -9,6 +9,7 @@ import type {Phase, Stage} from '../schema'
 import {useLayoutData} from '../useLayoutData'
 import {useCueBus} from '../cueBus'
 import {SCENE_EVENTS} from '../sceneEvents'
+import {useLayoutObsInfo} from '../obsConnection'
 
 function agoLabel(now: number | null, at: number | undefined): string {
     if (now === null) return '-'
@@ -23,14 +24,25 @@ export function DevPanel({
     seq,
     lastBusEventAt,
     onSetPhase,
+    hitSequenceKeys = [],
 }: {
     phase: Phase
     stages: Stage[]
     seq: number
     lastBusEventAt: number | null
     onSetPhase: (phase: Phase) => void
+    // Keys of the config's `hitSequence` elements (hit-sequence-plan.md §7); the block below only
+    // renders when there is at least one.
+    hitSequenceKeys?: string[]
 }) {
-    const {lastFetched} = useLayoutData()
+    const {lastFetched, events} = useLayoutData()
+    const obsInfo = useLayoutObsInfo()
+    const [hitKey, setHitKey] = useState('')
+    const [hitEventId, setHitEventId] = useState<number | null>(null)
+    const [showObsLog, setShowObsLog] = useState(false)
+    const hitElementKey = hitSequenceKeys.includes(hitKey) ? hitKey : hitSequenceKeys[0]
+    const hitEvents = events.filter((e) => !e.is_giveaway && !e.note)
+    const hitEvent = hitEvents.find((e) => e.id === hitEventId) ?? hitEvents[0]
     const cueBus = useCueBus()
 
     // Date.now()/localStorage must not run during render (SSR has neither) — seed both in
@@ -84,6 +96,55 @@ export function DevPanel({
                     ))}
                 </div>
             </div>
+            {hitSequenceKeys.length > 0 && (
+                <div className="lay-dev-sources">
+                    <div className="lay-dev-row">
+                        <span className="lay-dev-label">hit sequence</span>
+                        <span>
+                            {obsInfo
+                                ? `${obsInfo.status} · ${obsInfo.attempts} · ${obsInfo.lastError ?? 'no error'}`
+                                : 'obs off (?obs=0)'}
+                        </span>
+                    </div>
+                    <div className="lay-dev-row">
+                        {hitSequenceKeys.length > 1 && (
+                            <select value={hitElementKey} onChange={(e) => setHitKey(e.target.value)}>
+                                {hitSequenceKeys.map((k) => (
+                                    <option key={k} value={k}>{k}</option>
+                                ))}
+                            </select>
+                        )}
+                        <select value={hitEvent?.id ?? ''} onChange={(e) => setHitEventId(parseInt(e.target.value, 10))}>
+                            {hitEvents.map((e) => (
+                                <option key={e.id} value={e.id}>{e.team}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            className="lay-dev-event-btn"
+                            disabled={!hitEvent}
+                            onClick={() => hitEvent && cueBus.emit({kind: 'hit-sequence-test', elementKey: hitElementKey, eventId: hitEvent.id})}
+                        >
+                            Play
+                        </button>
+                        <button
+                            type="button"
+                            className="lay-dev-event-btn"
+                            onClick={() => cueBus.emit({kind: 'hit-sequence-abort', elementKey: hitElementKey})}
+                        >
+                            Abort
+                        </button>
+                    </div>
+                    <div className="lay-dev-row">
+                        <button type="button" className="lay-dev-event-btn" onClick={() => setShowObsLog((v) => !v)}>
+                            {showObsLog ? 'Hide' : 'Show'} OBS log
+                        </button>
+                    </div>
+                    {showObsLog && obsInfo && (
+                        <pre style={{margin: 0, whiteSpace: 'pre-wrap', fontSize: 11}}>{obsInfo.log.join('\n') || '(empty)'}</pre>
+                    )}
+                </div>
+            )}
             <div className="lay-dev-sources">
                 {Object.entries(lastFetched)
                     .sort(([a], [b]) => a.localeCompare(b))

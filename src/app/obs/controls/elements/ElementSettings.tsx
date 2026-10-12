@@ -35,6 +35,7 @@ import RipsSceneSettings from './RipsSceneSettings'
 import TickerSettings from './TickerSettings'
 import CameraShelfSettings from './CameraShelfSettings'
 import ObsToggleSettings from './ObsToggleSettings'
+import HitSequenceSettings from './HitSequenceSettings'
 import type { MyOBSWebsocket } from '@/app/entity/my_obs_websocket'
 
 type Props = {
@@ -181,6 +182,9 @@ const SETTINGS_PANELS = {
     ),
     obsToggle: ({elementKey, element, onPatchElement, obs, isConnected}) => (
         <ObsToggleSettings elementKey={elementKey} element={element} onPatchElement={onPatchElement} obs={obs} isConnected={isConnected}/>
+    ),
+    hitSequence: ({channelId, elementKey, element, config, onPatchElement, onEmitCue, obs, isConnected}) => (
+        <HitSequenceSettings channelId={channelId} elementKey={elementKey} element={element} config={config} onPatchElement={onPatchElement} onEmitCue={onEmitCue} obs={obs} isConnected={isConnected}/>
     ),
 } satisfies Record<RegistryId, SettingsRenderer | null>
 

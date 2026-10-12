@@ -18,6 +18,7 @@
 // of the panel below the fold — the summary line names each editor and whether it currently carries
 // a non-default blob.
 
+import {gridSlots} from '@/app/obs/sport_style/centreLayout'
 import {useState} from 'react'
 import type {DurableCue, Element, Phase, TransientCue} from '@/app/obs/layout/schema'
 import {DEFAULT_COLS, DEFAULT_PATCH, DEFAULT_TURF, FIELD} from '@/app/obs/sport_style/fieldConstants'
@@ -46,8 +47,9 @@ const MAX_MARGIN = 200
  *  R1 fix 5), fed by a display-only slot count rather than the break's real event count — this
  *  panel has no access to `events` (it isn't rendered inside a `<LayoutDataProvider>` the way the
  *  board is). `margin` is a transparent outer band; `edgeGap` comes from the turf blob (R1 fix 5, revised). */
-function fieldHeightFor(boxW: number, cols: number, slots: number, margin: number, edgeGap: number): {rows: number; height: number} {
-    const rows = slots > 0 ? Math.ceil(slots / cols) : 0
+function fieldHeightFor(boxW: number, cols: number, slots: number, margin: number, edgeGap: number, hole?: {cols: number; rows: number}): {rows: number; height: number} {
+    // Hole-aware row count (hit-sequence-plan.md §2.2) — the board deals around the ball slot.
+    const rows = slots > 0 ? gridSlots(slots, cols, hole).rows : 0
     const cellPx = rows > 0 ? Math.max(1, Math.floor((boxW - 2 * margin - 2 * edgeGap) / cols)) : 0
     const height = rows > 0 ? rows * cellPx + 2 * edgeGap + 2 * margin : 2 * edgeGap + 2 * margin
     return {rows, height}
@@ -68,7 +70,8 @@ export default function SportStyleBoardSettings({elementKey, element, currentPha
         : undefined
     const edgeGap = typeof turfEdgeGap === 'number' && Number.isFinite(turfEdgeGap) ? Math.max(0, turfEdgeGap) : DEFAULT_TURF.edgeGap
     const box = element.placements[currentPhase] ?? element.placements.all
-    const {rows, height} = fieldHeightFor(box?.w ?? 0, cols, slots, margin, edgeGap)
+    const hole = element.hole
+    const {rows, height} = fieldHeightFor(box?.w ?? 0, cols, slots, margin, edgeGap, hole)
 
     function setCols(next: number) {
         const clamped = Math.max(MIN_COLS, Math.min(MAX_COLS, Math.round(next) || DEFAULT_COLS))
@@ -146,6 +149,82 @@ export default function SportStyleBoardSettings({elementKey, element, currentPha
                     </select>
                 </div>
             </div>
+
+            {/* hit-sequence-plan.md §2.4: ball slot + sold reveal. All opt-in; unset = today's board. */}
+            <div className="d-flex gap-3 mb-2 align-items-end flex-wrap">
+                <div className="form-check">
+                    <input
+                        type="checkbox"
+                        id={`${elementKey}-hole`}
+                        className="form-check-input"
+                        checked={!!hole}
+                        onChange={(e) => onPatchElement(elementKey, {hole: e.target.checked ? {cols: 2, rows: 2} : undefined})}
+                    />
+                    <label className="form-check-label small" htmlFor={`${elementKey}-hole`}>Reserve a ball slot</label>
+                </div>
+                {hole && (
+                    <>
+                        <div>
+                            <label className="form-label mb-0 small">Slot cols</label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={Math.max(1, cols - 1)}
+                                className="form-control form-control-sm"
+                                style={{width: '80px'}}
+                                value={hole.cols}
+                                onChange={(e) => {
+                                    const v = Math.max(1, Math.min(Math.max(1, cols - 1), Math.round(parseInt(e.target.value, 10) || 1)))
+                                    onPatchElement(elementKey, {hole: {...hole, cols: v}})
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label className="form-label mb-0 small">Slot rows</label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={6}
+                                className="form-control form-control-sm"
+                                style={{width: '80px'}}
+                                value={hole.rows}
+                                onChange={(e) => {
+                                    const v = Math.max(1, Math.min(6, Math.round(parseInt(e.target.value, 10) || 1)))
+                                    onPatchElement(elementKey, {hole: {...hole, rows: v}})
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label className="form-label mb-0 small">Ball scale</label>
+                            <input
+                                type="number"
+                                min={0.1}
+                                max={2}
+                                step={0.05}
+                                className="form-control form-control-sm"
+                                style={{width: '90px'}}
+                                value={element.ballScale ?? 0.95}
+                                onChange={(e) => {
+                                    const v = parseFloat(e.target.value)
+                                    if (Number.isFinite(v)) onPatchElement(elementKey, {ballScale: Math.max(0.1, Math.min(2, v))})
+                                }}
+                            />
+                        </div>
+                    </>
+                )}
+                <div>
+                    <label className="form-label mb-0 small">Sold reveal</label>
+                    <select
+                        className="form-select form-select-sm"
+                        value={element.soldReveal === 'gated' ? 'gated' : 'immediate'}
+                        onChange={(e) => onPatchElement(elementKey, {soldReveal: e.target.value as 'immediate' | 'gated'})}
+                    >
+                        <option value="immediate">Immediate</option>
+                        <option value="gated">Gated</option>
+                    </select>
+                </div>
+            </div>
+            <div className="small text-muted mb-2">gated: cells turn sold only when a Hit sequence reveals them (90 s safety)</div>
 
             {/* The whole cobra Prices widget — Side Cards Price, Board: Price Ranges and Presets —
                 rendered as-is rather than re-styled copies: this board reads the same channel-wide

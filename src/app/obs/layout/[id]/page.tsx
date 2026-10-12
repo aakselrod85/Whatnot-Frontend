@@ -24,6 +24,7 @@ import {CueBusProvider, useCueBus} from '../cueBus'
 import {LayoutDataProvider} from '../useLayoutData'
 import {ResolvedBoxesProvider} from '../resolvedBoxes'
 import {AnchorsProvider} from '../anchors'
+import {LayoutObsProvider} from '../obsConnection'
 import {EventActiveProvider} from '../eventActive'
 import {Stage} from './Stage'
 import {ElementFrame} from './ElementFrame'
@@ -105,7 +106,7 @@ function LayoutStageContent({config, state}: {config: LayoutConfig; state: Overl
     )
 }
 
-function LayoutPageInner({channelId, devMode}: {channelId: number; devMode: boolean}) {
+function LayoutPageInner({channelId, devMode, obsOff}: {channelId: number; devMode: boolean; obsOff: boolean}) {
     const [config, setConfig] = useState<LayoutConfig>(() => defaultConfig())
     // Mirrors `config` for the reconcile poll below: that closure is only re-created on
     // `channelId` changing, so without a ref it would keep "current config" pinned to whatever
@@ -262,6 +263,12 @@ function LayoutPageInner({channelId, devMode}: {channelId: number; devMode: bool
         urls.forEach(preloadUrl)
     }, [config])
 
+    const hitSequenceKeys = useMemo(
+        () => Object.entries(config.elements).filter(([, el]) => el.kind === 'hitSequence').map(([key]) => key),
+        [config]
+    )
+    const obsEnabled = hitSequenceKeys.length > 0 && !obsOff
+
     const effectiveState = useMemo<OverlayState>(
         () => (devPhaseOverride ? {...state, phase: devPhaseOverride, phaseData: undefined} : state),
         [state, devPhaseOverride]
@@ -269,16 +276,23 @@ function LayoutPageInner({channelId, devMode}: {channelId: number; devMode: bool
 
     return (
         <LayoutDataProvider channelId={channelId} config={config}>
-            <LayoutStageContent config={config} state={effectiveState} />
-            {devMode && (
-                <DevPanel
-                    phase={effectiveState.phase}
-                    stages={config.stages}
-                    seq={seq}
-                    lastBusEventAt={lastBusEventAt}
-                    onSetPhase={setDevPhaseOverride}
-                />
-            )}
+            {/* hit-sequence-plan.md §4.5: the layout page's own obs-websocket, dialled only when the
+                config holds a `hitSequence` element and the tab was not opened with `?obs=0` (a dev
+                tab beside the real source must not double-fire OBS steps). Mounted here rather than
+                inside AnchorsProvider so the dev panel, a sibling of the stage, can read its status. */}
+            <LayoutObsProvider url={config.obsBindings.layoutObsUrl || 'ws://localhost:4455'} enabled={obsEnabled}>
+                <LayoutStageContent config={config} state={effectiveState} />
+                {devMode && (
+                    <DevPanel
+                        phase={effectiveState.phase}
+                        stages={config.stages}
+                        seq={seq}
+                        lastBusEventAt={lastBusEventAt}
+                        onSetPhase={setDevPhaseOverride}
+                        hitSequenceKeys={hitSequenceKeys}
+                    />
+                )}
+            </LayoutObsProvider>
         </LayoutDataProvider>
     )
 }
@@ -287,10 +301,11 @@ export default function Page({params}: {params: {id: string}}) {
     const channelId = parseInt(params.id)
     const searchParams = useSearchParams()
     const devMode = searchParams?.get('dev') === '1'
+    const obsOff = searchParams?.get('obs') === '0'
 
     return (
         <CueBusProvider>
-            <LayoutPageInner channelId={channelId} devMode={devMode} />
+            <LayoutPageInner channelId={channelId} devMode={devMode} obsOff={obsOff} />
         </CueBusProvider>
     )
 }

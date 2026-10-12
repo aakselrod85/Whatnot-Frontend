@@ -47,6 +47,65 @@
 import {sortCells, type FlatCell, type PlacedCell} from '../layout/elements/board-cobra-flat/layout'
 import {hasLogo} from './teamPalette'
 
+// hit-sequence-plan.md §2.2: an optional top-centre block of grid cells no team is dealt into (the
+// ball slot). Slot generation moved here from the inline `rowSizes` loop so the alphabetical mode
+// of the board can share it; with no hole the output is identical to the old loop.
+export type Hole = {cols: number; rows: number}
+export type GridSlot = {row: number; col: number; rowLen: number}
+
+let holeWarned = false
+
+/**
+ * Every dealable slot of an `n`-cell grid `cols` wide with an optional top-centre `hole`, in
+ * READING order (row-major, left to right). Rows are full from the top; only the last row is short.
+ * Hole columns are the centred run of `hole.cols` board columns (`floor((cols - hole.cols) / 2)`);
+ * on rows `0 .. hole.rows-1` those columns are skipped. A row that contains the hole has
+ * `rowLen = cols` and its `col` IS the board column; any other row behaves exactly as before.
+ * If `hole.cols >= cols` the hole is ignored (warned once).
+ */
+export function gridSlots(n: number, cols: number, hole?: Hole): {rows: number; slots: GridSlot[]} {
+    if (n <= 0 || cols <= 0) return {rows: 0, slots: []}
+    let h = hole
+    if (h && h.cols >= cols) {
+        if (!holeWarned) {
+            holeWarned = true
+            console.warn('[sport_style] hole.cols >= cols, hole ignored')
+        }
+        h = undefined
+    }
+    if (!h || h.cols < 1 || h.rows < 1) {
+        const rows = Math.ceil(n / cols)
+        const slots: GridSlot[] = []
+        for (let row = 0; row < rows; row++) {
+            const rowLen = row < rows - 1 ? cols : n - (rows - 1) * cols
+            for (let col = 0; col < rowLen; col++) slots.push({row, col, rowLen})
+        }
+        return {rows, slots}
+    }
+    const holeStart = Math.floor((cols - h.cols) / 2)
+    const holeEnd = holeStart + h.cols // exclusive
+    const capacity = (row: number) => (row < h.rows ? cols - h.cols : cols)
+    let rows = 0
+    let cap = 0
+    while (cap < n) cap += capacity(rows++)
+    const slots: GridSlot[] = []
+    let left = n
+    for (let row = 0; row < rows && left > 0; row++) {
+        if (row < h.rows) {
+            for (let c = 0; c < cols && left > 0; c++) {
+                if (c >= holeStart && c < holeEnd) continue
+                slots.push({row, col: c, rowLen: cols})
+                left--
+            }
+        } else {
+            const rowLen = Math.min(cols, left)
+            for (let c = 0; c < rowLen; c++) slots.push({row, col: c, rowLen})
+            left -= rowLen
+        }
+    }
+    return {rows, slots}
+}
+
 /**
  * Lays `cells` out into `PlacedCell[][]` render rows, value radiating from the board's centre in
  * three zones (header above): `sortCells` gives the value order, then cells are stably grouped
@@ -58,7 +117,7 @@ import {hasLogo} from './teamPalette'
  * within the highest-priority zone, and so on outward/through the zones. Each returned row is
  * sorted left-to-right by column so the caller can render it directly.
  */
-export function layoutCentred(cells: readonly FlatCell[], cols: number): PlacedCell[][] {
+export function layoutCentred(cells: readonly FlatCell[], cols: number, hole?: Hole): PlacedCell[][] {
     const bySortOrder = sortCells(cells)
     const group = (c: FlatCell) => (c.sold ? 2 : 0) + (hasLogo(c.team) ? 0 : 1)
     const ordered = [0, 1, 2, 3].flatMap((g) => bySortOrder.filter((c) => group(c) === g))
@@ -66,10 +125,7 @@ export function layoutCentred(cells: readonly FlatCell[], cols: number): PlacedC
     const n = ordered.length
     if (n === 0 || cols <= 0) return []
 
-    const rows = Math.ceil(n / cols)
-    const rowSizes = Array.from({length: rows}, (_, row) =>
-        row < rows - 1 ? cols : n - (rows - 1) * cols
-    )
+    const {rows, slots: gridSlotList} = gridSlots(n, cols, hole)
 
     // Middle-column band (header above): a symmetric run of board columns, centred on the board.
     let midCount = Math.round(cols / 3)
@@ -85,24 +141,22 @@ export function layoutCentred(cells: readonly FlatCell[], cols: number): PlacedC
     const slots: Slot[] = []
     const rowCentre = (rows - 1) / 2
     const boardColCentre = (cols - 1) / 2
-    rowSizes.forEach((rowLen, row) => {
+    gridSlotList.forEach(({row, col, rowLen}) => {
         const dy = Math.abs(row - rowCentre)
         const colShift = Math.floor((cols - rowLen) / 2)
-        for (let col = 0; col < rowLen; col++) {
-            const boardCol = col + colShift
-            const dx = Math.abs(boardCol - boardColCentre)
-            const middle = isMiddleCol(boardCol)
-            let zone: number
-            if (!middle) {
-                zone = 2
-            } else if (!hasInteriorRows) {
-                // rows <= 2: no interior rows, so zone A claims the middle columns on every row.
-                zone = 0
-            } else {
-                zone = isInteriorRow(row) ? 0 : 1
-            }
-            slots.push({row, col, dx, dy, d2: dx * dx + dy * dy, zone})
+        const boardCol = col + colShift
+        const dx = Math.abs(boardCol - boardColCentre)
+        const middle = isMiddleCol(boardCol)
+        let zone: number
+        if (!middle) {
+            zone = 2
+        } else if (!hasInteriorRows) {
+            // rows <= 2: no interior rows, so zone A claims the middle columns on every row.
+            zone = 0
+        } else {
+            zone = isInteriorRow(row) ? 0 : 1
         }
+        slots.push({row, col, dx, dy, d2: dx * dx + dy * dy, zone})
     })
     slots.sort((a, b) => {
         if (a.zone !== b.zone) return a.zone - b.zone
@@ -112,7 +166,7 @@ export function layoutCentred(cells: readonly FlatCell[], cols: number): PlacedC
         return a.col - b.col
     })
 
-    const grid: PlacedCell[][] = rowSizes.map(() => [])
+    const grid: PlacedCell[][] = Array.from({length: rows}, () => [] as PlacedCell[])
     ordered.forEach((cell, rank) => {
         const slot = slots[rank]
         if (!slot) return // defensive only: slots.length === ordered.length by construction above

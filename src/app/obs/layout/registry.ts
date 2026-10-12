@@ -34,6 +34,7 @@ import { CameraShelfElement } from './elements/camera-shelf/CameraShelfElement'
 import { SHELF_ASSETS, SHELF_PRELOAD } from './elements/camera-shelf/assets'
 import { ObsToggleElement } from './elements/obs-toggle/ObsToggleElement'
 import { mountObsToggle } from './elements/obs-toggle/mount'
+import { HitSequenceElement } from './elements/hit-sequence/HitSequenceElement'
 import type { AnimationId, BoardVariant, Box, Element, ElementKind, FrameVariant, Phase, TickerSlot, WidgetId } from './schema'
 import { ANIMATION_IDS, DEFAULT_FRAME_BORDERS, DEFAULT_FRAME_WIDTH, DEFAULT_TICKER_SLOTS, WIDGET_IDS } from './schema'
 import type { SceneEventName } from './sceneEvents'
@@ -77,6 +78,7 @@ export type RegistryId =
     | 'ticker'
     | 'cameraShelf'
     | 'obsToggle'
+    | 'hitSequence'
 
 // Shared prop contract every registry component (placeholder now, real components in Phase 2)
 // implements.
@@ -135,6 +137,8 @@ export type RegistryEntry = {
     // element always uses its plain box. [convention]: nothing checks that the component actually
     // publishes these via `usePublishAnchors` (anchors.tsx) — a stale/wrong name here just means the
     // runtime falls back to the box at render time (useTargetShape), never a build/type error.
+    // Dynamic families (e.g. sport_style's `cell:<eventId>`) are published without being declared;
+    // only code that knows the id reads them.
     anchors?: readonly string[]
     // Stage-hook mount function (obs-camera-shelf-plan.md §5): runs on the CONTROLS page only
     // (controls/useStageHooks.ts is the runner), letting an element type subscribe to
@@ -314,7 +318,9 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         defaultBox: SPORT_STYLE_BOX,
         // Turf/patch are opaque JSON pasted by the operator (schema.ts) — nothing to preload here;
         // team logos resolve at render time from /images/teams/ like every other patch-based board.
-        preload: [],
+        // hit-sequence-plan.md §2.5: the ball art shown in the optional `hole`; a missing file is a
+        // broken image, never a crash.
+        preload: ['/images/sport_style/ball.png'],
         component: SportStyleBoard,
         available: true,
         hasBox: true,
@@ -325,7 +331,8 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         reactsTo: [],
         // board-anchors-plan.md §3.3/§3.5: the painted (clipped) turf area, and the cell grid alone
         // — see SportStyleBoard.tsx's `usePublishAnchors` call for what each one resolves to.
-        anchors: ['field', 'grid'],
+        // `ball` only exists when the board has a `hole` (hit-sequence-plan.md §2.3).
+        anchors: ['field', 'grid', 'ball'],
     },
     'widget:pick2': {
         id: 'widget:pick2',
@@ -719,6 +726,25 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // `mount` — see stageHooks.ts/controls/useStageHooks.ts for the mechanism.
         mount: mountObsToggle,
     },
+    // hit-sequence-plan.md §1/§3.2: boxless, invisible except while a sequence plays. Not a singleton
+    // (several sequences may target different boards) but with its own group so `singleton: false`
+    // alone is what allows that.
+    hitSequence: {
+        id: 'hitSequence',
+        kind: 'hitSequence',
+        label: 'Hit sequence',
+        singleton: false,
+        singletonGroup: 'hitSequence',
+        defaultBox: FULL_BOX, // irrelevant: boxless
+        // The videos are preloaded by the element itself (HitSequenceElement.tsx), per config.
+        preload: [],
+        component: HitSequenceElement,
+        available: true,
+        hasBox: false,
+        // The settings panel is a step list.
+        wideBlock: true,
+        reactsTo: [],
+    },
 }
 
 /** Narrows a registry id's suffix to a real AnimationId, refusing anything ANIMATION_IDS lacks. */
@@ -835,6 +861,9 @@ export function makeElement(registryId: RegistryId): Element {
             // sources left unset — the caller (controls' ElementsPanel/ObsToggleSettings) adds
             // entries after placement, same "empty until edited" convention as `text`/`imageBox`.
             return { kind: 'obsToggle', placements }
+        case 'hitSequence':
+            // steps left unset — an empty list just reveals hits immediately (hit-sequence-plan.md §3.2).
+            return { kind: 'hitSequence', placements }
         default: {
             const _exhaustive: never = entry.kind
             throw new Error(`makeElement: unhandled kind ${JSON.stringify(_exhaustive)}`)

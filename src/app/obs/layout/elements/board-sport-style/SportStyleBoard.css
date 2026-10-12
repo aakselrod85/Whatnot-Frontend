@@ -95,3 +95,14 @@
 .sps-cell {
     position: absolute;
 }
+
+/* hit-sequence-plan.md §2.3: the NFL ball sitting in the board's `hole`. Positioned like a cell
+   (absolute inside .sps-inner, in the cells layer); hidden with visibility, never display, so its
+   anchor and layout stay put while a hit sequence plays. Rotated about its centre to lie along the
+   hole's diagonal, right tip up. */
+.sps-ball {
+    position: absolute;
+    object-fit: contain;
+    transform: rotate(-45deg);
+    pointer-events: none;
+}
