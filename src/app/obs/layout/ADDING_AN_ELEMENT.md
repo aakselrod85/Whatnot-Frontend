@@ -42,3 +42,7 @@ file contains — that rots; the code and its WHY-comments are the source for th
    bus, and returns an optional teardown.
    Nothing checks that a `mount` actually unsubscribes — a leaked handler fires on every stage
    change until reload.
+10. **[convention]** an element that must act on OBS in response to something only the layout sees (a
+    sale, a spine change) uses `useLayoutObs()` (`layout/obsConnection.tsx`, hit-sequence-plan.md); it is
+    `null` when the layout has no such element or the tab was opened with `?obs=0`, so always handle
+    it. Stage-change reactions keep using `mount` hooks on the controls page (convention 9).

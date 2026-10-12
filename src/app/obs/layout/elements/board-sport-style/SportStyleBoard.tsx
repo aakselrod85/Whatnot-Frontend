@@ -63,11 +63,11 @@
 // cue fired by the settings panel's "Regenerate turf"/"Regenerate teams" buttons — every mounted
 // board subscribes to the cue bus and bumps its own render-forcing counter on a match.
 
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import type {ElementProps} from '../../registry'
 import {useLayoutData} from '../../useLayoutData'
 import {useCueBus} from '../../cueBus'
-import {usePublishAnchors} from '../../anchors'
+import {usePublishAnchors, type Shape} from '../../anchors'
 import type {Event} from '@/app/entity/entities'
 import {TeamIconSrc} from '@/app/common/teams'
 import {getSpotAbbreviation} from '@/app/common/spot_label'
@@ -90,8 +90,17 @@ import {
     type Tier,
 } from '../board-cobra/pricing'
 import type {FlatCell} from '../board-cobra-flat/layout'
-import {layoutCentred} from '@/app/obs/sport_style/centreLayout'
+import {gridSlots, layoutCentred} from '@/app/obs/sport_style/centreLayout'
 import './SportStyleBoard.css'
+
+// hit-sequence-plan.md §2.3: the sold gate's safety net — a gated cell that was seen sold but never
+// got a `reveal-sold` cue (sequence aborted, hitSequence missing from the stage, queue overflow in
+// another tab) turns sold on its own after this long, so a mis-set-up gate can never freeze a cell.
+const GATE_TIMEOUT_MS = 90_000
+const BALL_SRC = '/images/sport_style/ball.png'
+// Fraction of ball.png's width the ball itself covers (opaque bounds 92..1684 of 1774), so
+// `ballScale` sizes the BALL's long axis, not the file's transparent margin.
+const BALL_ART_FILL = 1592 / 1774
 
 function rollSeed(): number {
     return Math.floor(Math.random() * 2 ** 31)
@@ -168,19 +177,19 @@ type CellProps = {
     patch: GeneralSettings
     // R3.2 tiered edge — `undefined` for a plain edge (edgeMode 'plain', or a 'regular'-tier team).
     edgeTier?: EdgeTier
+    // Passed in (not derived from `event.customer`) so the sold gate can hold a cell unsold.
+    sold: boolean
 }
 
 /** One patch cell, in its own component so `useTeamPalette` (a hook) can be called once per event
  *  regardless of how many cells the current break has — calling it inline in a `.map()` in the
  *  parent would break the rules of hooks whenever the event count changes between renders. */
-function SportStyleCell({event, x, y, patchSize, patch, edgeTier}: CellProps) {
+function SportStyleCell({event, x, y, patchSize, patch, edgeTier, sold}: CellProps) {
     // R1 fix 4: a spot without real logo art gets an initials label instead — `useTeamPalette`
     // already skips loading an image for one of these (teamPalette.ts), so `palette` naturally
     // stays `null` and the cell falls through to the fallback background/stitch below.
     const withLogo = hasLogo(event.team)
     const palette = useTeamPalette(event.team)
-    const sold = event.customer !== ''
-
     const autoBackground = palette
         ? (patch.mixEnabled ? mix(palette.background, palette.secondary, patch.mixRatio) : palette.background)
         : FALLBACK_BACKGROUND
@@ -224,6 +233,14 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
     // R3.4: two selects in SportStyleBoardSettings, no validation — narrowed with defaults exactly
     // like `cols`/`turf`/`patch` above.
     const edgeMode = boardElement?.edgeMode === 'tiered' ? 'tiered' : 'plain'
+    // hit-sequence-plan.md §2.1: ball slot + sold gate, all opt-in. A hole as wide as the grid
+    // would leave no room to deal into, so it is ignored (gridSlots warns too).
+    const holeRaw = boardElement?.hole
+    const holeCols = holeRaw && holeRaw.cols >= 1 && holeRaw.cols < cols ? Math.round(holeRaw.cols) : 0
+    const holeRows = holeRaw && holeCols > 0 && holeRaw.rows >= 1 ? Math.round(holeRaw.rows) : 0
+    const hole = useMemo(() => (holeCols > 0 && holeRows > 0 ? {cols: holeCols, rows: holeRows} : undefined), [holeCols, holeRows])
+    const ballScale = Number.isFinite(boardElement?.ballScale) && (boardElement?.ballScale ?? 0) > 0 ? (boardElement?.ballScale as number) : 0.95
+    const gated = boardElement?.soldReveal === 'gated'
     const sortMode = boardElement?.sortMode === 'centered' ? 'centered' : 'alphabetical'
     // Two nested insets. `margin` (R1 fix 5, board field, default 0) is a transparent band between
     // the element's edge and the painted field; `edgeGap` (the turf blob's own key, default
@@ -251,12 +268,20 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
         [rawEvents]
     )
 
+    // ---- sold gate (hit-sequence-plan.md §2.3), modelled on FlatBoard's settled baseline ----------
+    // `revealed` = sold event ids allowed to RENDER sold. The baseline marks everything already sold
+    // at mount (or on a break change) revealed, so only sales seen afterwards are held back.
+    const activeBreakId = stream?.active_break_id ?? null
+    const [revealed, setRevealed] = useState<Set<number>>(() => new Set())
+    const baselineBreakRef = useRef<number | null>(null)
+    const isShownSold = (e: Event) => e.customer !== '' && (!gated || revealed.has(e.id))
+
     // R3.1 tier assignment — copied verbatim from CobraFlatBoard.tsx (same inputs, same threshold
     // fallbacks) so a team lands on the same tier here as on the cobra boards. Computed always (it's
     // cheap): `edgeMode` decides whether it's DRAWN, `sortMode` whether it ORDERS (plan R3.1).
     const unsoldTeamNames = useMemo(
-        () => events.filter((e) => e.customer === '').map((e) => e.team),
-        [events]
+        () => events.filter((e) => !(e.customer !== '' && (!gated || revealed.has(e.id)))).map((e) => e.team),
+        [events, gated, revealed]
     )
     const defaultPrice = series?.default_price || DEFAULT_PRICE
     const bestThreshold = priceRanges.find((r) => r.tier_id === 'best')?.price_from ?? BEST_THRESHOLD
@@ -280,9 +305,10 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
     // (that row's own cell count — `cols` for every row but possibly the last), consumed by the
     // render loop below for the same cell-wise last-row centring regardless of `sortMode`.
     type PlacedEvent = {event: Event; row: number; col: number; rowLen: number}
+    const slotLayout = useMemo(() => gridSlots(events.length, cols, hole), [events.length, cols, hole])
     const placedEvents: PlacedEvent[] = useMemo(() => {
         if (events.length === 0) return []
-        const rowCount = Math.ceil(events.length / cols)
+        const rowLenAt = new Map(slotLayout.slots.map((sl) => [`${sl.row},${sl.col}`, sl.rowLen]))
         if (sortMode === 'centered') {
             // R3.3 'centered' (reworked) — build FlatCell[], hand it to layoutCentred() (2-D
             // centre-out dealing, sold pushed to the outer edges/corners), then read each
@@ -292,12 +318,12 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
                 eventId: e.id,
                 team: e.team,
                 tier: tierByTeam.get(e.team) ?? 'regular',
-                sold: e.customer !== '',
+                sold: e.customer !== '' && (!gated || revealed.has(e.id)),
                 priceLeft: priceLeftByTeam.get(e.team) ?? 0,
             }))
-            const placedRows = layoutCentred(flatCells, cols)
+            const placedRows = layoutCentred(flatCells, cols, hole)
             return placedRows.flatMap((row) =>
-                row.map((pc) => ({event: eventById.get(pc.cell.eventId)!, row: pc.row, col: pc.col, rowLen: row.length}))
+                row.map((pc) => ({event: eventById.get(pc.cell.eventId)!, row: pc.row, col: pc.col, rowLen: rowLenAt.get(`${pc.row},${pc.col}`) ?? row.length}))
             )
         }
         // R3.3 'alphabetical' (default) — real teams (`hasLogo`, same test used for the logo below)
@@ -312,13 +338,12 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
             return byName !== 0 ? byName : a.id - b.id
         })
         return ordered.map((event, idx) => {
-            const row = Math.floor(idx / cols)
-            const rowLen = row === rowCount - 1 ? ordered.length - row * cols : cols
-            return {event, row, col: idx % cols, rowLen}
+            const slot = slotLayout.slots[idx]
+            return {event, row: slot.row, col: slot.col, rowLen: slot.rowLen}
         })
-    }, [events, cols, sortMode, tierByTeam, priceLeftByTeam])
+    }, [events, cols, sortMode, tierByTeam, priceLeftByTeam, slotLayout, hole, gated, revealed])
 
-    const rows = events.length > 0 ? Math.ceil(events.length / cols) : 0
+    const rows = events.length > 0 ? slotLayout.rows : 0
     // The painted field is the box less `margin` on every side; the grid sits `edgeGap` inside that.
     const innerW = Math.max(1, box.w - 2 * margin)
     const cellPx = rows > 0 ? Math.max(1, Math.floor((innerW - 2 * edgeGap) / cols)) : 0
@@ -374,33 +399,90 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
     const fieldTop = box.y + fieldOffsetY
     const originX = box.x + margin
     const originY = fieldTop + margin
-    usePublishAnchors(
-        elementKey,
-        geometry
-            ? {
-                  // The painted (clipped) turf area, with its elliptical corners.
-                  field: {
-                      x: originX + geometry.field.x,
-                      y: originY + geometry.field.y,
-                      w: geometry.field.w,
-                      h: geometry.field.h,
-                      rx: fieldRx,
-                      ry: fieldRy,
-                  },
-                  // The cell grid only (inside the edge gap), square. `FieldGeometry` doesn't carry
-                  // gridW/gridH as its own fields — derived the same way fieldGeometry.ts computes
-                  // them internally (`cols`/`rows` are already in scope above).
-                  grid: {
-                      x: originX + geometry.gridLeft,
-                      y: originY + geometry.gridTop,
-                      w: cols * geometry.cellPx,
-                      h: rows * geometry.cellPx,
-                      rx: 0,
-                      ry: 0,
-                  },
-              }
-            : {}
-    )
+    // Per-cell top-left of the patch inside `.sps-inner` (R1 fix 1: the patch is centred inside its
+    // own `cellPx x cellPx` footprint). Computed once here so the render AND the `cell:<id>` anchors
+    // below read the same numbers.
+    const cellPositions = useMemo(() => {
+        if (!geometry) return []
+        return placedEvents.map(({event, row, col, rowLen}) => {
+            // A short last row (`rowLen < cols`) always lands ON the column formation — whole cells,
+            // every edge mode — and takes the most central ones, so the empty columns are split as
+            // evenly as possible between the two sides. With an odd number of empty columns an exact
+            // split is impossible on a cell grid; the spare column then sits on the right. A row
+            // holding the hole has `rowLen = cols`, so no shift (centreLayout.ts gridSlots).
+            const colShift = Math.floor((cols - rowLen) / 2)
+            const footprintX = geometry.gridLeft + (col + colShift) * geometry.cellPx
+            const footprintY = geometry.gridTop + row * geometry.cellPx
+            const pad = Math.floor((geometry.cellPx - patchSize) / 2)
+            return {event, x: footprintX + pad, y: footprintY + pad}
+        })
+    }, [geometry, placedEvents, cols, patchSize])
+
+    // The ball's square img box, centred on the hole's footprint, in `.sps-inner` coordinates
+    // (hit-sequence-plan.md §2.3). `undefined` without a hole. The art lies along the hole's
+    // diagonal (rotated -45deg in the CSS), its long axis `ballScale` of that diagonal, so the box
+    // is larger than the hole and the tips may reach slightly past it.
+    const ballRect = useMemo(() => {
+        if (!geometry || !hole) return undefined
+        const holeStart = Math.floor((cols - hole.cols) / 2)
+        const hx = geometry.gridLeft + holeStart * geometry.cellPx
+        const hy = geometry.gridTop
+        const hw = hole.cols * geometry.cellPx
+        const hh = hole.rows * geometry.cellPx
+        const side = (ballScale * Math.hypot(hw, hh)) / BALL_ART_FILL
+        return {x: hx + (hw - side) / 2, y: hy + (hh - side) / 2, side}
+    }, [geometry, hole, cols, ballScale])
+
+    // The lines layer with the ball slot cut out, so no strip or seam tick crosses the ball (or the
+    // empty slot while a hit sequence has the ball hidden). The cut is the slot's INTERIOR — inset
+    // by the strips centred on its outer seams (same `floor(lineW/2)` offset as fieldGeometry), so
+    // the lines framing the slot stay whole. An evenodd polygon: outer box, then the cut.
+    const linesCut = useMemo(() => {
+        if (!geometry || !hole) return undefined
+        const holeStart = Math.floor((cols - hole.cols) / 2)
+        const before = Math.floor(geometry.lineW / 2)
+        const x0 = geometry.gridLeft + holeStart * geometry.cellPx - before + geometry.lineW
+        const x1 = geometry.gridLeft + (holeStart + hole.cols) * geometry.cellPx - before
+        const y0 = geometry.gridTop - before + geometry.lineW
+        const y1 = geometry.gridTop + hole.rows * geometry.cellPx - before
+        return `polygon(evenodd, 0 0, ${innerW}px 0, ${innerW}px ${innerH}px, 0 ${innerH}px, 0 0, ${x0}px ${y0}px, ${x1}px ${y0}px, ${x1}px ${y1}px, ${x0}px ${y1}px, ${x0}px ${y0}px)`
+    }, [geometry, hole, cols, innerW, innerH])
+
+    // One record, one publish call (hooks stay unconditional). `cell:<eventId>` is a DYNAMIC family:
+    // not declared in the registry, read only by code that knows the id (hitSequence).
+    const anchors = useMemo(() => {
+        if (!geometry) return {}
+        const out: Record<string, Shape> = {
+            // The painted (clipped) turf area, with its elliptical corners.
+            field: {
+                x: originX + geometry.field.x,
+                y: originY + geometry.field.y,
+                w: geometry.field.w,
+                h: geometry.field.h,
+                rx: fieldRx,
+                ry: fieldRy,
+            },
+            // The cell grid only (inside the edge gap), square. `FieldGeometry` doesn't carry
+            // gridW/gridH as its own fields — derived the same way fieldGeometry.ts computes
+            // them internally (`cols`/`rows` are already in scope above).
+            grid: {
+                x: originX + geometry.gridLeft,
+                y: originY + geometry.gridTop,
+                w: cols * geometry.cellPx,
+                h: rows * geometry.cellPx,
+                rx: 0,
+                ry: 0,
+            },
+        }
+        if (ballRect) {
+            out.ball = {x: originX + ballRect.x, y: originY + ballRect.y, w: ballRect.side, h: ballRect.side, rx: ballRect.side / 2, ry: ballRect.side / 2}
+        }
+        for (const {event, x, y} of cellPositions) {
+            out[`cell:${event.id}`] = {x: originX + x, y: originY + y, w: patchSize, h: patchSize, rx: 0, ry: 0}
+        }
+        return out
+    }, [geometry, originX, originY, fieldRx, fieldRy, cols, rows, ballRect, cellPositions, patchSize])
+    usePublishAnchors(elementKey, anchors)
 
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const turfKey = useMemo(() => JSON.stringify(turf), [turf])
@@ -432,6 +514,82 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
             }
         })
     }, [cueBus])
+
+    // hit-sequence-plan.md §2.3: the ball art's visibility, driven by in-page `ball-visible` cues from
+    // the hitSequence element. Hidden = `visibility: hidden` only (the node and the `ball` anchor
+    // stay, so the fall video can still target it). Back to visible on mount and on a break change.
+    const [ballVisible, setBallVisible] = useState(true)
+    useEffect(() => {
+        setBallVisible(true)
+    }, [activeBreakId])
+    useEffect(() => {
+        return cueBus.subscribe((cue) => {
+            if (cue.kind !== 'ball-visible') return
+            if (cue.boardKey !== undefined && cue.boardKey !== elementKey) return
+            setBallVisible(cue.visible)
+        })
+    }, [cueBus, elementKey])
+
+    // Sold gate baseline (layout effect: no painted frame shows an already-sold cell as unsold).
+    // Events of a previous break can linger until the new fetch lands, so only events carrying the
+    // ACTIVE break id count as the baseline.
+    useLayoutEffect(() => {
+        if (!gated) return
+        if (activeBreakId === null) {
+            baselineBreakRef.current = null
+            return
+        }
+        if (baselineBreakRef.current === activeBreakId) return
+        const current = rawEvents.filter((e) => e.break_id === activeBreakId)
+        if (current.length === 0) return
+        baselineBreakRef.current = activeBreakId
+        setRevealed(new Set(current.filter((e) => e.customer !== '').map((e) => e.id)))
+    }, [gated, activeBreakId, rawEvents])
+
+    // `reveal-sold` cues from hitSequence.
+    useEffect(() => {
+        return cueBus.subscribe((cue) => {
+            if (cue.kind !== 'reveal-sold') return
+            if (cue.boardKey !== undefined && cue.boardKey !== elementKey) return
+            setRevealed((prev) => (prev.has(cue.eventId) ? prev : new Set(prev).add(cue.eventId)))
+        })
+    }, [cueBus, elementKey])
+
+    // Safety timeouts + re-arming: every gated-but-unrevealed sold id is revealed GATE_TIMEOUT_MS
+    // after it was first seen; an id that goes back to unsold is dropped from `revealed` so a later
+    // re-sale gates again.
+    const gateTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+    useEffect(() => {
+        const timers = gateTimersRef.current
+        if (!gated || baselineBreakRef.current === null) return
+        const soldIds = new Set(rawEvents.filter((e) => e.customer !== '').map((e) => e.id))
+        for (const e of rawEvents) {
+            if (e.customer === '' || revealed.has(e.id) || timers.has(e.id)) continue
+            timers.set(
+                e.id,
+                setTimeout(() => {
+                    timers.delete(e.id)
+                    setRevealed((prev) => (prev.has(e.id) ? prev : new Set(prev).add(e.id)))
+                }, GATE_TIMEOUT_MS)
+            )
+        }
+        timers.forEach((t, id) => {
+            if (revealed.has(id) || !soldIds.has(id)) {
+                clearTimeout(t)
+                timers.delete(id)
+            }
+        })
+        if (Array.from(revealed).some((id) => !soldIds.has(id) && rawEvents.some((e) => e.id === id))) {
+            setRevealed((prev) => new Set(Array.from(prev).filter((id) => soldIds.has(id) || !rawEvents.some((e) => e.id === id))))
+        }
+    }, [gated, rawEvents, revealed])
+    useEffect(() => {
+        const timers = gateTimersRef.current
+        return () => {
+            timers.forEach((t) => clearTimeout(t))
+            timers.clear()
+        }
+    }, [])
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -505,20 +663,7 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
                     </div>
 
                     {/* Layer 2 — cells, unclipped by the oval. */}
-                    {placedEvents.map(({event, row, col, rowLen}) => {
-                        // A short last row (`rowLen < cols`) always lands ON the column formation —
-                        // whole cells, every edge mode — and takes the most central ones, so the
-                        // empty columns are split as evenly as possible between the two sides. With
-                        // an odd number of empty columns an exact split is impossible on a cell
-                        // grid; the spare column then sits on the right.
-                        const emptyCols = cols - rowLen
-                        const colShift = Math.floor(emptyCols / 2)
-                        const footprintX = geometry.gridLeft + (col + colShift) * geometry.cellPx
-                        const footprintY = geometry.gridTop + row * geometry.cellPx
-                        // R1 fix 1: the patch is centred inside its own `cellPx × cellPx`
-                        // footprint, not flush with fieldGeometry.ts's seam-derived `cellBox`.
-                        const x = footprintX + Math.floor((geometry.cellPx - patchSize) / 2)
-                        const y = footprintY + Math.floor((geometry.cellPx - patchSize) / 2)
+                    {cellPositions.map(({event, x, y}) => {
                         // R3.2: tiered edge only when the operator has switched edgeMode on — every
                         // tier, including 'regular', now has its own neon skin (EDGE_TIER_BY_TIER is
                         // a total map), so every cell gets a skin in tiered mode. A custom spot with
@@ -533,9 +678,20 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
                                 patchSize={patchSize}
                                 patch={patch}
                                 edgeTier={edgeTier}
+                                sold={isShownSold(event)}
                             />
                         )
                     })}
+
+                    {ballRect && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            className="sps-ball"
+                            src={BALL_SRC}
+                            alt=""
+                            style={{left: ballRect.x, top: ballRect.y, width: ballRect.side, height: ballRect.side, visibility: ballVisible ? 'visible' : 'hidden'}}
+                        />
+                    )}
 
                     {/* Layer 3 — clip group B: column/row strips + hash ticks + seam ticks, above
                         the cells, clipped to the same oval field as clip group A above. Task spec
@@ -544,6 +700,7 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
                     {/* TEMPORARY: `TEMP_FIELD_IN_TIERED ||` forces the white lines on in tiered mode. */}
                     {(TEMP_FIELD_IN_TIERED || edgeMode !== 'tiered') && (
                         <div className="sps-clip-lines" style={{clipPath: fieldClip, WebkitClipPath: fieldClip}}>
+                          <div className="sps-clip-lines" style={{clipPath: linesCut, WebkitClipPath: linesCut}}>
                             {geometry.vStrips.map((s, i) => (
                                 <div key={`v-${i}`} className="sps-strip" style={{left: s.x, top: s.y, width: s.w, height: s.h, backgroundColor: lineColor}} />
                             ))}
@@ -558,6 +715,7 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
                             {seamTicksEnabled && geometry.seamTicks.map((t, i) => (
                                 <div key={`st-${i}`} className="sps-tick" style={{left: t.x, top: t.y, width: t.w, height: t.h, backgroundColor: lineColor}} />
                             ))}
+                          </div>
                         </div>
                     )}
 

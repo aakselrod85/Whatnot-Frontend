@@ -548,7 +548,22 @@ function validateBoardKind({ key, rawEl, stages }: KindValidatorCtx): { errors: 
         return { errors: [`element "${key}": invalid board variant ${JSON.stringify(variant)}`] }
     }
     const regId = `board:${variant}` as RegistryId
-    return { errors: validatePlacements(key, rawEl.placements, regId, stages), regId }
+    // hit-sequence-plan.md §2.1: board:sport_style's ball slot / sold gate. Checked whenever present
+    // (the fields ride the shared board shape), only READ by sport_style.
+    const errors = validatePlacements(key, rawEl.placements, regId, stages)
+    if (rawEl.hole !== undefined) {
+        const h = rawEl.hole
+        if (!isPlainObject(h) || !Number.isInteger(h.cols) || (h.cols as number) < 1 || !Number.isInteger(h.rows) || (h.rows as number) < 1) {
+            errors.push(`element "${key}": hole must be {cols, rows} with integers >= 1`)
+        }
+    }
+    if (rawEl.ballScale !== undefined && (!isFiniteNumber(rawEl.ballScale) || rawEl.ballScale <= 0 || rawEl.ballScale > 2)) {
+        errors.push(`element "${key}": ballScale must be a number in (0, 2]`)
+    }
+    if (rawEl.soldReveal !== undefined && rawEl.soldReveal !== 'immediate' && rawEl.soldReveal !== 'gated') {
+        errors.push(`element "${key}": soldReveal must be "immediate" or "gated"`)
+    }
+    return { errors, regId }
 }
 
 function validateWidgetKind({ key, rawEl, stages }: KindValidatorCtx): { errors: string[]; regId?: RegistryId } {
@@ -956,6 +971,120 @@ function validateObsToggleKind({ key, rawEl, stages }: KindValidatorCtx): { erro
     }
 }
 
+// `hitSequence` field validation (hit-sequence-plan.md §3.2): `target` a string, `queueCap` an
+// integer 1..10, and `steps` an array where every step passes a per-kind check. Step ids must be
+// non-empty and unique; video variant ids unique within their step.
+function validateHitStep(key: string, i: number, raw: unknown, seenIds: Set<string>): string[] {
+    const at = `element "${key}": steps[${i}]`
+    if (!isPlainObject(raw)) return [`${at} must be an object`]
+    const errors: string[] = []
+    if (typeof raw.id !== 'string' || raw.id.length === 0) errors.push(`${at}.id must be a non-empty string`)
+    else if (seenIds.has(raw.id)) errors.push(`${at}.id "${raw.id}" is duplicated`)
+    else seenIds.add(raw.id)
+    if (raw.label !== undefined && typeof raw.label !== 'string') errors.push(`${at}.label must be a string`)
+    if (raw.startAt !== 'prevEnd' && raw.startAt !== 'prevStart') errors.push(`${at}.startAt must be "prevEnd" or "prevStart"`)
+    if (!isFiniteNumber(raw.delayMs) || raw.delayMs < 0) errors.push(`${at}.delayMs must be a finite number >= 0`)
+    switch (raw.kind) {
+        case 'video': {
+            const p = raw.placement
+            if (!isPlainObject(p) || (p.mode !== 'screen' && p.mode !== 'pivot')) {
+                errors.push(`${at}.placement.mode must be "screen" or "pivot"`)
+            } else if (p.mode === 'pivot') {
+                if (p.anchor !== 'ball' && p.anchor !== 'cell') errors.push(`${at}.placement.anchor must be "ball" or "cell"`)
+                if (p.match !== 'size' && p.match !== 'none') errors.push(`${at}.placement.match must be "size" or "none"`)
+                if (!isFiniteNumber(p.sizeFactor) || p.sizeFactor <= 0) errors.push(`${at}.placement.sizeFactor must be a finite number > 0`)
+                if (!isFiniteNumber(p.scale) || p.scale <= 0) errors.push(`${at}.placement.scale must be a finite number > 0`)
+                const o = p.offset
+                if (!isPlainObject(o) || !isFiniteNumber(o.dx) || !isFiniteNumber(o.dy)) errors.push(`${at}.placement.offset must be {dx, dy} finite numbers`)
+            }
+            if (raw.durationMs !== undefined && (!isFiniteNumber(raw.durationMs) || raw.durationMs < 0)) {
+                errors.push(`${at}.durationMs must be a finite number >= 0`)
+            }
+            if (raw.speed !== undefined && (!isFiniteNumber(raw.speed) || raw.speed < 0.1 || raw.speed > 4)) {
+                errors.push(`${at}.speed must be a finite number in [0.1, 4]`)
+            }
+            if (!Array.isArray(raw.variants) || raw.variants.length === 0) {
+                errors.push(`${at}.variants must be a non-empty array`)
+            } else {
+                const vIds = new Set<string>()
+                const pivotMode = isPlainObject(p) && p.mode === 'pivot'
+                raw.variants.forEach((v: unknown, j: number) => {
+                    const vat = `${at}.variants[${j}]`
+                    if (!isPlainObject(v)) {
+                        errors.push(`${vat} must be an object`)
+                        return
+                    }
+                    if (typeof v.id !== 'string' || v.id.length === 0) errors.push(`${vat}.id must be a non-empty string`)
+                    else if (vIds.has(v.id)) errors.push(`${vat}.id "${v.id}" is duplicated`)
+                    else vIds.add(v.id)
+                    if (typeof v.src !== 'string') errors.push(`${vat}.src must be a string`)
+                    if (v.label !== undefined && typeof v.label !== 'string') errors.push(`${vat}.label must be a string`)
+                    if (v.when !== 'always' && v.when !== 'cellLeftOfBall' && v.when !== 'cellRightOfBall') {
+                        errors.push(`${vat}.when must be "always", "cellLeftOfBall" or "cellRightOfBall"`)
+                    }
+                    if (pivotMode) {
+                        const pv = v.pivot
+                        if (!isPlainObject(pv) || !isFiniteNumber(pv.x) || !isFiniteNumber(pv.y) || !isFiniteNumber(pv.d) || pv.d <= 0) {
+                            errors.push(`${vat}.pivot must be {x, y, d} finite numbers with d > 0 in pivot mode`)
+                        }
+                    }
+                })
+            }
+            break
+        }
+        case 'obs': {
+            if (raw.action !== 'show' && raw.action !== 'hide' && raw.action !== 'play' && raw.action !== 'showPlay') {
+                errors.push(`${at}.action must be "show", "hide", "play" or "showPlay"`)
+            }
+            if (
+                !Array.isArray(raw.items) ||
+                raw.items.some((it: unknown) => !isPlainObject(it) || typeof it.scene !== 'string' || typeof it.source !== 'string')
+            ) {
+                errors.push(`${at}.items must be an array of {scene: string, source: string}`)
+            }
+            if (raw.holdMs !== undefined && (!isFiniteNumber(raw.holdMs) || raw.holdMs < 0)) errors.push(`${at}.holdMs must be a finite number >= 0`)
+            if (raw.waitForEnd !== undefined && typeof raw.waitForEnd !== 'boolean') errors.push(`${at}.waitForEnd must be a boolean`)
+            break
+        }
+        case 'reveal':
+            break
+        case 'ball':
+            if (raw.action !== 'hide' && raw.action !== 'show') errors.push(`${at}.action must be "hide" or "show"`)
+            break
+        case 'wait':
+            if (!isFiniteNumber(raw.durationMs) || raw.durationMs < 0) errors.push(`${at}.durationMs must be a finite number >= 0`)
+            break
+        default:
+            errors.push(`${at}.kind must be one of video, obs, reveal, ball, wait`)
+    }
+    return errors
+}
+
+function validateHitSequenceFields(key: string, rawEl: Record<string, unknown>): string[] {
+    const errors: string[] = []
+    if (rawEl.target !== undefined && typeof rawEl.target !== 'string') errors.push(`element "${key}": target must be a string`)
+    if (rawEl.queueCap !== undefined && (!Number.isInteger(rawEl.queueCap) || (rawEl.queueCap as number) < 1 || (rawEl.queueCap as number) > 10)) {
+        errors.push(`element "${key}": queueCap must be an integer 1..10`)
+    }
+    if (rawEl.steps !== undefined) {
+        if (!Array.isArray(rawEl.steps)) {
+            errors.push(`element "${key}": steps must be an array`)
+        } else {
+            const seen = new Set<string>()
+            rawEl.steps.forEach((s: unknown, i: number) => errors.push(...validateHitStep(key, i, s, seen)))
+        }
+    }
+    return errors
+}
+
+function validateHitSequenceKind({ key, rawEl, stages }: KindValidatorCtx): { errors: string[]; regId?: RegistryId } {
+    const regId: RegistryId = 'hitSequence'
+    return {
+        errors: [...validatePlacements(key, rawEl.placements, regId, stages), ...validateHitSequenceFields(key, rawEl)],
+        regId,
+    }
+}
+
 // The enforcement this whole section exists for: a kind added to ElementKind (schema.ts) with no
 // entry below fails `tsc` right here — see the section's header comment.
 const KIND_VALIDATORS = {
@@ -976,6 +1105,7 @@ const KIND_VALIDATORS = {
     ticker: validateTickerKind,
     cameraShelf: validateCameraShelfKind,
     obsToggle: validateObsToggleKind,
+    hitSequence: validateHitSequenceKind,
 } satisfies Record<ElementKind, KindValidator>
 
 // `config.stages`: non-empty, every entry `{id: non-empty string, label: non-empty string}`,
@@ -1127,11 +1257,15 @@ export function validateConfig(
             if (obsBindings.useTransition !== undefined && typeof obsBindings.useTransition !== 'boolean') {
                 errors.push('config.obsBindings.useTransition must be a boolean')
             }
+            if (obsBindings.layoutObsUrl !== undefined && typeof obsBindings.layoutObsUrl !== 'string') {
+                errors.push('config.obsBindings.layoutObsUrl must be a string')
+            }
             if (errors.length === 0) {
                 validatedBindings = {
                     transitionSource: obsBindings.transitionSource as string | undefined,
                     cameraItem: obsBindings.cameraItem as string | undefined,
                     useTransition: obsBindings.useTransition as boolean | undefined,
+                    layoutObsUrl: obsBindings.layoutObsUrl as string | undefined,
                 }
             }
         }
@@ -1466,11 +1600,40 @@ export function validateCue(input: unknown): { ok: true; cue: Cue } | { ok: fals
         }
         return { ok: true, cue: { kind: 'sport-style-regenerate', target: input.target } }
     }
+    // hitSequence cues (hit-sequence-plan.md §3.1).
+    if (kind === 'reveal-sold') {
+        if (!Number.isInteger(input.eventId)) return { ok: false, errors: ['cue.eventId must be an integer'] }
+        if (input.boardKey !== undefined && typeof input.boardKey !== 'string') {
+            return { ok: false, errors: ['cue.boardKey must be a string'] }
+        }
+        return { ok: true, cue: { kind: 'reveal-sold', eventId: input.eventId as number, boardKey: input.boardKey as string | undefined } }
+    }
+    if (kind === 'ball-visible') {
+        if (typeof input.visible !== 'boolean') return { ok: false, errors: ['cue.visible must be a boolean'] }
+        if (input.boardKey !== undefined && typeof input.boardKey !== 'string') {
+            return { ok: false, errors: ['cue.boardKey must be a string'] }
+        }
+        return { ok: true, cue: { kind: 'ball-visible', visible: input.visible, boardKey: input.boardKey as string | undefined } }
+    }
+    if (kind === 'hit-sequence-test') {
+        if (typeof input.elementKey !== 'string' || input.elementKey.length === 0) {
+            return { ok: false, errors: ['cue.elementKey must be a non-empty string'] }
+        }
+        if (!Number.isInteger(input.eventId)) return { ok: false, errors: ['cue.eventId must be an integer'] }
+        return { ok: true, cue: { kind: 'hit-sequence-test', elementKey: input.elementKey, eventId: input.eventId as number } }
+    }
+    if (kind === 'hit-sequence-abort') {
+        if (input.elementKey !== undefined && typeof input.elementKey !== 'string') {
+            return { ok: false, errors: ['cue.elementKey must be a string'] }
+        }
+        return { ok: true, cue: { kind: 'hit-sequence-abort', elementKey: input.elementKey as string | undefined } }
+    }
     return {
         ok: false,
         errors: [
             'cue.kind must be one of event, photos-changed, refetch, highlight-photo, ' +
-                `sport-style-regenerate — got ${JSON.stringify(kind)}`,
+                'sport-style-regenerate, reveal-sold, ball-visible, hit-sequence-test, hit-sequence-abort ' +
+                `— got ${JSON.stringify(kind)}`,
         ],
     }
 }
@@ -1495,6 +1658,10 @@ function isDurableCue(cue: Cue): cue is DurableCue {
             return true
         case 'highlight-photo':
         case 'sport-style-regenerate':
+        case 'reveal-sold':
+        case 'ball-visible':
+        case 'hit-sequence-test':
+        case 'hit-sequence-abort':
             return false
         default: {
             const _exhaustive: never = cue

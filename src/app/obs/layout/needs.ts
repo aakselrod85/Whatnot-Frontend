@@ -65,4 +65,7 @@ export const NEEDS_BY_ID = {
     // Reads no spine data (obs-visibility-toggle-plan.md §5) — it carries only a list of OBS
     // source names and renders nothing.
     obsToggle: [],
+    // Reads only `events` and the active break id, both always-on spine sources
+    // (hit-sequence-plan.md §3.2) — no flag.
+    hitSequence: [],
 } as const satisfies Record<RegistryId, readonly NeedFlag[]>

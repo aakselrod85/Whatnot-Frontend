@@ -81,6 +81,7 @@ export default function Page({params}: { params: { id: string } }) {
 
     const [transitionDraft, setTransitionDraft] = useState('')
     const [cameraDraft, setCameraDraft] = useState('')
+    const [layoutObsDraft, setLayoutObsDraft] = useState('')
 
     // Transition-as-action state (obs-layout-plan.md §1.7): a stage switch that plays a
     // transition source applies the new phase when OBS reports MediaInputPlaybackEnded for it.
@@ -115,6 +116,10 @@ export default function Page({params}: { params: { id: string } }) {
     useEffect(() => {
         setCameraDraft(controls.config.obsBindings.cameraItem ?? '')
     }, [controls.config.obsBindings.cameraItem])
+
+    useEffect(() => {
+        setLayoutObsDraft(controls.config.obsBindings.layoutObsUrl ?? '')
+    }, [controls.config.obsBindings.layoutObsUrl])
 
     // Drop any pending transition wait on unmount.
     useEffect(() => {
@@ -347,7 +352,7 @@ export default function Page({params}: { params: { id: string } }) {
         if (result.error) setNotice({type: 'danger', message: result.error})
     }
 
-    async function saveBinding(field: 'transitionSource' | 'cameraItem', value: string) {
+    async function saveBinding(field: 'transitionSource' | 'cameraItem' | 'layoutObsUrl', value: string) {
         const trimmed = value.trim()
         const next = {
             ...controls.config,
@@ -540,6 +545,20 @@ export default function Page({params}: { params: { id: string } }) {
                                 value={cameraDraft}
                                 onChange={(e) => setCameraDraft(e.target.value)}
                                 onBlur={(e) => saveBinding('cameraItem', e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                            />
+                        </div>
+                        {/* hit-sequence-plan.md §4.6: where the LAYOUT page dials obs-websocket (only used
+                            when the layout has a Hit sequence element); same save path as the bindings above. */}
+                        <div className="mt-2">
+                            <label className="form-label mb-0 small">Layout page OBS URL</label>
+                            <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                placeholder="ws://localhost:4455"
+                                value={layoutObsDraft}
+                                onChange={(e) => setLayoutObsDraft(e.target.value)}
+                                onBlur={(e) => saveBinding('layoutObsUrl', e.target.value)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                             />
                         </div>
