@@ -18,7 +18,6 @@ export const RIPS_ASSETS = {
     birds: { src: '/images/rips_scene/birds.png', w: 2100, h: 301, frames: 10 },
     // Podium props (recipe.ts's `Podium`), drawn in front of everything else.
     pedestal: { src: '/images/rips_scene/BasePedestal.png', w: 512, h: 846 },
-    flag: { src: '/images/rips_scene/Flag.png', w: 200, h: 440 },
     vase: { src: '/images/rips_scene/Vase.png', w: 211, h: 182 },
 } satisfies Record<string, RipsAsset>
 
@@ -39,9 +38,11 @@ export const SKY_CLOUD_ASSETS: RipsAsset[] = [
 
 // Videos are kept out of RIPS_ASSETS on purpose: the layout page preloads every `preload` URL that
 // is not a font through an Image(), which cannot decode a video. FireInTheVase is VP9 with an alpha
-// channel, so its background stays transparent.
+// channel, so its background stays transparent. FlagIdle is the podium flag (VP9 + alpha too), a
+// seamless ~4.7 s idle loop; the rod sits in roughly its top 140 px (RipsScene.tsx's FLAG_PIN).
 export const RIPS_VIDEOS = {
     fire: { src: '/videos/rips_scene/FireInTheVase.webm', w: 1348, h: 827 },
+    flag: { src: '/videos/rips_scene/FlagIdle.webm', w: 322, h: 601 },
 } satisfies Record<string, RipsAsset>
 
 // registry.ts's `preload` list for the `ripsScene` entry.

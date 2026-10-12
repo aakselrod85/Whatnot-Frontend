@@ -88,11 +88,15 @@ export type Podium = {
     y: number
     scale: number
     mirror: boolean
-    // How hard the wind moves the flag's cloth (RipsScene.tsx's WavingFlag): 0 = a still image,
-    // 1 = the default gentle sway, up to 3. The rod at the top never moves.
+    // How hard the wind moves the flag's cloth (RipsScene.tsx's WavingFlag), on top of the flag
+    // video's own idle motion: 0 = the video as recorded, 1 = the default gentle sway, up to 3.
+    // The rod at the top never moves.
     flagWind: number
+    // Seconds the MIRRORED copy's flag runs ahead of the original's (video and wind alike), so the
+    // two flags never move in step. 0 = in sync; wraps around each loop's own length.
+    mirrorFlagOffset: number
     pedestal: Sprite // paint order inside the group: pedestal, flag, fire, vase
-    flag: Sprite
+    flag: Sprite // looping video (assets.ts's RIPS_VIDEOS.flag)
     fire: VideoSprite // looping video (assets.ts's RIPS_VIDEOS.fire), just behind the vase
     vase: Sprite
 }
@@ -148,9 +152,10 @@ export const DEFAULT_RIPS_RECIPE: RipsSceneRecipe = {
     // original size. The offsets are a rough first fit from the art (the bracket sits ~680 px up the
     // pedestal, the left step ~250 px up), to be tuned on the setup page.
     podium: {
-        enabled: false, x: 60, y: 640, scale: 1, mirror: true, flagWind: 1,
+        enabled: false, x: 60, y: 640, scale: 1, mirror: true, flagWind: 1, mirrorFlagOffset: 0,
         pedestal: { enabled: true, x: 0, y: 0, width: 512, rotation: 0 },
-        flag: { enabled: true, x: 276, y: -248, width: 200, rotation: 0 },
+        // Native video width; placed so the rod lands roughly on the pedestal's bracket.
+        flag: { enabled: true, x: 260, y: -90, width: 322, rotation: 0 },
         // Rough first fit: centred over the vase, its bottom sunk into the vase's mouth.
         fire: { enabled: true, x: -15, y: -380, width: 300, rotation: 0, speed: 1 },
         vase: { enabled: true, x: 30, y: -246, width: 211, rotation: 0 },

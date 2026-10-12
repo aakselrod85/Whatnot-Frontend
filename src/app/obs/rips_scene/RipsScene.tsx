@@ -380,6 +380,53 @@ export function useSkyVisibility(c: SkyCloud, index: number, stageH: number): Sk
     }, [mask, asset, c.width, c.x, c.y, c.pivotX, c.pivotY, stageH])
 }
 
+/** Keeps a looping video on the page clock: its position should be (now + phase) modulo its
+ *  duration, where `now` is performance.now() in seconds — shared by every element on the page, so
+ *  two videos locked with different phases stay `phase` apart for as long as the stream runs.
+ *
+ *  The video is positioned ONCE, when its metadata arrives (before the first frame shows). After
+ *  that it is never seeked again: a seek on the flag video freezes it for 0.2-0.3 s, because the
+ *  file has a single keyframe and the decoder has to replay it from the start. Drift (Chrome loses
+ *  about a frame at every loop seam) is corrected instead by nudging playbackRate a few percent
+ *  either way, which is invisible. `baseRate` is the rate the video should run at when on time.
+ *  Returns the cleanup. */
+const CLOCK_CHECK_MS = 500
+const CLOCK_GAIN = 0.25 // rate change per second of error
+const CLOCK_MAX_NUDGE = 0.05 // never more than 5 % faster or slower than baseRate
+
+function lockVideoToClock(video: HTMLVideoElement, phase: number, baseRate = 1): () => void {
+    let positioned = false
+    // Signed error in seconds, wrapped to the shortest way round the loop: > 0 = video is behind.
+    const error = (d: number) => {
+        const want = mod((performance.now() / 1000) * baseRate + phase, d)
+        let e = want - video.currentTime
+        if (e > d / 2) e -= d
+        if (e < -d / 2) e += d
+        return e
+    }
+    const position = () => {
+        const d = video.duration
+        if (positioned || !Number.isFinite(d) || d <= 0) return
+        positioned = true
+        video.currentTime = mod((performance.now() / 1000) * baseRate + phase, d)
+    }
+    const nudge = () => {
+        const d = video.duration
+        if (!positioned || !Number.isFinite(d) || d <= 0 || video.seeking) return
+        const n = Math.max(-CLOCK_MAX_NUDGE, Math.min(CLOCK_MAX_NUDGE, error(d) * CLOCK_GAIN))
+        const rate = Math.round(baseRate * (1 + n) * 500) / 500 // 0.002 steps: no churn on tiny changes
+        if (rate !== video.playbackRate) video.playbackRate = rate
+    }
+    video.addEventListener('loadedmetadata', position)
+    if (video.readyState >= 1) position()
+    const id = window.setInterval(nudge, CLOCK_CHECK_MS)
+    return () => {
+        video.removeEventListener('loadedmetadata', position)
+        window.clearInterval(id)
+        video.playbackRate = baseRate
+    }
+}
+
 function mod(v: number, n: number): number {
     return ((v % n) + n) % n
 }
@@ -502,18 +549,19 @@ function PodiumSprite({sp, asset, s}: {sp: Sprite; asset: RipsAsset; s: number})
     return <img className="rps-img" src={asset.src} alt="" draggable={false} style={spriteStyle(sp, asset, s)}/>
 }
 
-// The flag's cloth moving in a light wind. The art is drawn row by row into a canvas, each row shifted
-// sideways: a slow pendulum sway plus two ripples travelling down the cloth, all growing from zero
-// at the rod (rows above FLAG_PIN, native px) to full at the hem, so the rod and the cloth's top edge
-// stay put and the tassels move most. Rows also get a faint light/dark tint from how steeply the
-// cloth is bent there, so the motion reads as folds rather than a skewed picture. Frequencies are
-// whole cycles per FLAG_LOOP seconds: the motion repeats exactly. Mirrored copies get it for free
-// through the group's scale(-1, 1).
-const FLAG_PIN = 80
+// The flag's cloth moving in a light wind, on top of the flag video's own idle motion. Each tick
+// the current video frame is copied once into an offscreen canvas at native size, then drawn row by
+// row into the visible canvas, each row shifted sideways: a slow pendulum sway plus two ripples
+// travelling down the cloth, all growing from zero at the rod (rows above FLAG_PIN, native px) to
+// full at the hem, so the rod and the cloth's top edge stay put and the tassels move most. Rows
+// also get a faint light/dark tint from how steeply the cloth is bent there, so the motion reads as
+// folds rather than a skewed picture. Wind frequencies are whole cycles per FLAG_LOOP seconds.
+// Mirrored copies get it for free through the group's scale(-1, 1).
+const FLAG_PIN = 140 // native video px: the rod and the cloth's top edge
 const FLAG_LOOP = 6
-const FLAG_AMP = 7 // native px at the hem, at flagWind 1
+const FLAG_AMP = 11 // native video px at the hem, at flagWind 1
 
-function WavingFlag({sp, asset, s, wind}: {sp: Sprite; asset: RipsAsset; s: number; wind: number}) {
+function WavingFlag({sp, asset, s, wind, phase}: {sp: Sprite; asset: RipsAsset; s: number; wind: number; phase: number}) {
     const ref = useRef<HTMLCanvasElement>(null)
     const style = spriteStyle(sp, asset, s)
     const cssW = sp.width * s, cssH = (sp.width * asset.h / asset.w) * s
@@ -524,21 +572,38 @@ function WavingFlag({sp, asset, s, wind}: {sp: Sprite; asset: RipsAsset; s: numb
         cv.width = Math.max(1, Math.round(cssW * dpr))
         cv.height = Math.max(1, Math.round(cssH * dpr))
         const ctx = cv.getContext('2d')
-        if (!ctx) return
-        const img = new Image()
-        img.src = asset.src
+        // The video's current frame, copied once per tick: the row loop then reads 1 px strips from
+        // this canvas instead of asking the video decoder for hundreds of sub-rects a frame.
+        const frame = document.createElement('canvas')
+        frame.width = asset.w
+        frame.height = asset.h
+        const fctx = frame.getContext('2d')
+        if (!ctx || !fctx) return
+        // Never attached to the page: it only feeds frames to the canvas. Muted + playsInline lets
+        // it autoplay everywhere, OBS's browser source included.
+        const video = document.createElement('video')
+        video.muted = true
+        video.loop = true
+        video.playsInline = true
+        video.preload = 'auto'
+        video.src = asset.src
         let raf = 0
-        // The loop only starts inside `img.onload`, which can fire AFTER this effect has already been
-        // cleaned up (a Wind drag re-runs it several times while the image is still loading). The
+        // The loop only starts once the video has a frame, which can happen AFTER this effect has
+        // already been cleaned up (a Wind drag re-runs it several times while the video loads). The
         // cleanup's cancelAnimationFrame can't stop a loop that hasn't started, so every place that
-        // schedules a frame checks this flag — otherwise each stale onload would start one more loop
-        // drawing the old wind onto the same canvas, and they would outlive the component.
+        // schedules a frame checks this flag.
         let cancelled = false
-        const t0 = performance.now()
+        let started = false
         const k = cv.width / asset.w // canvas px per native px
         const draw = () => {
             if (cancelled) return
-            const t = ((performance.now() - t0) / 1000) % FLAG_LOOP
+            if (video.readyState >= 2) {
+                fctx.clearRect(0, 0, frame.width, frame.height)
+                fctx.drawImage(video, 0, 0, frame.width, frame.height)
+            }
+            // Page clock + phase, like the video (lockVideoToClock), so the mirrored flag's wind is
+            // offset by the same amount as its video.
+            const t = mod(performance.now() / 1000 + phase, FLAG_LOOP)
             const th = (2 * Math.PI * t) / FLAG_LOOP
             ctx.clearRect(0, 0, cv.width, cv.height)
             const shift = (y: number) => {
@@ -553,7 +618,7 @@ function WavingFlag({sp, asset, s, wind}: {sp: Sprite; asset: RipsAsset; s: numb
             // semi-transparent edge would show as a faint line every row)
             for (let y = 0; y < asset.h; y++) {
                 const y0 = Math.round(y * k), y1 = Math.round((y + 1) * k)
-                if (y1 > y0) ctx.drawImage(img, 0, y, asset.w, 1, shift(y + 0.5) * k, y0, cv.width, y1 - y0)
+                if (y1 > y0) ctx.drawImage(frame, 0, y, asset.w, 1, shift(y + 0.5) * k, y0, cv.width, y1 - y0)
             }
             // fold shading: tint each row by the cloth's bend there, only where the cloth is (source-atop)
             ctx.globalCompositeOperation = 'source-atop'
@@ -567,26 +632,47 @@ function WavingFlag({sp, asset, s, wind}: {sp: Sprite; asset: RipsAsset; s: numb
             ctx.globalCompositeOperation = 'source-over'
             raf = requestAnimationFrame(draw)
         }
-        img.onload = () => {
-            if (!cancelled) raf = requestAnimationFrame(draw)
+        const start = () => {
+            if (cancelled || started) return
+            started = true
+            raf = requestAnimationFrame(draw)
         }
+        video.addEventListener('loadeddata', start)
+        const unlock = lockVideoToClock(video, phase)
+        video.play().catch(() => {
+            // Autoplay refused (not expected for a muted video): the first frame still draws once
+            // loaded, the cloth just sways on a still picture.
+        })
         return () => {
             cancelled = true
             cancelAnimationFrame(raf)
+            unlock()
+            video.removeEventListener('loadeddata', start)
+            video.pause()
+            video.removeAttribute('src')
+            video.load() // drop the decoder and its buffered data right away
         }
-    }, [asset, cssW, cssH, wind, sp.enabled])
+    }, [asset, cssW, cssH, wind, phase, sp.enabled])
     if (!sp.enabled) return null
     return <canvas ref={ref} className="rps-img" style={style}/>
 }
 
 /** A podium prop drawn as a muted, looping, autoplaying video. `playbackRate` is not an HTML
- *  attribute, so it is set on the element after mount and again whenever `speed` changes. */
-function PodiumVideo({sp, asset, s}: {sp: VideoSprite; asset: RipsAsset; s: number}) {
+ *  attribute, so it is set on the element after mount and again whenever `speed` changes. With
+ *  `phase` set, the video is locked to the page clock (lockVideoToClock) at that offset, without
+ *  ever seeking after the start. */
+function PodiumVideo({sp, asset, s, phase}: {sp: VideoSprite; asset: RipsAsset; s: number; phase?: number}) {
     const ref = useRef<HTMLVideoElement>(null)
     const rate = Number.isFinite(sp.speed) ? Math.max(VIDEO_SPEED_MIN, Math.min(VIDEO_SPEED_MAX, sp.speed)) : 1
     useEffect(() => {
         if (ref.current) ref.current.playbackRate = rate
     }, [rate, sp.enabled])
+    // With a phase, the clock lock nudges playbackRate around `rate` from here on.
+    useEffect(() => {
+        const v = ref.current
+        if (!v || phase === undefined || !sp.enabled) return
+        return lockVideoToClock(v, phase, rate)
+    }, [phase, rate, sp.enabled])
     if (!sp.enabled) return null
     return (
         <video
@@ -601,7 +687,7 @@ function PodiumVideo({sp, asset, s}: {sp: VideoSprite; asset: RipsAsset; s: numb
             disablePictureInPicture
             // A new source resets playbackRate to 1 once its metadata loads; set it again then.
             onLoadedMetadata={(e) => {
-                e.currentTarget.playbackRate = rate
+                if (phase === undefined) e.currentTarget.playbackRate = rate
             }}
         />
     )
@@ -613,6 +699,8 @@ function PodiumVideo({sp, asset, s}: {sp: VideoSprite; asset: RipsAsset; s: numb
  *  is flipped horizontally about it — so the copy has nothing of its own to fall out of sync. */
 function PodiumGroup({podium, s, mirrored}: {podium: Podium; s: number; mirrored: boolean}) {
     const anchorX = mirrored ? STAGE_W - podium.x : podium.x
+    // The only per-copy difference: the mirrored flag runs `mirrorFlagOffset` seconds ahead.
+    const flagPhase = mirrored && Number.isFinite(podium.mirrorFlagOffset) ? podium.mirrorFlagOffset : 0
     const sx = mirrored ? -podium.scale : podium.scale
     return (
         <div
@@ -621,8 +709,8 @@ function PodiumGroup({podium, s, mirrored}: {podium: Podium; s: number; mirrored
         >
             <PodiumSprite sp={podium.pedestal} asset={RIPS_ASSETS.pedestal} s={s}/>
             {podium.flagWind > 0
-                ? <WavingFlag sp={podium.flag} asset={RIPS_ASSETS.flag} s={s} wind={Math.min(3, podium.flagWind)}/>
-                : <PodiumSprite sp={podium.flag} asset={RIPS_ASSETS.flag} s={s}/>}
+                ? <WavingFlag sp={podium.flag} asset={RIPS_VIDEOS.flag} s={s} wind={Math.min(3, podium.flagWind)} phase={flagPhase}/>
+                : <PodiumVideo sp={{...podium.flag, speed: 1}} asset={RIPS_VIDEOS.flag} s={s} phase={flagPhase}/>}
             <PodiumVideo sp={podium.fire} asset={RIPS_VIDEOS.fire} s={s}/>
             <PodiumSprite sp={podium.vase} asset={RIPS_ASSETS.vase} s={s}/>
         </div>
