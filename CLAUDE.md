@@ -45,6 +45,7 @@ BACKEND_HOST=http://localhost:5555
 | `/obs/[id]`, `/obs/manage/[id]`, `/obs/teams/[id]` | OBS browser source pages |
 | `/obs/layout/[id]` | OBS browser source rendering a channel's layout config (the boards/widgets/animations placed via the builder) |
 | `/obs/controls/[id]` | Operator-facing builder/controls page for a channel's layout config |
+| `/overlays/screen-crack.html` | Static OBS browser source (`public/overlays/`): procedural crack + shatter, one pass per load. See README "OBS overlays" |
 | `/package/[id]` | Shipping / package management |
 
 ## Pattern: Adding a New API Call
