@@ -16,7 +16,8 @@
 // - The cleanup pass (run end OR abort) always restores the ball and hides OBS items still shown;
 //   if OBS is down at that moment it is remembered and run on the next connect.
 // - Simultaneous sales queue FIFO up to `queueCap`; past the cap the cell is revealed immediately.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ElementProps } from '../../registry'
 import type { HitStep, VideoVariant } from '../../schema'
 import { CANVAS } from '../../schema'
@@ -81,6 +82,14 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
     // Latest values for the runner's callbacks (read at each step's start, not at run start).
     const latest = useRef({ ballShape, boxShape, cellShape, obs, seq, targetKey, events, teamPrices, priceRanges, series })
     latest.current = { ballShape, boxShape, cellShape, obs, seq, targetKey, events, teamPrices, priceRanges, series }
+
+    // `.lay-canvas`, found once from the in-frame marker (layout effect: before the first paint and
+    // before any run can start, so the videos never remount mid-run).
+    const markerRef = useRef<HTMLDivElement>(null)
+    const [canvasEl, setCanvasEl] = useState<HTMLElement | null>(null)
+    useLayoutEffect(() => {
+        setCanvasEl((markerRef.current?.closest('.lay-canvas') as HTMLElement | null) ?? null)
+    }, [])
 
     const videoEls = useRef<Map<string, HTMLVideoElement>>(new Map())
     const metaRef = useRef<Map<string, VideoMeta & { durationMs: number }>>(new Map())
@@ -347,8 +356,14 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
         }
     }, [cueBus])
 
-    return (
-        <div className="hitseq-root">
+    // Stacking (same trick and same reason as CardsElement's `.crd-top-layer`): this element's
+    // ElementFrame is a stacking context with the element's Layer as z-index, so nothing inside it
+    // can out-order the cards element's centre/zoomed card, which is portalled into `.lay-canvas`
+    // at near-max z. The videos are therefore portalled into `.lay-canvas` too, one z above it
+    // (HitSequence.css). The marker stays in the frame only to find the canvas; without one (no
+    // `.lay-canvas` ancestor) the videos render in place, as before.
+    const root = (
+        <div className={canvasEl ? 'hitseq-root hitseq-root--top' : 'hitseq-root'}>
             {variants.map(({ variant }) => (
                 <video
                     key={variant.id}
@@ -368,6 +383,11 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
                     onLoadedMetadata={(e) => recordMeta(variant.id, e.currentTarget)}
                 />
             ))}
+        </div>
+    )
+    return (
+        <div ref={markerRef} className="hitseq-marker">
+            {canvasEl ? createPortal(root, canvasEl) : root}
         </div>
     )
 }

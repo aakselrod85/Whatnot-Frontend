@@ -12,6 +12,20 @@
     overflow: hidden;
 }
 
+/* In-frame marker: only there to locate `.lay-canvas` (and to host the root when there is none). */
+.hitseq-marker {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+/* The root once portalled into `.lay-canvas`, next to every `.lay-element-frame`: max int, one
+   above the cards element's portalled layers (`.crd-top-layer` / `.crd-zoom-portal`, max int - 1),
+   so a hit video plays in front of an automatically shown card. */
+.hitseq-root--top {
+    z-index: 2147483647;
+}
+
 .hitseq-video {
     position: absolute;
     left: 0;

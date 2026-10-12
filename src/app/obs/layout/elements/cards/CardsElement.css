@@ -108,8 +108,9 @@
     position: absolute;
     /* Sibling of every `.lay-element-frame` inside `.lay-canvas`, each of which carries its
        element's Layer as z-index — without an explicit value here the portal paints at z auto,
-       i.e. under any element whose Layer is > 0. Max int keeps it above every Layer. */
-    z-index: 2147483647;
+       i.e. under any element whose Layer is > 0. Max int - 1 keeps it above every Layer and
+       leaves max int for the hit-sequence videos (HitSequence.css `.hitseq-root--top`). */
+    z-index: 2147483646;
     pointer-events: none;
 }
 
@@ -121,7 +122,8 @@
 .crd-top-layer {
     position: absolute;
     overflow: visible;
-    z-index: 2147483647;
+    /* max int - 1, same as `.crd-zoom-portal` above. */
+    z-index: 2147483646;
     pointer-events: none;
 }
 
