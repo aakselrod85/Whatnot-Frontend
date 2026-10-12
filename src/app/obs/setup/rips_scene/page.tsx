@@ -256,7 +256,17 @@ export default function Page() {
                 <Num label="Width" value={sp.width} min={10} max={2000} step={1} onChange={(v) => setSprite(key, {width: v})}/>
                 <Num label="Rotation °" value={sp.rotation} min={-180} max={180} step={0.5} onChange={(v) => setSprite(key, {rotation: v})}/>
                 {key === 'flag' && (
-                    <Num label="Wind (0 = still)" value={recipe.podium.flagWind} min={0} max={3} step={0.1} onChange={(v) => setPodium({flagWind: v})}/>
+                    <>
+                        <Num label="Wind (0 = still)" value={recipe.podium.flagWind} min={0} max={3} step={0.1} onChange={(v) => setPodium({flagWind: v})}/>
+                        <Num
+                            label="Mirror copy offset, s"
+                            value={recipe.podium.mirrorFlagOffset}
+                            min={0}
+                            max={10}
+                            step={0.05}
+                            onChange={(v) => setPodium({mirrorFlagOffset: v})}
+                        />
+                    </>
                 )}
                 {key === 'fire' && (
                     <Num

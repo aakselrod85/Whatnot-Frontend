@@ -83,14 +83,14 @@ To apply a change:
 
 ## Rips scene banners (wind)
 
-The two banners on the rips scene's podium move gently in the wind: the rod stays still, the cloth sways and ripples, and the tassels swing most. It loops every 6 seconds, and the mirrored banner follows on its own.
+The two banners on the rips scene's podium are a looping video (`public/videos/rips_scene/FlagIdle.webm`), and the wind is added on top of it: the rod stays still, the cloth sways and ripples, and the tassels swing most. The wind loops every 6 seconds, and the mirrored banner follows on its own.
 
 **In OBS:** nothing to set up. The rips scene renders inside the layout browser source (`<frontend-host>/obs/layout/<id>`). Once this is deployed, refresh that source and the banners move.
 
 **Change the strength**
 
 1. Open `/obs/setup/rips_scene` (also linked from the rips scene element in `/obs/controls/<id>`, "Open setup page").
-2. Under **Podium: flag**, set **Wind**: `0` = still image, `1` = default gentle sway, up to `3`. The preview updates live.
+2. Under **Podium: flag**, set **Wind**: `0` = the video as recorded, no extra wind, `1` = default gentle sway, up to `3`. **Mirror copy offset, s** shifts the mirrored banner's loop (video and wind) by that many seconds, so the two banners move out of step; `0` = in sync. The preview updates live.
 3. Click **Copy** in the recipe box.
 4. In `/obs/controls/<id>`, open the rips scene element, expand **Scene recipe**, paste and click **Apply**. The stream picks it up without a refresh.
 
