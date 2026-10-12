@@ -535,6 +535,7 @@ export type Element = (
           target?: string // board element key; default first board:sport_style in config
           steps?: HitStep[] // empty/absent = detect hits, reveal them immediately, play nothing
           queueCap?: number // default 3
+          minTier?: 'regular' | 'mid' | 'good' | 'best' // lowest tier that plays; default 'mid', 'regular' = every hit
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions

@@ -1066,6 +1066,9 @@ function validateHitSequenceFields(key: string, rawEl: Record<string, unknown>):
     if (rawEl.queueCap !== undefined && (!Number.isInteger(rawEl.queueCap) || (rawEl.queueCap as number) < 1 || (rawEl.queueCap as number) > 10)) {
         errors.push(`element "${key}": queueCap must be an integer 1..10`)
     }
+    if (rawEl.minTier !== undefined && !(['regular', 'mid', 'good', 'best'] as unknown[]).includes(rawEl.minTier)) {
+        errors.push(`element "${key}": minTier must be "regular", "mid", "good" or "best"`)
+    }
     if (rawEl.steps !== undefined) {
         if (!Array.isArray(rawEl.steps)) {
             errors.push(`element "${key}": steps must be an array`)

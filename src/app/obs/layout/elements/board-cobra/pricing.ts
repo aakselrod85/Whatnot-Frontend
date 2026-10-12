@@ -23,8 +23,6 @@ import type {SeriesTeamTotal} from '@/app/entity/entities'
 
 export const BEST_THRESHOLD = 700
 export const GOOD_THRESHOLD = 450
-export const BEST_MIN = 3
-export const GOOD_MIN = 4
 export const MID_THRESHOLD = 50
 export const MAX_ROW_CELLS = 7
 export const TOTAL_ROWS = 6
@@ -89,18 +87,15 @@ export function assignTiers(teamNames: string[], prices: SeriesTeamTotal[], defa
 
     withPrice.sort((a, b) => b.total - a.total)
 
-    const bestCount = Math.max(BEST_MIN, withPrice.filter((t) => t.total >= bestThreshold).length)
-    const goodCount = Math.max(GOOD_MIN, withPrice.slice(bestCount).filter((t) => t.total >= goodThreshold).length)
-
     const cells: TeamCell[] = []
 
-    withPrice.forEach(({team, total, unsold}, idx) => {
+    withPrice.forEach(({team, total, unsold}) => {
         let tier: Tier
         if (unsold === 0) {
             tier = 'regular'
-        } else if (idx < bestCount) {
+        } else if (total >= bestThreshold) {
             tier = 'best'
-        } else if (idx < bestCount + goodCount) {
+        } else if (total >= goodThreshold) {
             tier = 'good'
         } else if (total >= midThreshold) {
             tier = 'mid'

@@ -29,11 +29,21 @@ import { runSteps, type ObsStep, type RunHandle, type VideoStep } from './runner
 import { chooseVariant, videoRect, type VideoMeta } from './placement'
 import { executeObsStep, hideShown, type ShownItem } from './obsSteps'
 import { useHitDetector } from './useHitDetector'
+import {
+    assignTiers,
+    BEST_THRESHOLD,
+    DEFAULT_PRICE,
+    GOOD_THRESHOLD,
+    MID_THRESHOLD,
+    TIER_RANK,
+    type Tier,
+} from '../board-cobra/pricing'
 import './HitSequence.css'
 
 const QUEUE_GAP_MS = 500
 const VIDEO_FALLBACK_MS = 3000
 const DEFAULT_QUEUE_CAP = 3
+const DEFAULT_MIN_TIER: Tier = 'mid'
 
 type Active = { runId: number; event: Event; test: boolean }
 
@@ -50,7 +60,7 @@ type RunCtx = {
 
 export function HitSequenceElement({ elementKey, element }: ElementProps) {
     const seq = element.kind === 'hitSequence' ? element : null
-    const { config, events, stream } = useLayoutData()
+    const { config, events, stream, series, priceRanges, teamPrices } = useLayoutData()
     const cueBus = useCueBus()
     const obs = useLayoutObs()
     const activeBreakId = stream?.active_break_id ?? null
@@ -69,8 +79,8 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
     const cellShape = useResolvedAnchor(targetKey ?? '', active ? `cell:${active.event.id}` : undefined)
 
     // Latest values for the runner's callbacks (read at each step's start, not at run start).
-    const latest = useRef({ ballShape, boxShape, cellShape, obs, seq, targetKey, events })
-    latest.current = { ballShape, boxShape, cellShape, obs, seq, targetKey, events }
+    const latest = useRef({ ballShape, boxShape, cellShape, obs, seq, targetKey, events, teamPrices, priceRanges, series })
+    latest.current = { ballShape, boxShape, cellShape, obs, seq, targetKey, events, teamPrices, priceRanges, series }
 
     const videoEls = useRef<Map<string, HTMLVideoElement>>(new Map())
     const metaRef = useRef<Map<string, VideoMeta & { durationMs: number }>>(new Map())
@@ -170,6 +180,17 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
         [cleanupPass, emitReveal, log, pump]
     )
 
+    // Tier of one team from its own prices, thresholds as SportStyleBoard.tsx computes them (copied
+    // lines). Reads through `latest` so the callback's identity never follows the price poll.
+    const tierOfTeam = useCallback((team: string): Tier => {
+        const { series, priceRanges, teamPrices } = latest.current
+        const defaultPrice = series?.default_price || DEFAULT_PRICE
+        const bestThreshold = priceRanges.find((r) => r.tier_id === 'best')?.price_from ?? BEST_THRESHOLD
+        const goodThreshold = priceRanges.find((r) => r.tier_id === 'good')?.price_from ?? GOOD_THRESHOLD
+        const midThreshold  = priceRanges.find((r) => r.tier_id === 'mid')?.price_from  ?? MID_THRESHOLD
+        return assignTiers([team], teamPrices, defaultPrice, { bestThreshold, goodThreshold, midThreshold })[0]?.tier ?? 'regular'
+    }, [])
+
     const startRun = useCallback(
         (a: Active) => {
             startingRef.current = false
@@ -185,7 +206,7 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
                 videoByStep: new Map(),
             }
             activeRef.current = ctx
-            log(`${a.test ? 'rehearsal' : 'hit'} on ${a.event.team} (${steps.length} steps)`)
+            log(`${a.test ? 'rehearsal' : 'hit'} on ${a.event.team} (${tierOfTeam(a.event.team)}, ${steps.length} steps)`)
             if (steps.length === 0) {
                 // Nothing to play: detect and reveal immediately (plan §3.2).
                 finishRun(ctx, false)
@@ -239,7 +260,7 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
             ctx.handle = handle
             void handle.done.then(() => finishRun(ctx, false))
         },
-        [cueBus, emitReveal, finishRun, log]
+        [cueBus, emitReveal, finishRun, log, tierOfTeam]
     )
 
     // Starts the run for a newly committed `active` (state, so the `cell:<id>` anchor subscription
@@ -266,8 +287,15 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
 
     // ---- detection ---------------------------------------------------------------------------------
     const queueCap = Number.isInteger(seq?.queueCap) ? (seq?.queueCap as number) : DEFAULT_QUEUE_CAP
+    const minTier: Tier = seq?.minTier && seq.minTier in TIER_RANK ? seq.minTier : DEFAULT_MIN_TIER
     const onHit = useCallback(
         (event: Event) => {
+            const tier = tierOfTeam(event.team)
+            if (TIER_RANK[tier] > TIER_RANK[minTier]) {
+                log(`${event.team} is ${tier}, below ${minTier}: revealing without a sequence`)
+                emitReveal(event.id)
+                return
+            }
             if (queueRef.current.length < queueCap) {
                 queueRef.current.push(event)
                 pump()
@@ -276,7 +304,7 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
                 emitReveal(event.id)
             }
         },
-        [queueCap, pump, emitReveal, log]
+        [queueCap, minTier, tierOfTeam, pump, emitReveal, log]
     )
     useHitDetector({ events, activeBreakId, enabled: !!targetKey, onHit })
 

@@ -14,6 +14,7 @@ import type { Element, HitStep, LayoutConfig, TransientCue, VideoPlacement, Vide
 import type { MyOBSWebsocket } from '@/app/entity/my_obs_websocket'
 import type { Event, WNChannel, WNStream, GetEventsByBreakResponse } from '@/app/entity/entities'
 import { getEndpoints, isBackendFailure, post } from '@/app/lib/backend'
+import { TIER_LABEL, type Tier } from '@/app/obs/layout/elements/board-cobra/pricing'
 import type { PatchElement } from './ElementBlock'
 
 type Props = {
@@ -424,6 +425,18 @@ export default function HitSequenceSettings({ channelId, elementKey, element, co
                     <input type="number" min={1} max={10} className="form-control form-control-sm" style={{ width: 80 }} value={seq.queueCap ?? 3}
                         onChange={(e) => onPatchElement(elementKey, { queueCap: Math.max(1, Math.min(10, Math.round(num(e.target.value, 3)))) })} />
                 </div>
+                <div>
+                    <label className="form-label mb-0 small">Play for</label>
+                    <select className="form-select form-select-sm" value={seq.minTier ?? 'mid'} onChange={(e) => onPatchElement(elementKey, { minTier: e.target.value as Tier })}>
+                        <option value="regular">Every team</option>
+                        <option value="mid">{TIER_LABEL.mid} and above</option>
+                        <option value="good">{TIER_LABEL.good} and above</option>
+                        <option value="best">{TIER_LABEL.best} only</option>
+                    </select>
+                </div>
+            </div>
+            <div className="small text-secondary">
+                Teams below this are marked sold immediately, with no animation. A series without prices has only Side Card teams.
             </div>
             <div className="small text-secondary">
                 {resolvedTargetKey ? `Board sold reveal: ${targetReveal}` : 'No sport style board in this layout'}
