@@ -19,6 +19,8 @@ export const RIPS_ASSETS = {
     // Podium props (recipe.ts's `Podium`), drawn in front of everything else.
     pedestal: { src: '/images/rips_scene/BasePedestal.png', w: 512, h: 846 },
     vase: { src: '/images/rips_scene/Vase.png', w: 211, h: 182 },
+    // Strip along the scene's bottom edge: stretched to the full width, always BOTTOM_FRAME_H px tall.
+    bottomFrame: { src: '/images/rips_scene/FrameForTheMarble_Top.png', w: 1080, h: 15 },
 } satisfies Record<string, RipsAsset>
 
 // Centre of the circle the cloud band in MiddleCloud.png is drawn on, in the image's own px —
