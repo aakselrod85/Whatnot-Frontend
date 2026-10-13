@@ -8,6 +8,11 @@
     z-index: 100;
 }
 
+/* While the press burst plays the cell sits above everything else on the board, accents included. */
+.rfb-cell-active {
+    z-index: 9999;
+}
+
 .rfb-cell-content {
     position: relative;
     width: 100%;
@@ -68,6 +73,23 @@
     left: 0;
     width: 100%;
     height: 100%;
+}
+
+/* Press burst: a 650% video centred on the cell (-275% = (100% - 650%) / 2). It spills far past the
+   cell and past the board, which is why the element is `unclipped` in registry.ts. */
+.rfb-video-overlay {
+    position: absolute;
+    top: -275%;
+    left: -275%;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.rfb-video-overlay video {
+    width: 650%;
+    height: 650%;
 }
 
 .rfb-icon {

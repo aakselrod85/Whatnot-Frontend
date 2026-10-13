@@ -38,9 +38,11 @@ The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone 
 | `veined` (default) | `public/images/rips_tiles/veined/` | The board's marble across the whole stone, veins included |
 | `clean` | `public/images/rips_tiles/clean/` | Veins softened away inside the gold octagon, so nothing runs behind the logo |
 
-Both marble sets also swap the board backdrop to `public/images/rips_board/board_tiles.png`: the same board with the gold frame around the blue inset redrawn in the tiles' gold, with the same cut corners and a three-face moulding. See "Change the board edge" below.
+The board backdrop is the same for every set: `public/images/rips_board/BoardSeparate.png` (the blue board in its gold frame, no marble surround), stretched to the element's box. The team cells sit 15 px in from every edge of the 1473x354 art (`RIPS_BOARD_INSET` in `src/app/obs/layout/elements/board-rips-flat/boardArt.ts`), scaled with the box so they follow the frame at any size; re-check it if the art is replaced.
 
-`icons` brings back the previous `new_teams` octagon icons and the original `board.png`.
+`board.png` and `board_tiles.png` (the old marble-surround backdrops) are no longer shown on the board; the tile generator below still reads `board.png` for the marble texture, and "Change the board edge" only affects `board_tiles.png`.
+
+`icons` brings back the previous `new_teams` octagon icons.
 
 **Pick a set**
 

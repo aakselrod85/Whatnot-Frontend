@@ -145,6 +145,15 @@ export const DEFAULT_TICKER_SLOTS: Record<WidgetId, TickerSlot> = Object.fromEnt
 export const FRAME_VARIANTS = ['static'] as const
 export type FrameVariant = (typeof FRAME_VARIANTS)[number]
 
+// Skin of the `frame` element — same reasoning as `RESULTS_STYLES` below: a field rather than a
+// registry variant because a style only changes how the frame is painted, not its settings,
+// singleton group or stage behaviour, and an absent field keeps every stored config on the
+// code-drawn look. 'default' is the code-drawn black fill + drifting gradient; 'rips' paints the
+// marble art in public/images/static/rips with a cut-out and a fixed 16px gold 9-slice frame
+// (see elements/frame/FrameElement.tsx).
+export const FRAME_STYLES = ['default', 'rips'] as const
+export type FrameStyle = (typeof FRAME_STYLES)[number]
+
 // obs-layout-plan.md §1.9's wrap-around stash-or-pass, plus `stashOrPassWrapTl` — the same
 // animation rebuilt on a local label timeline (stash-or-pass-timeline-plan.md). The two are
 // deliberately both available so they can be placed together and compared; whichever wins, the
@@ -300,19 +309,24 @@ export type Element = (
           reactions?: Reactions
       }
     // FE-generated frame (obs-layout-plan.md §2.5 — replaces the old full-canvas `<img>`).
-    // Two settings, stacked from the canvas edge inwards:
-    //   - `borders` — how far the plain BLACK fill reaches in from each screen edge, per side.
+    // Settings, stacked from the canvas edge inwards:
+    //   - `borders` — how far the opaque surround reaches in from each screen edge, per side (the
+    //     plain BLACK fill in the default style; the edge of the cut-out in the marble in 'rips').
     //     Per-stage, resolved exactly like `placements` — `borders[phase] ?? borders.all`, see
     //     `resolveBorders` in config.ts — so "same on every stage" is one edit (`all`) and a stage
     //     can still override.
     //   - `frameWidth` — the thickness of the gradient frame drawn just inside that black fill.
     //     One number for all four sides, and NOT per-stage: the frame is the channel's constant
     //     furniture, it is the black fill around it that stages move (see FrameSettings.tsx).
-    // The registry id/variant stays `static` even though the frame is now code-drawn rather than
-    // an image (see registry.ts's comment on that choice).
+    //     Default style only — the 'rips' gold frame is a fixed 16px band (its art is 16px).
+    //   - `style` — which skin (`FRAME_STYLES`); absent = 'default', so configs stored before the
+    //     field existed render exactly as they always have.
+    // The registry id/variant stays `static` even though the frame is code-drawn (default) or a
+    // masked art layer (rips) rather than a stretched image (see registry.ts's comment on that).
     | {
           kind: 'frame'
           variant: FrameVariant
+          style?: FrameStyle
           borders?: Partial<Record<PlacementKey, Sides>>
           frameWidth?: number
           placements: Partial<Record<PlacementKey, Box>>

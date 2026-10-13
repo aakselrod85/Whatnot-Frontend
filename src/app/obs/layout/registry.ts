@@ -5,6 +5,7 @@
 import type { ComponentType } from 'react'
 import { Placeholder } from './Placeholder'
 import { FrameElement } from './elements/frame/FrameElement'
+import { RIPS_FRAME_PRELOAD } from './elements/frame/ripsAssets'
 import { StashOrPassWrap } from './elements/animation/StashOrPassWrap'
 import { StashOrPassTl } from './elements/animation/tl/StashOrPassTl'
 import { StashOrPassRing } from './elements/animation/ring/StashOrPassRing'
@@ -14,6 +15,7 @@ import { ClassicBoard } from './elements/board-classic/ClassicBoard'
 import { CobraBoard } from './elements/board-cobra/CobraBoard'
 import { CobraFlatBoard } from './elements/board-cobra-flat/CobraFlatBoard'
 import { RipsFlatBoard } from './elements/board-rips-flat/RipsFlatBoard'
+import { RIPS_BOARD_ART } from './elements/board-rips-flat/boardArt'
 import { SportStyleBoard } from './elements/board-sport-style/SportStyleBoard'
 import { ResultsElement } from './elements/results/ResultsElement'
 import { ThinResults } from './elements/results-thin/ThinResults'
@@ -160,9 +162,9 @@ const BOARD_BOX: Box = { x: 0, y: 300, w: 1080, h: 1300 }
 // portrait footprint would sit two-thirds empty (cobra-flat-board-plan.md §4). Purely a starting
 // point — the operator resizes it in the builder like any other box.
 const COBRA_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 340 }
-// rips_flat: board.png's native size (1080x250), so the backdrop is 1:1 by default
-// (rips-flat-board-plan.md §4). Any other box stretches the marble like board:flat's board.png.
-const RIPS_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 250 }
+// rips_flat: full canvas width at the backdrop art's own aspect (1473x354, boardArt.ts), so the
+// gold frame is undistorted by default. Any other box stretches it like board:flat's board.png.
+const RIPS_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 260 }
 // classic is a 10-column grid of square team tiles plus an 8-cell centre block: 32 teams + 8
 // reserved cells = 40 cells / 10 cols = 4 rows of squares — at REF_W (ClassicBoard.tsx, 810) that's
 // roughly 2.1:1, landscape (obs-layout-plan.md §2.10.4). BOARD_BOX is 1080x1300 (0.83:1, portrait)
@@ -299,7 +301,9 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         singletonGroup: 'board:rips_flat',
         defaultBox: RIPS_FLAT_BOX,
         // Static art only; team icons and tiled skins resolve at render time.
-        preload: ['/images/rips_board/board.png', '/images/rips_board/board_tiles.png'],
+        preload: [RIPS_BOARD_ART.src],
+        // The press burst on a sale is 650% of a cell — taller than this short board.
+        unclipped: true,
         component: RipsFlatBoard,
         available: true,
         hasBox: true,
@@ -504,9 +508,11 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         label: 'Frame (generated)',
         singleton: true,
         singletonGroup: 'frame',
-        defaultBox: FULL_BOX,
         // Irrelevant for frame — makeElement() below always places it via `all` instead.
-        preload: [],
+        defaultBox: FULL_BOX,
+        // The 'rips' style's two PNGs (elements/frame/ripsAssets.ts), preloaded whatever style
+        // the element is on — same reasoning as `results` above. The default style has no art.
+        preload: RIPS_FRAME_PRELOAD,
         component: FrameElement,
         available: true,
         // Boxless (obs-layout-plan.md §1.9): it draws its border bands + edge ornament over its

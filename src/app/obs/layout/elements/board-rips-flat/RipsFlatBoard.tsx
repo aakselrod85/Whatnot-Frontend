@@ -1,12 +1,15 @@
 'use client'
 
-// The `board:rips_flat` registry component (rips-flat-board-plan.md). rips_board/board.png as a
-// backdrop, one square cell per team slot inside its blue inset. Ordering is board:cobra_flat's
+// The `board:rips_flat` registry component (rips-flat-board-plan.md). The framed board art
+// (boardArt.ts) as a backdrop, one square cell per team slot inside its gold frame
+// (`RIPS_BOARD_INSET`). Ordering is board:cobra_flat's
 // (layoutCells, imported), the sold state is board:flat's (tiles/, CellSkin, AccentOverlay
 // imported); the settled-baseline / grouping logic below is copied from FlatBoard.tsx.
 //
-// No move animation on sale (plan §7.1): a sale re-deals the grid and the sold cell flips in its
-// new slot. `reactsTo` is [] for the same reason as board:cobra_flat (no `sold` scene event).
+// No move animation on sale (plan §7.1), but the re-deal waits: a sold cell flips and plays its
+// press burst in the slot it was sold in, and only when that ends (the cell "settles") does the
+// grid re-deal and the cell jump to the sold block. `reactsTo` is [] for the same reason as
+// board:cobra_flat (no `sold` scene event).
 
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import type {ElementProps} from '../../registry'
@@ -27,12 +30,9 @@ import {cellExposure} from '../board-flat/tiles/exposure'
 import {styleForGroup} from '../board-flat/tiles/manifest'
 import {useManifest} from '../board-flat/tiles/useManifest'
 import {Group} from '../board-flat/tiles/types'
+import {RIPS_BOARD_ART, RIPS_BOARD_INSET} from './boardArt'
 import {DEFAULT_RIPS_TILE_SET, RIPS_TILE_SETS, RipsFlatCell, type RipsTileSet} from './RipsFlatCell'
 import './RipsFlatBoard.css'
-
-// The blue inset of /images/rips_board/board.png as fractions of the image (147/1080, 140/1080,
-// 27/250, 25/250). MUST be re-measured if board.png is replaced (same rule as rips_scene/assets.ts).
-const INSET = {left: 0.136, right: 0.13, top: 0.108, bottom: 0.1}
 
 // Every skin renders at this tier regardless of group size — same override as FlatBoard.tsx.
 const FORCE_SKIN_TIER: 1 | 2 | 3 | null = 3
@@ -43,7 +43,7 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 
 /*
  * Integer-pixel layout (FlatBoard.tsx's useIntegerBoardLayout, with BASE_PAD replaced by the
- * backdrop's inset). Callback ref because the "No active stream / break" early returns mount a
+ * backdrop's inset, given in art px and scaled with the stretched backdrop). Callback ref because the "No active stream / break" early returns mount a
  * different root before the real wrapper (same reason as useCobraFlatLayout).
  */
 function useRipsFlatLayout(rowCount: number) {
@@ -67,10 +67,10 @@ function useRipsFlatLayout(rowCount: number) {
     const {w, h} = wrapSize
     if (w === 0 || h === 0 || rowCount === 0) return {wrapRef: setWrapEl, layoutVars: null}
 
-    const insetL = Math.round(w * INSET.left)
-    const insetR = Math.round(w * INSET.right)
-    const insetT = Math.round(h * INSET.top)
-    const insetB = Math.round(h * INSET.bottom)
+    const insetL = Math.round((w * RIPS_BOARD_INSET) / RIPS_BOARD_ART.w)
+    const insetR = insetL
+    const insetT = Math.round((h * RIPS_BOARD_INSET) / RIPS_BOARD_ART.h)
+    const insetB = insetT
     const insetW = Math.max(0, w - insetL - insetR)
     const insetH = Math.max(0, h - insetT - insetB)
 
@@ -109,14 +109,15 @@ export function RipsFlatBoard({box, element}: ElementProps) {
     const manifest = useManifest()
     const tileSet = tileSetOf(element)
 
-    // Cells whose flip animation has finished — only these join the shared grouping.
+    // Cells whose sale effect (flip + press burst) has finished — only these join the shared
+    // grouping, and the grid is not re-dealt while any sold cell is still outside this set.
     const [settled, setSettled] = useState<Set<number>>(new Set())
     // One-time baseline guard, reset whenever this board (re)mounts.
     const initializedRef = useRef(false)
 
     const events = useMemo(() => rawEvents.filter((e) => !e.is_giveaway && !e.note), [rawEvents])
 
-    const handleFlipComplete = useCallback((id: number) => {
+    const handleSettled = useCallback((id: number) => {
         setSettled((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
     }, [])
 
@@ -173,9 +174,28 @@ export function RipsFlatBoard({box, element}: ElementProps) {
         [events, tierByTeam, priceLeftByTeam]
     )
 
+    // While a sold cell is still playing its effect the deal is frozen at the last one made with
+    // nothing pending — the sale changes tiers and prices as well as `sold`, so holding back that
+    // one flag would not keep the cell in place. Falls back to the live deal if the set of events
+    // itself changed meanwhile (or before the mount baseline, when there is nothing frozen yet).
+    const hasPending = useMemo(
+        () => events.some((e) => e.customer !== '' && !settled.has(e.id)),
+        [events, settled]
+    )
+    const frozenCellsRef = useRef<FlatCell[] | null>(null)
+    useEffect(() => {
+        if (!hasPending) frozenCellsRef.current = cells
+    }, [hasPending, cells])
+    const dealtCells = useMemo(() => {
+        const frozen = frozenCellsRef.current
+        if (!hasPending || !frozen || frozen.length !== cells.length) return cells
+        const ids = new Set(cells.map((c) => c.eventId))
+        return frozen.every((c) => ids.has(c.eventId)) ? frozen : cells
+    }, [hasPending, cells])
+
     const rowSizes = useMemo(() => splitRows(events.length), [events.length])
     const rowCount = rowSizes.length
-    const placed = useMemo(() => layoutCells(cells), [cells])
+    const placed = useMemo(() => layoutCells(dealtCells), [dealtCells])
     const {wrapRef, layoutVars} = useRipsFlatLayout(rowCount)
 
     const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events])
@@ -233,7 +253,7 @@ export function RipsFlatBoard({box, element}: ElementProps) {
     }
 
     return (
-        <div className={tileSet === 'icons' ? 'rfb-root' : 'rfb-root rfb-root-stone'} ref={wrapRef} style={{...(layoutVars ?? {}), '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
+        <div className="rfb-root" ref={wrapRef} style={{...(layoutVars ?? {}), '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
             {layoutVars && (
                 <>
                     <div className="rfb-grid">
@@ -241,7 +261,7 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                             const e = eventById.get(it.eventId)
                             if (!e) return null
                             let group: Group | undefined = posGroup.get(`${it.row},${it.col}`)
-                            // Freshly flipped (not yet settled) cell renders as a standalone tile.
+                            // Sold but not yet settled (effect still playing): a standalone tile.
                             if (!group && e.customer !== '') {
                                 group = {r0: it.row, c0: it.col, r1: it.row, c1: it.col, cells: 1, tier: 1, key: `solo-${e.id}`}
                             }
@@ -254,7 +274,7 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                                     styleId={group && manifest ? styleForGroup(manifest, group.key) : undefined}
                                     tier={group ? (FORCE_SKIN_TIER ?? group.tier) : undefined}
                                     alreadySettled={settled.has(e.id)}
-                                    onFlipComplete={handleFlipComplete}
+                                    onSettled={handleSettled}
                                     style={{gridRow: it.row + 1, gridColumn: it.col + 1}}
                                     tileSet={tileSet}
                                 />
