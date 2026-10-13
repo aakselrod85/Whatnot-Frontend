@@ -32,6 +32,11 @@ const Z_BIRDS = 35
 const Z_FRONT_BACK = 40
 const Z_FRONT_FRONT = 50
 const Z_PODIUM = 60 // in front of every layer and every glow
+const Z_BOTTOM_FRAME = 70 // the bottom strip covers the podium's base too
+
+// Height of the bottom frame strip in real px. Deliberately NOT multiplied by the stage scale: the
+// strip is always this tall, whatever size the scene is drawn at; only its width follows the box.
+const BOTTOM_FRAME_H = 15
 const Z_MARKS = 100
 
 // Glow sits at its layer's z + 5, so it paints directly in front of that layer.
@@ -786,6 +791,15 @@ export function RipsScene({w, h, recipe, debug}: Props) {
 
             {podium.enabled && <PodiumGroup podium={podium} s={s} mirrored={false}/>}
             {podium.enabled && podium.mirror && <PodiumGroup podium={podium} s={s} mirrored/>}
+
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                className="rps-img"
+                src={RIPS_ASSETS.bottomFrame.src}
+                alt=""
+                draggable={false}
+                style={{left: 0, bottom: 0, width: '100%', height: BOTTOM_FRAME_H, zIndex: Z_BOTTOM_FRAME}}
+            />
 
             {debug?.showPivots && (
                 <>
