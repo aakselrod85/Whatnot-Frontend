@@ -1,4 +1,4 @@
-import {FC, useEffect, useState} from 'react'
+import {FC, useCallback, useEffect, useState} from 'react'
 import {Event} from '@/app/entity/entities'
 import {Exposure} from '../board-flat/tiles/types'
 import {Manifest} from '../board-flat/tiles/manifest'
@@ -21,6 +21,21 @@ const tileSrc = (set: RipsTileSet, team: string) =>
 // only frame; the Frame_Empty.png overlay was removed 2026-10-07 on request). Back: flat's CellSkin.
 // `alreadySettled` has flat's meaning: a cell sold at mount renders straight into the static
 // `rfb-cell-final` class (no animation), so a fresh mount never replays every flip at once.
+//
+// The press burst is the old flat board's (obs/[id]/flat/flatEventComponent.tsx, where it sits
+// behind ENABLE_PRESS_VIDEO): `PRESS_VIDEO_SRC` at 650% of the cell, centred on it, started
+// `PRESS_VIDEO_DELAY_MS` into the 1.2s flip so it lands as the cell drops back, removed when it
+// ends. Only a cell that sells while the board is watching gets it — same gate as the flip.
+//
+// `onSettled` fires when the BURST ends, not the flip: the board holds the cell in its slot (and
+// out of the shared skin grouping) until then, so the whole effect plays where the team was sold.
+// A video that never ends must not hold the board forever, hence the fallback timer: the video's
+// own length plus a margin once known, `PRESS_VIDEO_FALLBACK_MS` until then.
+const PRESS_VIDEO_SRC = '/videos/press_animation.webm'
+const PRESS_VIDEO_DELAY_MS = 1050
+const PRESS_VIDEO_FALLBACK_MS = 8000
+const PRESS_VIDEO_MARGIN_MS = 1000
+
 interface Props {
     event: Event
     manifest?: Manifest | null
@@ -28,25 +43,52 @@ interface Props {
     styleId?: string
     tier?: number
     alreadySettled?: boolean
-    onFlipComplete?: (id: number) => void
+    onSettled?: (id: number) => void
     style?: React.CSSProperties
     tileSet?: RipsTileSet
 }
 
-export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tier, alreadySettled, onFlipComplete, style, tileSet = DEFAULT_RIPS_TILE_SET}) => {
+export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tier, alreadySettled, onSettled, style, tileSet = DEFAULT_RIPS_TILE_SET}) => {
     const flipped = event.customer !== ''
     const skipAnimation = flipped && !!alreadySettled
     const [animating, setAnimating] = useState(false)
+    const [showVideo, setShowVideo] = useState(false)
+    const [fallbackMs, setFallbackMs] = useState(PRESS_VIDEO_FALLBACK_MS)
 
     useEffect(() => {
         setAnimating(flipped && !skipAnimation)
     }, [flipped, skipAnimation])
 
+    // `skipAnimation` turns true once the board settles the cell — after the burst, or straight
+    // away for a cell sold at mount, which is the only case where it cancels the timer. Only an
+    // un-sell hides a playing video early.
+    useEffect(() => {
+        if (!flipped) {
+            setShowVideo(false)
+            return
+        }
+        if (skipAnimation) return
+        const t = setTimeout(() => setShowVideo(true), PRESS_VIDEO_DELAY_MS)
+        return () => clearTimeout(t)
+    }, [flipped, skipAnimation])
+
+    const eventId = event.id
+    const finishBurst = useCallback(() => {
+        setShowVideo(false)
+        onSettled?.(eventId)
+    }, [onSettled, eventId])
+
+    useEffect(() => {
+        if (!showVideo) return
+        const t = setTimeout(finishBurst, fallbackMs)
+        return () => clearTimeout(t)
+    }, [showVideo, fallbackMs, finishBurst])
+
     const contentClass = flipped ? (skipAnimation ? 'rfb-cell-final' : 'rfb-cell-flipped') : ''
 
     return (
-        <div className={`rfb-cell ${animating ? 'rfb-cell-flipping' : ''}`} style={style}>
-            <div className={`rfb-cell-content ${contentClass}`} onAnimationEnd={() => { setAnimating(false); if (flipped) onFlipComplete?.(event.id) }}>
+        <div className={`rfb-cell ${animating ? 'rfb-cell-flipping' : ''} ${showVideo ? 'rfb-cell-active' : ''}`} style={style}>
+            <div className={`rfb-cell-content ${contentClass}`} onAnimationEnd={() => setAnimating(false)}>
                 <div className="rfb-face rfb-front">
                     <div className={tileSet === 'icons' ? 'rfb-tile' : 'rfb-tile rfb-tile-stone'}>
                         {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element */}
@@ -61,6 +103,23 @@ export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tie
                     )}
                 </div>
             </div>
+            {showVideo && (
+                <div className="rfb-video-overlay">
+                    <video
+                        autoPlay
+                        muted
+                        playsInline
+                        onLoadedMetadata={(e) => {
+                            const d = e.currentTarget.duration
+                            if (Number.isFinite(d)) setFallbackMs(d * 1000 + PRESS_VIDEO_MARGIN_MS)
+                        }}
+                        onEnded={finishBurst}
+                        onError={finishBurst}
+                    >
+                        <source src={PRESS_VIDEO_SRC} type="video/webm" />
+                    </video>
+                </div>
+            )}
         </div>
     )
 }

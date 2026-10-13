@@ -12,6 +12,7 @@ import {
     DEFAULT_FRAME_BORDERS,
     DEFAULT_FRAME_WIDTH,
     DEFAULT_STAGES,
+    FRAME_STYLES,
     FRAME_VARIANTS,
     IMAGE_FITS,
     MAX_TEXT_LENGTH,
@@ -257,6 +258,7 @@ const VALID_FRAME_VARIANTS = FRAME_VARIANTS
 const VALID_ANIMATION_IDS = ANIMATION_IDS
 const VALID_RESULTS_SORTS = RESULTS_SORTS
 const VALID_RESULTS_STYLES = RESULTS_STYLES
+const VALID_FRAME_STYLES = FRAME_STYLES
 
 function validatePlacements(key: string, placementsRaw: unknown, regId: RegistryId, stages: Stage[]): string[] {
     const errors: string[] = []
@@ -669,6 +671,13 @@ function validateFrameKind({ key, rawEl, stages }: KindValidatorCtx): { errors: 
     }
     errors.push(...validateBorders(key, rawEl.borders, stages))
     errors.push(...validateFrameWidth(key, rawEl.frameWidth))
+    // `style` (schema.ts `FRAME_STYLES`): absent = 'default'; same shape as the `results` check.
+    if (
+        rawEl.style !== undefined &&
+        (typeof rawEl.style !== 'string' || !(VALID_FRAME_STYLES as readonly string[]).includes(rawEl.style))
+    ) {
+        errors.push(`element "${key}": style must be one of ${VALID_FRAME_STYLES.join(', ')}`)
+    }
     return { errors, regId }
 }
 

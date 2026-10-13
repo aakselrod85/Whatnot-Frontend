@@ -1,7 +1,10 @@
 /* frame:static (obs-layout-plan.md §2.5). Classes prefixed `frm-` only — no html/body rules, no
  * .container/.row/.col, no vh/vw/vmin (the frame is always the full 1080x1920 canvas, so plain
  * percentages of its own root are exactly right, same convention as StashOrPassWrap.css). Deletes
- * the old `.frame-static-img` styling entirely — the frame is code-drawn now, no <img>.
+ * the old `.frame-static-img` styling entirely — no stretched <img>: the default style is
+ * code-drawn (`.frm-black`/`.frm-mat`/`.frm-drift`) and the 'rips' style is a masked marble layer
+ * plus a 9-slice gold band (`.frm-rips-*`, at the bottom). Which one renders is decided in
+ * FrameElement.tsx from `element.style`.
  */
 
 .frm-root {
@@ -40,10 +43,14 @@
  */
 .frm-mat {
     box-sizing: border-box;
+}
 
-    /* Two mask layers — the whole border box, minus the content box (= the hole the padding
-       leaves) — composited so only the ring survives. The -webkit- pair is kept alongside the
-       standard one for older CEF builds in OBS, which only understand the legacy syntax. */
+/* Shared by the gradient ring and the rips marble (both are "paint only on the padding ring").
+   Two mask layers — the whole border box, minus the content box (= the hole the padding
+   leaves) — composited so only the ring survives. The -webkit- pair is kept alongside the
+   standard one for older CEF builds in OBS, which only understand the legacy syntax. */
+.frm-mat,
+.frm-rips-marble {
     -webkit-mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
     -webkit-mask-clip: content-box, border-box;
     -webkit-mask-composite: xor;
@@ -94,4 +101,36 @@
     to {
         transform: translateX(0);
     }
+}
+
+/* ---- 'rips' style (obs-layout-plan.md §2.5, rips subsection) ------------------------------------
+ * Two layers, both positioned inline from the resolved `borders` in FrameElement.tsx:
+ *   - `.frm-rips-marble` — the marble art stretched over the whole canvas (100% 100%: the PNG is
+ *     941x1672 against a 1080x1920 canvas, under 0.1% off in aspect, so no cover/crop), masked by
+ *     the shared ring mask above so its padding — the borders — is painted and its content box —
+ *     the cut-out — is fully transparent.
+ *   - `.frm-rips-gold` — the gold frame as a CSS 9-slice: a 16px border on a transparent box whose
+ *     border box is exactly the hole, so the band lies entirely INSIDE the cut-out (over the
+ *     outermost 16px of the content) and the art's 16x16 corners stay native. `stretch` (not
+ *     round/repeat) along the edges is deliberate. The 16 here must match `RIPS_FRAME_BAND` in
+ *     ripsAssets.ts — it is the art's band thickness.
+ */
+
+.frm-rips-marble {
+    inset: 0;
+    box-sizing: border-box;
+    /* background-image is set inline (ripsAssets.ts is the single source of the URL). */
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+}
+
+.frm-rips-gold {
+    box-sizing: border-box;
+    background: transparent;
+    border: 16px solid transparent;
+    /* border-image-source is set inline (ripsAssets.ts). No `fill` keyword: the middle slice is
+       the hole and stays unpainted. */
+    border-image-slice: 16;
+    border-image-width: 16px;
+    border-image-repeat: stretch;
 }
