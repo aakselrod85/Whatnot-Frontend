@@ -62,8 +62,9 @@ const DIRECTION_LABELS: Record<TickerDirection, string> = { left: 'Left', right:
 // "commit on close, not per keystroke/drag" reasoning TextSettings.tsx applies to its textarea, just
 // via a native listener since React has no `onChange`-vs-`onInput` distinction for this element type.
 // `key={value}` on the caller side remounts it (re-seeding `defaultValue`) whenever the committed
-// value changes from elsewhere (another session, an undo).
-function ColorField({ value, onCommit }: { value: string; onCommit: (next: string) => void }) {
+// value changes from elsewhere (another session, an undo). Exported so DimmerSettings.tsx reuses
+// the same control (and the same commit-on-close behaviour) instead of a second copy.
+export function ColorField({ value, onCommit }: { value: string; onCommit: (next: string) => void }) {
     const ref = useRef<HTMLInputElement | null>(null)
     useEffect(() => {
         const el = ref.current

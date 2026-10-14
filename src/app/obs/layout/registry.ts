@@ -20,6 +20,7 @@ import { SportStyleBoard } from './elements/board-sport-style/SportStyleBoard'
 import { ResultsElement } from './elements/results/ResultsElement'
 import { ThinResults } from './elements/results-thin/ThinResults'
 import { RIPS_RESULTS_PRELOAD } from './elements/results/ripsStyle'
+import { RIPS_RESULTS_THIN_PRELOAD } from './elements/results-thin/ripsStyle'
 import { CircleWidget } from './elements/circle/CircleWidget'
 import { CardsElement } from './elements/cards/CardsElement'
 import { TextElement } from './elements/text/TextElement'
@@ -37,8 +38,9 @@ import { SHELF_ASSETS, SHELF_PRELOAD } from './elements/camera-shelf/assets'
 import { ObsToggleElement } from './elements/obs-toggle/ObsToggleElement'
 import { mountObsToggle } from './elements/obs-toggle/mount'
 import { HitSequenceElement } from './elements/hit-sequence/HitSequenceElement'
+import { DimmerElement } from './elements/dimmer/DimmerElement'
 import type { AnimationId, BoardVariant, Box, Element, ElementKind, FrameVariant, Phase, TickerSlot, WidgetId } from './schema'
-import { ANIMATION_IDS, DEFAULT_FRAME_BORDERS, DEFAULT_FRAME_WIDTH, DEFAULT_TICKER_SLOTS, WIDGET_IDS } from './schema'
+import { ANIMATION_IDS, DEFAULT_DIMMER_COLOR, DEFAULT_FRAME_BORDERS, DEFAULT_FRAME_WIDTH, DEFAULT_TICKER_SLOTS, WIDGET_IDS } from './schema'
 import type { SceneEventName } from './sceneEvents'
 import type { MountFn } from './stageHooks'
 // `registryIdOf` moved to elementId.ts (obs-layout-adding-elements-plan.md §A.1) — that module has
@@ -81,6 +83,7 @@ export type RegistryId =
     | 'cameraShelf'
     | 'obsToggle'
     | 'hitSequence'
+    | 'dimmer'
 
 // Shared prop contract every registry component (placeholder now, real components in Phase 2)
 // implements.
@@ -448,10 +451,16 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // Interpretation: the plan's use case is "alongside a board, or during ripping" — full
         // `results` already owns the `results` phase by default, so this defaults to `ripping`
         // rather than competing with it. The operator can add it to any phase either way.
-        preload: [],
+        // The 'rips' style's static art (results-thin/ripsStyle.ts), preloaded whatever style the
+        // element is on — same reasoning as the `results` entry above. The default style has no art.
+        preload: RIPS_RESULTS_THIN_PRELOAD,
         component: ThinResults,
         available: true,
         hasBox: true,
+        // The 'rips' style's top decoration (results-thin/RipsTopDecoration.tsx) — the ledge and
+        // medallion standing on the box's top edge and the chains up to the canvas top — draws
+        // ABOVE the box, outside it. The element clips its own board/grid (`.rest-frame`).
+        unclipped: true,
         // Matches `results` (§2.3): a manually-triggered 'sold' scene event forces an immediate
         // events refetch instead of waiting up to 5s for the spine's normal poll.
         reactsTo: [],
@@ -751,6 +760,23 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         wideBlock: true,
         reactsTo: [],
     },
+    // Full-canvas tint (schema.ts's `dimmer` variant). A singleton with its own group: two
+    // dimmers would only ever multiply into one darker dimmer, which is what the alpha slider is
+    // for. Boxless on purpose — it is the whole canvas by definition, so there is nothing to
+    // position or resize; the controls block keeps only the Layer input.
+    dimmer: {
+        id: 'dimmer',
+        kind: 'dimmer',
+        label: 'Dimmer',
+        singleton: true,
+        singletonGroup: 'dimmer',
+        defaultBox: FULL_BOX, // irrelevant: boxless
+        preload: [],
+        component: DimmerElement,
+        available: true,
+        hasBox: false,
+        reactsTo: [],
+    },
 }
 
 /** Narrows a registry id's suffix to a real AnimationId, refusing anything ANIMATION_IDS lacks. */
@@ -816,8 +842,8 @@ export function makeElement(registryId: RegistryId): Element {
         case 'results':
             return { kind: 'results', placements }
         case 'resultsThin':
-            // columns/textSize/iconSize/sort left unset — the component's own defaults apply
-            // (see ThinResults.tsx's DEFAULT_* constants), same convention as the wrap animation.
+            // columns/sort/style left unset — the component's own defaults apply (see
+            // ThinResults.tsx's DEFAULT_* constants), same convention as the wrap animation.
             return { kind: 'resultsThin', placements }
         case 'cards':
             return { kind: 'cards', placements }
@@ -827,7 +853,7 @@ export function makeElement(registryId: RegistryId): Element {
             return { kind: 'reserved', placements }
         case 'text':
             // text/fontSize left unset — the component's own default applies (TextElement.tsx's
-            // DEFAULT_FONT_SIZE), same convention as resultsThin's columns/textSize/iconSize/sort.
+            // DEFAULT_FONT_SIZE), same convention as resultsThin's columns/sort/style.
             return { kind: 'text', placements }
         case 'imageBox':
             // url/fit left unset — the operator uploads an image in ImageBoxSettings, and the
@@ -870,6 +896,14 @@ export function makeElement(registryId: RegistryId): Element {
         case 'hitSequence':
             // steps left unset — an empty list just reveals hits immediately (hit-sequence-plan.md §3.2).
             return { kind: 'hitSequence', placements }
+        case 'dimmer':
+            // `color` IS seeded (unlike `text`'s fontSize) so the settings panel's picker and slider
+            // show the real stored value from the first render, not a component default they would
+            // have to re-derive. `z: -20` puts a fresh dimmer under everything: elements with no `z`
+            // sort at 0, and the frame's "Below content" toggle (FrameSettings.tsx) writes -10, so
+            // -20 is under even a frame that was itself sent below the content. The operator moves
+            // it up with the ordinary Layer input if they want it over something.
+            return { kind: 'dimmer', color: DEFAULT_DIMMER_COLOR, placements, z: -20 }
         default: {
             const _exhaustive: never = entry.kind
             throw new Error(`makeElement: unhandled kind ${JSON.stringify(_exhaustive)}`)

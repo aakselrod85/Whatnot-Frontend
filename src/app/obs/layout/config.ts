@@ -9,6 +9,7 @@ import {
     BOARD_VARIANTS,
     BUILT_IN_STAGES,
     CANVAS,
+    DIMMER_COLOR_RE,
     DEFAULT_FRAME_BORDERS,
     DEFAULT_FRAME_WIDTH,
     DEFAULT_STAGES,
@@ -18,6 +19,7 @@ import {
     MAX_TEXT_LENGTH,
     RESULTS_SORTS,
     RESULTS_STYLES,
+    RESULTS_THIN_STYLES,
     TICKER_BANDS,
     TICKER_DIRECTIONS,
     TICKER_FONTS,
@@ -258,6 +260,7 @@ const VALID_FRAME_VARIANTS = FRAME_VARIANTS
 const VALID_ANIMATION_IDS = ANIMATION_IDS
 const VALID_RESULTS_SORTS = RESULTS_SORTS
 const VALID_RESULTS_STYLES = RESULTS_STYLES
+const VALID_RESULTS_THIN_STYLES = RESULTS_THIN_STYLES
 const VALID_FRAME_STYLES = FRAME_STYLES
 
 function validatePlacements(key: string, placementsRaw: unknown, regId: RegistryId, stages: Stage[]): string[] {
@@ -347,7 +350,11 @@ function validateBorders(key: string, bordersRaw: unknown, stages: Stage[]): str
 }
 
 // `resultsThin` field validation (obs-layout-plan.md §2.4): `columns` is a positive integer,
-// `textSize`/`iconSize` are positive finite numbers (px), `sort` is one of the two literals.
+// `sort` is one of the two literals, `style` one of RESULTS_THIN_STYLES — the same checks as
+// `results`. The element's former `textSize`/`iconSize` px settings were removed (sizes now
+// derive from the box, see ThinResults.tsx) and are deliberately NOT rejected here if a stored
+// element still carries them: unknown keys are ignored for every kind (see the note on
+// validateCameraShelfFields), so such a config keeps loading unchanged.
 function validateResultsThinFields(key: string, rawEl: Record<string, unknown>): string[] {
     const errors: string[] = []
     if (rawEl.columns !== undefined) {
@@ -355,20 +362,21 @@ function validateResultsThinFields(key: string, rawEl: Record<string, unknown>):
             errors.push(`element "${key}": columns must be an integer >= 1`)
         }
     }
-    if (rawEl.textSize !== undefined) {
-        if (!isFiniteNumber(rawEl.textSize) || rawEl.textSize <= 0) {
-            errors.push(`element "${key}": textSize must be a finite number > 0`)
-        }
-    }
-    if (rawEl.iconSize !== undefined) {
-        if (!isFiniteNumber(rawEl.iconSize) || rawEl.iconSize <= 0) {
-            errors.push(`element "${key}": iconSize must be a finite number > 0`)
-        }
-    }
     if (rawEl.sort !== undefined) {
         if (typeof rawEl.sort !== 'string' || !(VALID_RESULTS_SORTS as readonly string[]).includes(rawEl.sort)) {
             errors.push(`element "${key}": sort must be one of ${VALID_RESULTS_SORTS.join(', ')}`)
         }
+    }
+    // `style` (schema.ts `RESULTS_THIN_STYLES`): absent = 'default'; same shape as the `results` check.
+    if (
+        rawEl.style !== undefined &&
+        (typeof rawEl.style !== 'string' || !(VALID_RESULTS_THIN_STYLES as readonly string[]).includes(rawEl.style))
+    ) {
+        errors.push(`element "${key}": style must be one of ${VALID_RESULTS_THIN_STYLES.join(', ')}`)
+    }
+    // `topDecoration` (the rips style's ledge + chains above the box): absent = true.
+    if (rawEl.topDecoration !== undefined && typeof rawEl.topDecoration !== 'boolean') {
+        errors.push(`element "${key}": topDecoration must be a boolean`)
     }
     return errors
 }
@@ -1097,6 +1105,29 @@ function validateHitSequenceKind({ key, rawEl, stages }: KindValidatorCtx): { er
     }
 }
 
+// `dimmer.color` validation (schema.ts's `dimmer` variant): absent, or a `#rrggbb` / `#rrggbbaa`
+// hex string (DIMMER_COLOR_RE). Both lengths are accepted because the settings panel always writes
+// 8 digits but a hand-edited config may well carry the 6-digit form everyone knows; the element
+// treats that as fully opaque (elements/dimmer/dimmerColor.ts). Rejected rather than silently
+// defaulted here for the same reason as cameraShelf's `fillColor`: this validator never rewrites
+// an element (validateConfig assigns `rawEl as Element` verbatim), so "fall back to the default"
+// is the renderer's job, and a value that fails this check is reported like every other bad field.
+function validateDimmerFields(key: string, rawEl: Record<string, unknown>): string[] {
+    const errors: string[] = []
+    if (rawEl.color !== undefined && (typeof rawEl.color !== 'string' || !DIMMER_COLOR_RE.test(rawEl.color))) {
+        errors.push(`element "${key}": color must be a "#rrggbb" or "#rrggbbaa" hex string`)
+    }
+    return errors
+}
+
+function validateDimmerKind({ key, rawEl, stages }: KindValidatorCtx): { errors: string[]; regId?: RegistryId } {
+    const regId: RegistryId = 'dimmer'
+    return {
+        errors: [...validatePlacements(key, rawEl.placements, regId, stages), ...validateDimmerFields(key, rawEl)],
+        regId,
+    }
+}
+
 // The enforcement this whole section exists for: a kind added to ElementKind (schema.ts) with no
 // entry below fails `tsc` right here — see the section's header comment.
 const KIND_VALIDATORS = {
@@ -1118,6 +1149,7 @@ const KIND_VALIDATORS = {
     cameraShelf: validateCameraShelfKind,
     obsToggle: validateObsToggleKind,
     hitSequence: validateHitSequenceKind,
+    dimmer: validateDimmerKind,
 } satisfies Record<ElementKind, KindValidator>
 
 // `config.stages`: non-empty, every entry `{id: non-empty string, label: non-empty string}`,

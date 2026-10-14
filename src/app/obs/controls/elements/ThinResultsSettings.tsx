@@ -1,17 +1,23 @@
 'use client'
 
-// Settings for `resultsThin` (obs-layout-plan.md §2.4): Columns, Text size (px), Icon size (px),
-// and Sort (Alphabetical / By customer). Like FrameSettings/StashOrPassWrapSettings, this mutates
-// the element itself via `onPatchElement` (ElementsPanel's `mutate` -> debounced `pushConfig`),
-// not a separate backend endpoint — `columns`/`textSize`/`iconSize`/`sort` all live on the
-// element in LayoutConfig.
+// Settings for `resultsThin` (obs-layout-plan.md §2.4): Style (skin), Columns and Sort
+// (Alphabetical / By customer) — the same set as ResultsSettings.tsx, because the element now
+// sizes its rows from its box exactly as the full board does (ThinResults.tsx), so there is no
+// text or icon size to set. A style only changes how the board and its cells are painted
+// (schema.ts `RESULTS_THIN_STYLES`): 'default' is the palette this element has always had, 'rips'
+// paints over the art in public/images/results_mini/rips
+// (layout/elements/results-thin/ripsStyle.ts). Like FrameSettings/StashOrPassWrapSettings, this
+// mutates the element itself via `onPatchElement` (ElementsPanel's `mutate` -> debounced
+// `pushConfig`), not a separate backend endpoint — `style`/`columns`/`sort`/`topDecoration` all
+// live on the element in LayoutConfig. "Top decoration" (rips only) switches the ledge and chains
+// drawn above the box (results-thin/RipsTopDecoration.tsx).
 
-import type {Element} from '@/app/obs/layout/schema'
+import type {Element, ResultsThinStyle} from '@/app/obs/layout/schema'
 import {
     DEFAULT_COLUMNS,
-    DEFAULT_ICON_SIZE,
     DEFAULT_SORT,
-    DEFAULT_TEXT_SIZE,
+    DEFAULT_STYLE,
+    DEFAULT_TOP_DECORATION,
 } from '@/app/obs/layout/elements/results-thin/ThinResults'
 import type {PatchElement} from './ElementBlock'
 import SortButtons from './SortButtons'
@@ -26,12 +32,25 @@ export default function ThinResultsSettings({elementKey, element, onPatchElement
     if (element.kind !== 'resultsThin') return null
 
     const columns = element.columns ?? DEFAULT_COLUMNS
-    const textSize = element.textSize ?? DEFAULT_TEXT_SIZE
-    const iconSize = element.iconSize ?? DEFAULT_ICON_SIZE
     const sort = element.sort ?? DEFAULT_SORT
+    const style = element.style ?? DEFAULT_STYLE
+    const topDecoration = element.topDecoration ?? DEFAULT_TOP_DECORATION
+    const topDecorationId = `rest-topdeco-${elementKey}`
 
     return (
         <div className="d-flex gap-3 flex-wrap">
+            <div className="mb-2">
+                <label className="form-label mb-0 small">Style</label>
+                <select
+                    className="form-select form-select-sm"
+                    style={{width: '120px'}}
+                    value={style}
+                    onChange={(e) => onPatchElement(elementKey, {style: e.target.value as ResultsThinStyle})}
+                >
+                    <option value="default">Default</option>
+                    <option value="rips">Rips</option>
+                </select>
+            </div>
             <div className="mb-2">
                 <label className="form-label mb-0 small">Columns</label>
                 <input
@@ -47,35 +66,21 @@ export default function ThinResultsSettings({elementKey, element, onPatchElement
                     }}
                 />
             </div>
-            <div className="mb-2">
-                <label className="form-label mb-0 small">Text size (px)</label>
-                <input
-                    type="number"
-                    min={1}
-                    className="form-control form-control-sm"
-                    style={{width: '100px'}}
-                    value={textSize}
-                    onChange={(e) => {
-                        const parsed = parseInt(e.target.value, 10)
-                        onPatchElement(elementKey, {textSize: Number.isFinite(parsed) && parsed > 0 ? parsed : 1})
-                    }}
-                />
-            </div>
-            <div className="mb-2">
-                <label className="form-label mb-0 small">Icon size (px)</label>
-                <input
-                    type="number"
-                    min={1}
-                    className="form-control form-control-sm"
-                    style={{width: '100px'}}
-                    value={iconSize}
-                    onChange={(e) => {
-                        const parsed = parseInt(e.target.value, 10)
-                        onPatchElement(elementKey, {iconSize: Number.isFinite(parsed) && parsed > 0 ? parsed : 1})
-                    }}
-                />
-            </div>
             <SortButtons value={sort} onChange={(next) => onPatchElement(elementKey, {sort: next})}/>
+            {/* Rips only (RipsTopDecoration.tsx): the ledge + medallion above the box and the chains
+                up to the canvas top. Hidden for the default style, which never draws them. */}
+            {style === 'rips' && (
+                <div className="form-check mb-2 align-self-end">
+                    <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id={topDecorationId}
+                        checked={topDecoration}
+                        onChange={(e) => onPatchElement(elementKey, {topDecoration: e.target.checked})}
+                    />
+                    <label className="form-check-label small" htmlFor={topDecorationId}>Top decoration</label>
+                </div>
+            )}
         </div>
     )
 }

@@ -49,6 +49,7 @@ export type ElementKind =
     | 'cameraShelf'
     | 'obsToggle'
     | 'hitSequence'
+    | 'dimmer'
 
 // ---- hitSequence (hit-sequence-plan.md §3.1) ---------------------------------------------------
 export type HitStepBase = {
@@ -191,6 +192,13 @@ export type ResultsSort = (typeof RESULTS_SORTS)[number]
 export const RESULTS_STYLES = ['default', 'rips'] as const
 export type ResultsStyle = (typeof RESULTS_STYLES)[number]
 
+// Skin of the `resultsThin` element — same reasoning as `RESULTS_STYLES`. Its own constant rather
+// than a reuse of that one so the two elements' style lists can diverge. 'rips' paints the board
+// and its cells over the art in public/images/results_mini/rips (see
+// elements/results-thin/ripsStyle.ts).
+export const RESULTS_THIN_STYLES = ['default', 'rips'] as const
+export type ResultsThinStyle = (typeof RESULTS_THIN_STYLES)[number]
+
 // Per-element opt-out of a native reaction its registry entry declares in `reactsTo` (registry.ts)
 // — default (key absent, or `undefined`) is "on"; only `false` turns it off. See config.ts
 // `effectiveReactions()`.
@@ -296,14 +304,19 @@ export type Element = (
     // (`resultsThin`) rather than a `results` variant, so a config may place both at once (e.g.
     // the full board during `results` plus a thin list next to the board during `selling`/
     // `ripping`). Reuses `elements/results/orderResults.ts` with these as its `{columns, sort}`.
-    // `textSize`/`iconSize` are px, applied directly by the component (not derived from `box` —
-    // rows squeeze to their content instead of dividing box.h by row count).
+    // Same field set as `results`: row, icon and text sizes all derive from `box` (box.h divided
+    // by the row count, see ThinResults.tsx), so there is nothing else to configure. Older stored
+    // configs may still carry `textSize`/`iconSize` from before that change; unknown keys are
+    // ignored by validateConfig (config.ts), so they load fine and are simply not read.
     | {
           kind: 'resultsThin'
           columns?: number
-          textSize?: number
-          iconSize?: number
           sort?: ResultsSort
+          style?: ResultsThinStyle
+          // 'rips' style only: the ledge + medallion drawn above the box and the two chains up to
+          // the canvas top (results-thin/RipsTopDecoration.tsx). Absent = true. Ignored by the
+          // default style, which never draws them.
+          topDecoration?: boolean
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions
@@ -554,6 +567,23 @@ export type Element = (
           z?: number
           reactions?: Reactions
       }
+    // Boxless full-canvas tint (elements/dimmer/DimmerElement.tsx): ONE semi-transparent rectangle
+    // over the whole 1080x1920 canvas, meant to sit at the bottom of the layout so it darkens
+    // whatever OBS shows under the browser source (the camera) while every element above it stays
+    // at full brightness. Which stages it is on is just its `placements` (the box inside is never
+    // read — the layout mounts boxless elements full-canvas), and where it sits in the stack is the
+    // ordinary `z`. `color` is the one setting: an `#rrggbbaa` hex with the alpha baked in rather
+    // than a separate opacity field, so the config carries exactly one value and the settings
+    // panel's picker + slider only ever compose that one string. A 6-digit `#rrggbb` is accepted
+    // too (= fully opaque); absent = DEFAULT_DIMMER_COLOR. Not in MIRRORABLE_KINDS — a copy of a
+    // full-canvas rectangle at another x/y is meaningless.
+    | {
+          kind: 'dimmer'
+          color?: string
+          placements: Partial<Record<PlacementKey, Box>>
+          z?: number
+          reactions?: Reactions
+      }
 ) & MirrorFields
 
 export type LayoutConfig = {
@@ -689,6 +719,18 @@ export const DEFAULT_FRAME_WIDTH = 8
 // pre-wrap` can't just wrap around. Enforced by config.ts's validator and used as the controls
 // textarea's `maxLength` (TextSettings.tsx) so the two never disagree.
 export const MAX_TEXT_LENGTH = 500
+
+// `dimmer.color` (see the variant's comment): black at 60% — `0x99` = 153/255 — dark enough that
+// the camera reads as "dimmed" without going to a blackout. Seeded by `makeElement` (registry.ts)
+// and the fallback the component/settings panel use for an absent or unparsable value. Lives here,
+// like DEFAULT_FRAME_WIDTH, so config.ts and registry.ts share one literal without importing each
+// other.
+export const DEFAULT_DIMMER_COLOR = '#00000099'
+
+// What `dimmer.color` may look like: `#rrggbb` or `#rrggbbaa`, either case. config.ts's validator
+// rejects anything else; the element's own helpers (elements/dimmer/dimmerColor.ts) normalise a
+// 6-digit value to fully opaque and anything unparsable to DEFAULT_DIMMER_COLOR at render time.
+export const DIMMER_COLOR_RE = /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i
 
 export const BUS_EVENT_NAME = 'mob:trigger'
 export const DEV_CHANNEL_NAME = 'mob:bus'
