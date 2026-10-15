@@ -68,4 +68,6 @@ export const NEEDS_BY_ID = {
     // Reads `events` and the active break id (always-on spine sources) plus, for the tier filter
     // (hit-sequence-plan.md §13), the same price sources as `board:sport_style`.
     hitSequence: ['needsCobra', 'needsSeries'],
+    // A static tint — reads nothing but its own `color` from the config, same as `text`/`frame`.
+    dimmer: [],
 } as const satisfies Record<RegistryId, readonly NeedFlag[]>

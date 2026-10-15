@@ -1,7 +1,13 @@
 /* obs-layout-plan.md §2.4 — sibling of elements/results/ResultRow.css. All classes prefixed
    `rest-` (`res-` is taken by §2.3's `results` element); no vh/vw/vmin, no body/html rules, no
-   .container/.row/.col overrides. Row height is intentionally NOT set here — it comes from
-   content (icon size + padding), which is what makes rows squeeze instead of stretch. */
+   .container/.row/.col overrides.
+
+   Everything here is sized off `--rest-row-h`, the row height ThinResults.tsx derives from
+   `box.h / rows` and sets on the grid (same scheme as ResultRow.css's `--res-row-h`): the row
+   fills its grid track, and the icon, the abbreviation tile, the name and the vertical padding are
+   all fixed fractions of that height. The factors reproduce the proportions this element used to
+   get from its old px settings at a 44px row — icon 28px (0.64), name 22px (0.5), vertical
+   padding 4px (0.09) — and simply scale from there, up or down, with no lower bound. */
 
 .rest-row-item {
     /* Spans two of the grid's half-tracks. `grid-column-end` rather than the `grid-column`
@@ -12,8 +18,13 @@
     gap: 8px;
     width: 100%;
     max-width: 100%;
+    /* Fill the track the .tsx sized for this row. */
+    height: 100%;
     box-sizing: border-box;
-    padding: 4px 6px;
+    /* Vertical padding follows the row so it does not swallow a short row; horizontal stays px.
+       0.09 + 0.64 (icon) + 0.09 leaves 0.18 of the row for the two 2px borders, so the padding
+       stays visible above and below the icon for any row taller than ~22px. */
+    padding: calc(var(--rest-row-h, 44px) * 0.09) 6px;
     /* Tier frame, as on the full board: the border colour IS the price ranking. Content stays
        uniform ivory (decision D4 in overlay-1f-plan.md). */
     border: 2px solid var(--rest-tier-grey);
@@ -27,18 +38,23 @@
 .rest-tier-grey { border-color: var(--rest-tier-grey); }
 
 .rest-image {
+    width: calc(var(--rest-row-h, 44px) * 0.64);
+    height: calc(var(--rest-row-h, 44px) * 0.64);
     object-fit: contain;
     flex-shrink: 0;
 }
 
 /* Non-team spot ("Chaser 1", "Mystery Box 3"): there is no art for these (obs-layout-plan.md
    §2.3.1/§2.4.1), so it renders the same abbreviation tile as the full `results` board's
-   `.res-abbr` and the classic board's ClassicCustomSpot, sized to iconSize like the <img> it
-   replaces. Uses this element's own `--rest-*` palette (declared on `.rest-root` in
-   ThinResults.css) rather than `results`' `--res-*` vars — the two elements are independent and
-   either may be placed without the other. Border is bronze, not a tier colour — D4 says the tier
-   ramp belongs to the row's outer frame, not this tile. */
+   `.res-abbr` and the classic board's ClassicCustomSpot, with the same footprint as the <img> it
+   replaces; its type is half the tile. Uses this element's own `--rest-*` palette (declared on
+   `.rest-root` in ThinResults.css) rather than `results`' `--res-*` vars — the two elements are
+   independent and either may be placed without the other. Border is bronze, not a tier colour —
+   D4 says the tier ramp belongs to the row's outer frame, not this tile. */
 .rest-abbr {
+    width: calc(var(--rest-row-h, 44px) * 0.64);
+    height: calc(var(--rest-row-h, 44px) * 0.64);
+    font-size: calc(var(--rest-row-h, 44px) * 0.32);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -57,6 +73,7 @@
     align-items: center;
     flex: 1;
     min-width: 0;
+    font-size: calc(var(--rest-row-h, 44px) * 0.5);
     line-height: 1.2;
     box-sizing: border-box;
 }

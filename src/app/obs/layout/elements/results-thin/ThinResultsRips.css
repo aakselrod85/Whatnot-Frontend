@@ -1,0 +1,68 @@
+/* The 'rips' skin of the `resultsThin` element (ripsStyle.ts). Every rule is scoped under
+   `.rest-root--rips`, which ThinResults.tsx puts on `.rest-root` only for that style, so the
+   default look in ThinResults.css / ThinResultRow.css is untouched. Image paths are NOT written
+   here: ThinResults/ThinResultRow hand them in as custom properties (--rest-cell-art) so ripsStyle.ts is the single source. Sibling of results/ResultsRips.css. */
+
+/* The frame is the positioning context for the board-art layer and the grid. */
+.rest-root--rips .rest-frame {
+    position: relative;
+}
+
+/* The board art as a 9-slice: border widths and border-image come inline from ThinResults.tsx
+   (RIPS_THIN_BOARD_SLICE / RIPS_THIN_BOARD_SCALE in ripsStyle.ts). Its own layer under the grid,
+   so the border does not shift the grid's `inset`. */
+.rest-root--rips .rest-board-art {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+/* The grid sits in the blue marble field the board art leaves inside its cream border —
+   RIPS_THIN_GRID_INSETS, applied as `inset` by the .tsx so the two cannot drift apart. The
+   default style's own panel colour, border, rounding and padding would show through the art's
+   transparent corners or double up with the painted border, so they go — and ThinResults.tsx
+   knows they are gone: in this style it divides the inset field by the row count with no border
+   or padding taken off, so `grid-template-rows` (ThinResults.css) still fits every row exactly. */
+.rest-root--rips .rest-grid {
+    position: absolute;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+}
+
+/* A cell is its own gilt plate: the art replaces the tier-coloured border and the lifted panel
+   fill (the rank is still computed; this skin just does not colour it). Text, icon, abbreviation
+   tile, high-bid/giveaway tint and empty-slot dimming are left as the default style has them. The
+   art is painted in fill mode (100% 100%), by the user's choice over a 9-slice — see ripsStyle.ts. */
+.rest-root--rips .rest-row-item {
+    background: var(--rest-cell-art) 0 0 / 100% 100% no-repeat;
+    border: none;
+    border-radius: 0;
+    /* Keep the content off the plate's gold rim: ~2.8% of the cell width at the sides, and ~10%
+       of its height top and bottom (the rim is ~14px of the 143px-tall art). The vertical value
+       is a fraction of the row rather than px so a squeezed row keeps the same share of its
+       height for content; a percentage would not do — it resolves against the cell WIDTH. */
+    padding: calc(var(--rest-row-h, 44px) * 0.1) 4%;
+}
+
+/* The top decoration (RipsTopDecoration.tsx): a full-box layer, sibling of .rest-frame so the
+   frame's overflow:hidden does not clip it — every sprite is placed ABOVE the box with a negative
+   top (the registry entry is `unclipped`; .rest-root itself has no overflow rule). Not
+   interactive, so the builder's drag/handles never hit it. Sprite positions, sizes and z-order are
+   inline from the .tsx (all numbers in ripsStyle.ts). */
+.rest-root--rips .rest-deco {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.rest-root--rips .rest-deco-img {
+    position: absolute;
+    display: block;
+    user-select: none;
+}

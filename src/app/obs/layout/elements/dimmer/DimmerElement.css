@@ -1,0 +1,13 @@
+/* `dimmer` (schema.ts's `dimmer` variant). Classes prefixed `dimmer-` only — no html/body rules,
+ * no .container/.row/.col, no vh/vw/vmin: the root always fills its (full-canvas) box, sized by
+ * ElementFrame, so plain 100%/100% is exactly right — same convention as FrameElement.css. The
+ * colour itself is set inline from the config (DimmerElement.tsx).
+ */
+
+.dimmer-root {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}

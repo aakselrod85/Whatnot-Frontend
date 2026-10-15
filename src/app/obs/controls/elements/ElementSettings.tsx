@@ -36,6 +36,7 @@ import TickerSettings from './TickerSettings'
 import CameraShelfSettings from './CameraShelfSettings'
 import ObsToggleSettings from './ObsToggleSettings'
 import HitSequenceSettings from './HitSequenceSettings'
+import DimmerSettings from './DimmerSettings'
 import type { MyOBSWebsocket } from '@/app/entity/my_obs_websocket'
 
 type Props = {
@@ -186,6 +187,7 @@ const SETTINGS_PANELS = {
     hitSequence: ({channelId, elementKey, element, config, onPatchElement, onEmitCue, obs, isConnected}) => (
         <HitSequenceSettings channelId={channelId} elementKey={elementKey} element={element} config={config} onPatchElement={onPatchElement} onEmitCue={onEmitCue} obs={obs} isConnected={isConnected}/>
     ),
+    dimmer: ({elementKey, element, onPatchElement}) => <DimmerSettings elementKey={elementKey} element={element} onPatchElement={onPatchElement}/>,
 } satisfies Record<RegistryId, SettingsRenderer | null>
 
 export default function ElementSettings(props: Props) {
