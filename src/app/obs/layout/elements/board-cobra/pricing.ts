@@ -40,9 +40,10 @@ const DEFICIT_TOTAL = ROW_DEFICITS.reduce((sum, d) => sum + d, 0)
 /* Each row is either the same height as the row above it or 10% shorter — never taller. */
 export const ROW_STEP = 0.9
 
-/* No row may occupy more than this share of the board. Without it, a board that only fills two
-   rows hands each one half the box. */
-export const MAX_ROW_SHARE = 0.20
+/* No row may occupy more than this share of the board. Rows otherwise always fill the whole box
+   height (see rowShares), so this only binds on boards of one or two rows: a single row takes the
+   top half and leaves the bottom half empty. */
+export const MAX_ROW_SHARE = 0.5
 
 export type Tier = 'best' | 'good' | 'mid' | 'regular'
 
@@ -185,18 +186,28 @@ export function rowWeights(tiers: Tier[]): number[] {
 }
 
 /*
- * Each row's share of the board. Normally that is just its weight over the
- * total, but when the tallest row would exceed MAX_ROW_SHARE every share is
- * scaled by the same factor — capping rows individually would let flexbox hand
- * the slack to the rows below and flatten the 10% steps. Any leftover height is
- * left empty at the bottom of the board.
+ * Each row's share of the board. Shares always add up to the whole board: normally each is just
+ * its weight over the total, but any row that would exceed MAX_ROW_SHARE is pinned at the cap and
+ * its excess is handed to the uncapped rows in proportion to their weights, repeating until no row
+ * is over. Handing it out by weight keeps "never taller than the row above" intact, since the
+ * capped rows are always the heaviest. The one case that can't fill is a single row, which stops
+ * at the cap.
  */
 export function rowShares(weights: number[]): number[] {
-    const total = weights.reduce((sum, w) => sum + w, 0)
-    if (total === 0) return weights.map(() => 0)
+    const shares = weights.map(() => 0)
+    let free     = weights.map((w, i) => (w > 0 ? i : -1)).filter((i) => i >= 0)
+    let left     = 1
 
-    const shares  = weights.map((w) => w / total)
-    const tallest = Math.max(...shares)
-    const scale   = tallest > MAX_ROW_SHARE ? MAX_ROW_SHARE / tallest : 1
-    return shares.map((s) => s * scale)
+    while (free.length > 0) {
+        const total = free.reduce((sum, i) => sum + weights[i], 0)
+        const over  = free.filter((i) => (weights[i] / total) * left > MAX_ROW_SHARE)
+        if (over.length === 0) {
+            for (const i of free) shares[i] = (weights[i] / total) * left
+            break
+        }
+        for (const i of over) shares[i] = MAX_ROW_SHARE
+        left -= over.length * MAX_ROW_SHARE
+        free  = free.filter((i) => !over.includes(i))
+    }
+    return shares
 }
