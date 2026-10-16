@@ -313,10 +313,6 @@ export type Element = (
           columns?: number
           sort?: ResultsSort
           style?: ResultsThinStyle
-          // 'rips' style only: the ledge + medallion drawn above the box and the two chains up to
-          // the canvas top (results-thin/RipsTopDecoration.tsx). Absent = true. Ignored by the
-          // default style, which never draws them.
-          topDecoration?: boolean
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions

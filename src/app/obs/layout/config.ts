@@ -374,10 +374,6 @@ function validateResultsThinFields(key: string, rawEl: Record<string, unknown>):
     ) {
         errors.push(`element "${key}": style must be one of ${VALID_RESULTS_THIN_STYLES.join(', ')}`)
     }
-    // `topDecoration` (the rips style's ledge + chains above the box): absent = true.
-    if (rawEl.topDecoration !== undefined && typeof rawEl.topDecoration !== 'boolean') {
-        errors.push(`element "${key}": topDecoration must be a boolean`)
-    }
     return errors
 }
 

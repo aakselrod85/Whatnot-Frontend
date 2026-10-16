@@ -17,9 +17,9 @@
 //
 // 'rips' — art-based (ripsAssets.ts): the marble `back` PNG stretched over the whole canvas with
 //   ONE rectangular cut-out — the canvas minus the same resolved `borders` — masked out of it, and
-//   the gold `gold` PNG drawn as a CSS 9-slice band of fixed `RIPS_FRAME_BAND` px sitting entirely
-//   INSIDE that hole — its outer edge on the hole edge, so it overlaps the outermost 16px of the
-//   content rather than the marble. `frameWidth` is ignored in this style (the band is the art's
+//   the gold `gold` PNG drawn as a CSS 9-slice (`RIPS_FRAME_SLICE`) sitting INSIDE that hole —
+//   its outer edge `RIPS_FRAME_OVERLAP` px past the hole edge, over the marble, so it covers the
+//   outermost strip of the content and hides the art's transparent outer pixels. `frameWidth` is ignored in this style (the band is the art's
 //   own thickness), and there is no black fill, no gradient and no inner rule. See `ripsGeometry`
 //   below for how the two boxes come from `borders`.
 //
@@ -32,7 +32,7 @@ import type { ElementProps } from '../../registry'
 import { resolveBorders, resolveFrameWidth } from '../../config'
 import type { Sides } from '../../schema'
 import { CANVAS } from '../../schema'
-import { RIPS_FRAME_ASSETS, RIPS_FRAME_BAND } from './ripsAssets'
+import { RIPS_FRAME_ASSETS, RIPS_FRAME_OVERLAP, RIPS_FRAME_SLICE } from './ripsAssets'
 import './FrameElement.css'
 
 // The drifting gradient layer is three canvases wide so it still covers the canvas at both ends of
@@ -50,10 +50,10 @@ const INNER_RULE_PX = 2
 // setting. Deliberately small — there is no "no cut-out" toggle, a frame with no hole is a frame
 // covering the content.
 //
-// The minimum is two bands plus 1px: the gold band is drawn INSIDE the hole (see ripsGeometry), so
-// a hole narrower than that would make the 9-slice box smaller than its own borders, and CSS would
-// grow it past the hole anyway.
-const RIPS_HOLE_MIN = RIPS_FRAME_BAND * 2 + 1
+// The minimum is two slices plus 1px: the gold frame is drawn INSIDE the hole (see ripsGeometry),
+// so a hole narrower than that would make the 9-slice box smaller than its own corners, and CSS
+// would squash them.
+const RIPS_HOLE_MIN = RIPS_FRAME_SLICE * 2 + 1
 
 function clampPair(a: number, b: number, extent: number): [number, number] {
     const maxSum = extent - RIPS_HOLE_MIN
@@ -71,14 +71,19 @@ function clampHole(borders: Sides): Sides {
 
 // 'rips' geometry, all in canvas px (insets from the canvas edges):
 //   - hole  = the canvas minus the (clamped) borders — the one transparent cut-out in the marble;
-//   - frame = the hole itself. With `box-sizing: border-box` and a 16px border, its border box IS
-//     the hole, so the 9-slice band occupies exactly the outermost 16px INSIDE the cut-out: its
-//     outer edge meets the marble with no gap, and it covers that 16px strip of the content behind
-//     it (the chosen look — the frame sits on the picture, not on the wall). `clampHole` keeps the
-//     hole at least two bands wide/tall so the band never outgrows it.
+//   - frame = the hole grown OUTWARDS by `RIPS_FRAME_OVERLAP` on every side. Its border box is the
+//     9-slice, so the gold sits inside the cut-out (the chosen look — the frame sits on the
+//     picture, not on the wall) except for that thin overlap over the marble, which hides the
+//     art's transparent outer pixels. `clampHole` keeps the hole at least two slices wide/tall so
+//     the corners never squash.
 function ripsGeometry(borders: Sides) {
     const hole = clampHole(borders)
-    const frame: Sides = hole
+    const frame: Sides = {
+        top: hole.top - RIPS_FRAME_OVERLAP,
+        right: hole.right - RIPS_FRAME_OVERLAP,
+        bottom: hole.bottom - RIPS_FRAME_OVERLAP,
+        left: hole.left - RIPS_FRAME_OVERLAP,
+    }
     return { hole, frame }
 }
 
@@ -100,13 +105,15 @@ function RipsFrame({ borders }: { borders: Sides }) {
                     paddingLeft: hole.left,
                 }}
             />
-            {/* The gold band: a 9-slice border on a box that IS the hole, so it is drawn just inside
-                the cut-out. Slice/width/repeat live in FrameElement.css; only the source and the
-                box are set here. */}
+            {/* The gold frame: a 9-slice border on the hole grown by the overlap. Slice and width
+                come from ripsAssets.ts (one source of truth); repeat lives in FrameElement.css. */}
             <div
                 className="frm-rips-gold"
                 style={{
                     borderImageSource: `url(${RIPS_FRAME_ASSETS.gold.src})`,
+                    borderImageSlice: RIPS_FRAME_SLICE,
+                    borderImageWidth: `${RIPS_FRAME_SLICE}px`,
+                    borderWidth: RIPS_FRAME_SLICE,
                     top: frame.top,
                     right: frame.right,
                     bottom: frame.bottom,

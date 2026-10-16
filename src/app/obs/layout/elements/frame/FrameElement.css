@@ -109,11 +109,10 @@
  *     941x1672 against a 1080x1920 canvas, under 0.1% off in aspect, so no cover/crop), masked by
  *     the shared ring mask above so its padding — the borders — is painted and its content box —
  *     the cut-out — is fully transparent.
- *   - `.frm-rips-gold` — the gold frame as a CSS 9-slice: a 16px border on a transparent box whose
- *     border box is exactly the hole, so the band lies entirely INSIDE the cut-out (over the
- *     outermost 16px of the content) and the art's 16x16 corners stay native. `stretch` (not
- *     round/repeat) along the edges is deliberate. The 16 here must match `RIPS_FRAME_BAND` in
- *     ripsAssets.ts — it is the art's band thickness.
+ *   - `.frm-rips-gold` — the gold frame as a CSS 9-slice on a transparent box: the hole grown by
+ *     a few px of overlap, so the gold lies inside the cut-out and just laps over the marble. The
+ *     slice/border width are set inline from ripsAssets.ts (`RIPS_FRAME_SLICE`), so corners stay
+ *     native. `stretch` (not round/repeat) along the edges is deliberate.
  */
 
 .frm-rips-marble {
@@ -127,10 +126,9 @@
 .frm-rips-gold {
     box-sizing: border-box;
     background: transparent;
-    border: 16px solid transparent;
-    /* border-image-source is set inline (ripsAssets.ts). No `fill` keyword: the middle slice is
-       the hole and stays unpainted. */
-    border-image-slice: 16;
-    border-image-width: 16px;
+    border-style: solid;
+    border-color: transparent;
+    /* border-width, border-image-source/-slice/-width are set inline (ripsAssets.ts). No `fill`
+       keyword: the middle slice is the hole and stays unpainted. */
     border-image-repeat: stretch;
 }

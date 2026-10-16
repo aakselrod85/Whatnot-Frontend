@@ -23,8 +23,14 @@ import {useSceneEvent} from '../../sceneEventBus'
 import {orderResults} from '../results/orderResults'
 import {NO_SERIES_TIER, tiersByEventId} from '../results/tiers'
 import {ThinResultRow} from './ThinResultRow'
-import {RipsTopDecoration} from './RipsTopDecoration'
-import {RIPS_THIN_BOARD_SCALE, RIPS_THIN_BOARD_SLICE, RIPS_THIN_BOARD_SRC, RIPS_THIN_GRID_INSETS} from './ripsStyle'
+import {
+    RIPS_THIN_BOARD_SCALE,
+    RIPS_THIN_BOARD_SLICE,
+    RIPS_THIN_BOARD_SRC,
+    RIPS_THIN_CORNER,
+    RIPS_THIN_CORNER_OVERHANG,
+    RIPS_THIN_GRID_INSETS,
+} from './ripsStyle'
 import type {ResultsSort, ResultsThinStyle} from '../../schema'
 import './ThinResults.css'
 import './ThinResultsRips.css'
@@ -43,8 +49,6 @@ const GRID_ROW_GAP = 4
 export const DEFAULT_COLUMNS = 2
 export const DEFAULT_SORT: ResultsSort = 'alphabetical'
 export const DEFAULT_STYLE: ResultsThinStyle = 'default' // the only look this element had before styles
-// The rips style's ledge + chains above the box (RipsTopDecoration.tsx): on unless switched off.
-export const DEFAULT_TOP_DECORATION = true
 
 export function ThinResults({elementKey, element, box}: ElementProps) {
     const {events: rawEvents, breakObject, stream, refetch} = useLayoutData()
@@ -57,9 +61,6 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
     const sort = element.kind === 'resultsThin' ? (element.sort ?? DEFAULT_SORT) : DEFAULT_SORT
     const style = element.kind === 'resultsThin' ? (element.style ?? DEFAULT_STYLE) : DEFAULT_STYLE
     const isRips = style === 'rips'
-    // Rips only: the default style never draws the decoration whatever the flag says.
-    const showTopDecoration =
-        isRips && (element.kind === 'resultsThin' ? (element.topDecoration ?? DEFAULT_TOP_DECORATION) : DEFAULT_TOP_DECORATION)
 
     const {ordered} = useMemo(
         // 'row': .rest-grid is a plain grid-auto-flow:row, so it must be handed the sorted order
@@ -172,9 +173,46 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
                     </div>
                 )}
             </div>
-            {/* Sibling of .rest-frame, not inside it: the frame clips (ThinResults.css), and the
-                decoration draws above the box — the registry entry is `unclipped` for it. */}
-            {showTopDecoration && <RipsTopDecoration box={box} />}
+            {/* Corner ornaments: a sibling of .rest-frame (which clips) so they can stick out past
+                the board, and after it so they sit above the board and the cells. */}
+            {isRips && <RipsBoardCorners/>}
+        </div>
+    )
+}
+
+// The four meander corners of the rips board (ripsStyle.ts RIPS_THIN_CORNER): one top-left PNG,
+// mirrored for the other three so every ornament faces into the board, each pushed out past the
+// board's edges by RIPS_THIN_CORNER_OVERHANG.
+const CORNERS = [
+    {key: 'tl', h: 'left', v: 'top', flip: ''},
+    {key: 'tr', h: 'right', v: 'top', flip: 'scaleX(-1)'},
+    {key: 'bl', h: 'left', v: 'bottom', flip: 'scaleY(-1)'},
+    {key: 'br', h: 'right', v: 'bottom', flip: 'scale(-1, -1)'},
+] as const
+
+function RipsBoardCorners() {
+    const sc = RIPS_THIN_BOARD_SCALE
+    const c = RIPS_THIN_CORNER
+    const o = RIPS_THIN_CORNER_OVERHANG
+    return (
+        <div className="rest-board-corners" aria-hidden="true">
+            {CORNERS.map((k) => (
+                // eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element
+                <img
+                    key={k.key}
+                    className="rest-board-corner"
+                    src={c.src}
+                    alt=""
+                    draggable={false}
+                    style={{
+                        width: c.w * sc,
+                        height: c.h * sc,
+                        [k.h]: -o.x * sc,
+                        [k.v]: -o.y * sc,
+                        transform: k.flip || undefined,
+                    }}
+                />
+            ))}
         </div>
     )
 }

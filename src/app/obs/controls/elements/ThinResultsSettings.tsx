@@ -8,16 +8,14 @@
 // paints over the art in public/images/results_mini/rips
 // (layout/elements/results-thin/ripsStyle.ts). Like FrameSettings/StashOrPassWrapSettings, this
 // mutates the element itself via `onPatchElement` (ElementsPanel's `mutate` -> debounced
-// `pushConfig`), not a separate backend endpoint — `style`/`columns`/`sort`/`topDecoration` all
-// live on the element in LayoutConfig. "Top decoration" (rips only) switches the ledge and chains
-// drawn above the box (results-thin/RipsTopDecoration.tsx).
+// `pushConfig`), not a separate backend endpoint — `style`/`columns`/`sort` all
+// live on the element in LayoutConfig.
 
 import type {Element, ResultsThinStyle} from '@/app/obs/layout/schema'
 import {
     DEFAULT_COLUMNS,
     DEFAULT_SORT,
     DEFAULT_STYLE,
-    DEFAULT_TOP_DECORATION,
 } from '@/app/obs/layout/elements/results-thin/ThinResults'
 import type {PatchElement} from './ElementBlock'
 import SortButtons from './SortButtons'
@@ -34,8 +32,6 @@ export default function ThinResultsSettings({elementKey, element, onPatchElement
     const columns = element.columns ?? DEFAULT_COLUMNS
     const sort = element.sort ?? DEFAULT_SORT
     const style = element.style ?? DEFAULT_STYLE
-    const topDecoration = element.topDecoration ?? DEFAULT_TOP_DECORATION
-    const topDecorationId = `rest-topdeco-${elementKey}`
 
     return (
         <div className="d-flex gap-3 flex-wrap">
@@ -67,20 +63,6 @@ export default function ThinResultsSettings({elementKey, element, onPatchElement
                 />
             </div>
             <SortButtons value={sort} onChange={(next) => onPatchElement(elementKey, {sort: next})}/>
-            {/* Rips only (RipsTopDecoration.tsx): the ledge + medallion above the box and the chains
-                up to the canvas top. Hidden for the default style, which never draws them. */}
-            {style === 'rips' && (
-                <div className="form-check mb-2 align-self-end">
-                    <input
-                        type="checkbox"
-                        className="form-check-input"
-                        id={topDecorationId}
-                        checked={topDecoration}
-                        onChange={(e) => onPatchElement(elementKey, {topDecoration: e.target.checked})}
-                    />
-                    <label className="form-check-label small" htmlFor={topDecorationId}>Top decoration</label>
-                </div>
-            )}
         </div>
     )
 }
