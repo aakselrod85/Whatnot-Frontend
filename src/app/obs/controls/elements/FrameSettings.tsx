@@ -10,7 +10,7 @@
 // skin. The four per-side widths mean the same thing in both styles — how far the opaque surround
 // reaches in from each screen edge — only the caption changes: the default style's "black fill"
 // is the rips style's cut-out inset. Frame width is hidden for 'rips': that frame is the art's
-// fixed 16px band (ripsAssets.ts `RIPS_FRAME_BAND`), deliberately not a setting.
+// fixed 9-slice art (ripsAssets.ts `RIPS_FRAME_SLICE`), deliberately not a setting.
 //
 // Frame width is deliberately NOT part of the per-stage machinery below: the frame is the
 // channel's constant furniture and it is the black fill around it that stages move, so it is one

@@ -49,19 +49,16 @@
     padding: calc(var(--rest-row-h, 44px) * 0.1) 4%;
 }
 
-/* The top decoration (RipsTopDecoration.tsx): a full-box layer, sibling of .rest-frame so the
-   frame's overflow:hidden does not clip it — every sprite is placed ABOVE the box with a negative
-   top (the registry entry is `unclipped`; .rest-root itself has no overflow rule). Not
-   interactive, so the builder's drag/handles never hit it. Sprite positions, sizes and z-order are
-   inline from the .tsx (all numbers in ripsStyle.ts). */
-.rest-root--rips .rest-deco {
+/* Corner ornaments over the board (ThinResults.tsx RipsBoardCorners): a non-clipping layer the
+   size of the box, above `.rest-frame` (later in the DOM). Sizes and the overhang past the edges are set inline from ripsStyle.ts. */
+.rest-root--rips .rest-board-corners {
     position: absolute;
     inset: 0;
     overflow: visible;
     pointer-events: none;
 }
 
-.rest-root--rips .rest-deco-img {
+.rest-root--rips .rest-board-corner {
     position: absolute;
     display: block;
     user-select: none;

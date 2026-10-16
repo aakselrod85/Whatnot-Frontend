@@ -457,9 +457,8 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         component: ThinResults,
         available: true,
         hasBox: true,
-        // The 'rips' style's top decoration (results-thin/RipsTopDecoration.tsx) — the ledge and
-        // medallion standing on the box's top edge and the chains up to the canvas top — draws
-        // ABOVE the box, outside it. The element clips its own board/grid (`.rest-frame`).
+        // The 'rips' style's corner ornaments (results-thin/ripsStyle.ts RIPS_THIN_CORNER) stick out
+        // past the box edges. The element clips its own board/grid (`.rest-frame`).
         unclipped: true,
         // Matches `results` (§2.3): a manually-triggered 'sold' scene event forces an immediate
         // events refetch instead of waiting up to 5s for the spine's normal poll.
