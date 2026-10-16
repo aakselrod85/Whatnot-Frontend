@@ -8,9 +8,8 @@
    Two viewport-relative patterns from the old file are replaced:
      - `.cobra-root{height:100vh}` -> `.cbr-root{height:100%}`, since ElementFrame already sizes
        this component's root to exactly the element's box (matching ResultsElement.css/
-       CircleWidget.css's convention). Per-row `maxHeight` (was `${share*100}vh`) is now computed
-       in CobraBoard.tsx as `${share * box.h}px` and set inline, same as the old file did (it was
-       already an inline style there, just in vh).
+       CircleWidget.css's convention). Per-row height (was a `${share*100}vh` max-height) is now
+       an explicit `${share * usableHeight}px` set inline by CobraBoard.tsx.
      - Every fixed `rem` font-size is now `calc(var(--cbr-font) * N)` with the SAME N the old file
        used per tier — same pattern `var(--cbr-rem)` used, except `--cbr-font` is set PER ROW by
        CobraBoard.tsx (on each `.cbr-row`) to a font basis fit to BOTH axes of that row (see the
@@ -29,11 +28,10 @@
      - Text-relative chrome (cell margin+border, cell content's bottom padding, the gem's margin/
        border/border-radius) is `em`, so it follows the font-size cascade above automatically — see
        the per-rule comments below for how each em value was derived from the old px number.
-     - Structural chrome that has nothing to do with any one row's text (`.cbr-root`'s row `gap`,
-       `.cbr-waiting`'s padding) is a fraction of the box height instead, via the `--cbr-box-h`
-       custom property CobraBoard.tsx sets on `.cbr-root` (raw `box.h` in px) — see
-       ROW_GAP_FRACTION/WAITING_PADDING_FRACTION in that file for how each fraction reproduces the
-       old fixed px value at the reference box (h=1300).
+     - Structural chrome that has nothing to do with any one row's text (`.cbr-root`'s row `gap`)
+       is a fraction of the box height instead, via the `--cbr-box-h` custom property
+       CobraBoard.tsx sets on `.cbr-root` (raw `box.h` in px) — see ROW_GAP_FRACTION in that file
+       for how the fraction reproduces the old fixed 1px gap at the reference box (h=1300).
      - Left as bare px: the two `border: 2px` frames were promoted to `em` (see `.cbr-cell`/
        `.cbr-cell__gem` below) since they read as an integral "frame" of the neon chrome, not a
        hairline. What's left as literal px is every text-shadow/box-shadow blur & spread radius
@@ -55,22 +53,15 @@
     font-family: var(--font-exo2), sans-serif;
 }
 
-.cbr-waiting {
-    color: #fff;
-    font-size: calc(var(--cbr-font) * 1.5);
-    /* 20px at the reference box height (1300px) — see WAITING_PADDING_FRACTION, CobraBoard.tsx. */
-    padding: calc(var(--cbr-box-h) * 0.01538462);
-}
-
 /* ── Rows ──
-   Heights come from the inline flex-grow weights AND the inline max-height (px, derived from
-   box.h) set in CobraBoard.tsx: each row is either as tall as the row above it or 10% shorter,
-   never taller. `--cbr-font` (also set inline, per row) is this row's two-axis font basis; the
+   Heights are the explicit inline px height set in CobraBoard.tsx (rowShares, pricing.ts): rows
+   fill the box, none taller than half of it, each as tall as the row above it or 10% shorter
+   (never taller). `--cbr-font` (also set inline, per row) is this row's two-axis font basis; the
    `font-size` here just makes plain `em` on every descendant resolve against it without each
    chrome rule needing its own `calc(var(--cbr-font) * …)`. */
 .cbr-row {
     display: flex;
-    flex: 1 1 0%;
+    flex: 0 0 auto;
     min-height: 0;
     overflow: hidden;
     width: 100%;

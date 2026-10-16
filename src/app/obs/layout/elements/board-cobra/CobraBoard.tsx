@@ -15,9 +15,10 @@
 //     why the sibling non-cobra board's `window.innerWidth` note doesn't apply to cobra's
 //     `buildRows` (it never read `window` to begin with).
 //   - Sizing is box-relative, replacing every viewport unit the old CSS used:
-//       - Row heights: the old inline style read `${share*100}vh` — `vh` there meant "the browser
-//         source's height", which WAS the whole widget, i.e. this element's `box.h`. Replaced with
-//         `${shares[ri] * box.h}px`.
+//       - Row heights: the old inline style read `${share*100}vh` as a max-height under flex-grow
+//         weights, with rows capped at 20% of the box and the rest left empty. Rows now get an
+//         explicit `${shares[ri] * usableHeight}px` height; rowShares (pricing.ts) makes them fill
+//         the whole box with no row above half of it.
 //       - Root height: `.cobra-root { height: 100vh }` -> `.cbr-root { height: 100% }` (of the
 //         box `ElementFrame` already sizes this component's root to, matching the convention in
 //         ResultsElement.css/CircleWidget.css).
@@ -31,6 +32,8 @@
 //     Nothing in this element's CSS references vh/vw/vmin, and there is no `window.innerWidth`
 //     read anywhere in this file (see pricing.ts's header for why: cobra's `buildRows` never had
 //     one).
+//   - No waiting message: with no active stream or break the board renders nothing, the same as
+//     when every team has sold.
 //   - Team names come from `events` filtered to unsold slots only (`!e.is_giveaway &&
 //     (e.customer === '' || e.customer === NoCustomer)`) — cobra shows what is still available to
 //     buy and at what price, not who already won it; identical filter to the old route.
@@ -50,7 +53,6 @@ import {
     buildRows,
     DEFAULT_PRICE,
     GOOD_THRESHOLD,
-    MAX_ROW_SHARE,
     MID_THRESHOLD,
     rowShares,
     rowTierOf,
@@ -156,13 +158,12 @@ function pickSheenTargets(cells: readonly TeamCell[], count: number): TeamCell[]
 const K_H = 0.0738
 const K_W = 0.0630
 
-// Row gap and the waiting-message padding are structural chrome (not text-relative), so they're
-// fractions of the box height in CobraBoard.css (`calc(var(--cbr-box-h) * …)`) rather than an em.
-// Both fractions reproduce the old fixed px values (1px gap, 20px padding) at the reference box
-// height (1300px). Duplicated as numbers here, matching the CSS fractions by hand (CSS can't be
-// `import`ed from), only so `usableHeight` below matches what actually renders.
+// Row gap is structural chrome (not text-relative), so it's a fraction of the box height in
+// CobraBoard.css (`calc(var(--cbr-box-h) * …)`) rather than an em. The fraction reproduces the old
+// fixed 1px gap at the reference box height (1300px). Duplicated as a number here, matching the CSS
+// fraction by hand (CSS can't be `import`ed from), only so `usableHeight` below matches what
+// actually renders.
 const ROW_GAP_FRACTION = 1 / 1300
-const WAITING_PADDING_FRACTION = 20 / 1300
 
 // Cell chrome as a fraction of the row's font basis — matches `.cbr-cell`'s `margin` (0.375em) and
 // `border` (0.125em) in CobraBoard.css. Used only to estimate, per row, how much width that chrome
@@ -248,33 +249,7 @@ export function CobraBoard({box}: ElementProps) {
         [rows, shares, usableHeight, box.w]
     )
 
-    // The waiting message has no row to size against, so it's treated as one virtual row spanning
-    // the whole box: the tallest a real row is ever allowed to be (MAX_ROW_SHARE) by one cell wide,
-    // less the message's own padding (see WAITING_PADDING_FRACTION above).
-    const waitingBasis = useMemo(() => {
-        const rowPx     = MAX_ROW_SHARE * box.h
-        const paddingPx = box.h * WAITING_PADDING_FRACTION
-        const cellPx    = Math.max(0, box.w - 2 * paddingPx)
-        return Math.min(rowPx * K_H, cellPx * K_W)
-    }, [box.h, box.w])
-
-    if (!stream) {
-        return (
-            <div className="cbr-root"
-                 style={{'--cbr-box-h': `${box.h}px`, '--cbr-font': `${waitingBasis.toFixed(2)}px`} as React.CSSProperties}>
-                <span className="cbr-waiting">No active stream</span>
-            </div>
-        )
-    }
-
-    if (!stream.active_break_id) {
-        return (
-            <div className="cbr-root"
-                 style={{'--cbr-box-h': `${box.h}px`, '--cbr-font': `${waitingBasis.toFixed(2)}px`} as React.CSSProperties}>
-                <span className="cbr-waiting">No active break</span>
-            </div>
-        )
-    }
+    if (!stream?.active_break_id) return null
 
     return (
         <div className="cbr-root" style={{'--cbr-box-h': `${box.h}px`} as React.CSSProperties}>
@@ -282,8 +257,7 @@ export function CobraBoard({box}: ElementProps) {
                 <div key={ri}
                      className={`cbr-row cbr-row--${tiers[ri]}`}
                      style={{
-                         flex: `${weights[ri]} 1 0%`,
-                         maxHeight: `${(shares[ri] * box.h).toFixed(2)}px`,
+                         height: `${(shares[ri] * usableHeight).toFixed(2)}px`,
                          '--cbr-font': `${fontBases[ri].toFixed(2)}px`,
                      } as React.CSSProperties}>
                     {row.map((cell) => {
