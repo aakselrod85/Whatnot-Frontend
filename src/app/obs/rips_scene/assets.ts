@@ -39,11 +39,11 @@ export const SKY_CLOUD_ASSETS: RipsAsset[] = [
 ]
 
 // Videos are kept out of RIPS_ASSETS on purpose: the layout page preloads every `preload` URL that
-// is not a font through an Image(), which cannot decode a video. FireInTheVase is VP9 with an alpha
-// channel, so its background stays transparent. FlagIdle is the podium flag (VP9 + alpha too), a
+// is not a font through an Image(), which cannot decode a video. FireStilish is VP9 with an alpha
+// channel, so its background stays transparent (a ~3.8 s loop at 30 fps). FlagIdle is the podium flag (VP9 + alpha too), a
 // seamless ~4.7 s idle loop; the rod sits in roughly its top 140 px (RipsScene.tsx's FLAG_PIN).
 export const RIPS_VIDEOS = {
-    fire: { src: '/videos/rips_scene/FireInTheVase.webm', w: 1348, h: 827 },
+    fire: { src: '/videos/rips_scene/FireStilish.webm', w: 601, h: 600 },
     flag: { src: '/videos/rips_scene/FlagIdle.webm', w: 322, h: 601 },
 } satisfies Record<string, RipsAsset>
 

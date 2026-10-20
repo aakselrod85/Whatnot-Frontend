@@ -157,7 +157,7 @@ export const DEFAULT_RIPS_RECIPE: RipsSceneRecipe = {
         // Native video width; placed so the rod lands roughly on the pedestal's bracket.
         flag: { enabled: true, x: 260, y: -90, width: 322, rotation: 0 },
         // Rough first fit: centred over the vase, its bottom sunk into the vase's mouth.
-        fire: { enabled: true, x: -15, y: -380, width: 300, rotation: 0, speed: 1 },
+        fire: { enabled: true, x: 15, y: -385, width: 240, rotation: 0, speed: 1 },
         vase: { enabled: true, x: 30, y: -246, width: 211, rotation: 0 },
     },
 }
