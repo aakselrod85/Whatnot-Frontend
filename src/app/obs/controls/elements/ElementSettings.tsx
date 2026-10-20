@@ -10,6 +10,7 @@
 // makes a missing id a compile error instead — every id must appear, `null` where there is
 // deliberately no panel.
 
+import type {WNBreak} from '@/app/entity/entities'
 import type {ReactElement} from 'react'
 import type {RegistryId} from '@/app/obs/layout/registry'
 import type {DurableCue, Element, LayoutConfig, Phase, TransientCue} from '@/app/obs/layout/schema'
@@ -43,6 +44,8 @@ type Props = {
     registryId: RegistryId
     channelId: number
     seriesId?: number | null
+    activeBreak?: WNBreak | null
+    onBreakRefresh?: () => unknown
     elementKey: string
     element: Element
     currentPhase: Phase
@@ -146,12 +149,14 @@ const SETTINGS_PANELS = {
             onFireCue={onFireCue}
         />
     ),
-    priceSign: ({elementKey, element, onPatchElement, seriesId, onFireCue}) => (
+    priceSign: ({elementKey, element, onPatchElement, seriesId, activeBreak, onBreakRefresh, onFireCue}) => (
         <PriceSignSettings
             elementKey={elementKey}
             element={element}
             onPatchElement={onPatchElement}
             seriesId={seriesId}
+            activeBreak={activeBreak}
+            onBreakRefresh={onBreakRefresh}
             onFireCue={onFireCue}
         />
     ),

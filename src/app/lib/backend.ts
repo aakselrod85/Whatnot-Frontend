@@ -60,6 +60,12 @@ export function getEndpoints()  {
         series_price_ranges_create: "/api/series/price_ranges/create",
         series_price_ranges_update: "/api/series/price_ranges/update",
         series_price_ranges_delete: "/api/series/price_ranges/delete",
+        series_price_ranges_reorder: "/api/series/price_ranges/reorder",
+
+        // price-ranges-v2-plan.md §0.3 — channel-scoped ordered lists of series.
+        series_preset_list:   "/api/series/preset/list",
+        series_preset_create: "/api/series/preset/create",
+        series_preset_delete: "/api/series/preset/delete",
 
         photo_list:            "/api/photo/list",
         photo_delete:          "/api/photo/delete",

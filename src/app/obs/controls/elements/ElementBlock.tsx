@@ -4,6 +4,7 @@
 // (see obs-layout-plan.md §1.6/§1.7, now folded into the controls page). Replaces the table row
 // this element used to be in the old channel/[id]/widgets LayoutBuilder.
 
+import type {WNBreak} from '@/app/entity/entities'
 import type {Box, DurableCue, Element, LayoutConfig, PlacementKey, Phase, TransientCue} from '@/app/obs/layout/schema'
 import type {MyOBSWebsocket} from '@/app/entity/my_obs_websocket'
 import {MIRRORABLE_KINDS} from '@/app/obs/layout/schema'
@@ -36,6 +37,8 @@ type Props = {
     currentPhase: Phase
     channelId: number
     seriesId?: number | null
+    activeBreak?: WNBreak | null
+    onBreakRefresh?: () => unknown
     config: LayoutConfig
     onSetPlacement: SetPlacement
     onSetPersistent: SetPersistent
@@ -68,6 +71,8 @@ export default function ElementBlock({
     currentPhase,
     channelId,
     seriesId,
+    activeBreak,
+    onBreakRefresh,
     config,
     onSetPlacement,
     onSetPersistent,
@@ -465,6 +470,8 @@ export default function ElementBlock({
                                 registryId={regId}
                                 channelId={channelId}
                                 seriesId={seriesId}
+                                activeBreak={activeBreak}
+                                onBreakRefresh={onBreakRefresh}
                                 elementKey={elementKey}
                                 element={element}
                                 currentPhase={currentPhase}

@@ -2,7 +2,7 @@
 
 // The `priceSign` registry component (obs-price-sign-plan.md v2) — a stone pedestal at the bottom
 // of the box with one stone tablo per price range stacked above it, growing upward. Same data as
-// `priceRanges` (../price-ranges/PriceRangesElement.tsx); `formatRange` is COPIED from there.
+// `priceRanges` (../price-ranges/PriceRangesElement.tsx); `rangeLabel` comes from lib/priceRange.ts.
 //
 // Renders nothing unless the current series is a `price_ranges` series with at least one range.
 // Geometry: all px from `box`, anchored at the box's bottom centre; the stack may rise above the
@@ -11,11 +11,8 @@
 import type { ElementProps } from '../../registry'
 import { useLayoutData } from '../../useLayoutData'
 import { SIGN_ASSETS, TABLO_BADGE, TABLO_LABEL, TABLO_WIDTH_RATIO } from './assets'
+import { rangeLabel } from '@/app/lib/priceRange'
 import './PriceSignElement.css'
-
-function formatRange(priceFrom: number, priceTo: number | null): string {
-    return priceTo === null ? `$${priceFrom}+` : `$${priceFrom}–$${priceTo}`
-}
 
 export function PriceSignElement({ box, element }: ElementProps) {
     const { series, seriesPriceRanges } = useLayoutData()
@@ -62,7 +59,7 @@ export function PriceSignElement({ box, element }: ElementProps) {
                                 height: tabloH,
                             }}
                         >
-                            {formatRange(r.price_from, r.price_to)}
+                            {rangeLabel(r)}
                         </span>
                         <span
                             className="psn-count"

@@ -76,6 +76,16 @@ export interface SeriesPriceRange {
     price_from: number
     price_to: number | null
     count: number
+    label: string
+    sort_order: number
+}
+
+export interface SeriesPreset {
+    id: number
+    channel_id: number
+    name: string
+    series_ids: number[]
+    created_at: string
 }
 
 export interface SeriesWithCount extends Series {

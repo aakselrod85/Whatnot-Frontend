@@ -8,7 +8,7 @@
 
 import {useEffect, useState} from 'react'
 import {getEndpoints, post} from '@/app/lib/backend'
-import type {Series} from '@/app/entity/entities'
+import type {Series, WNBreak} from '@/app/entity/entities'
 import type {DurableCue, Element} from '@/app/obs/layout/schema'
 import SeriesPriceRangesEditor from '@/app/component/seriesPriceRangesEditor'
 import {useSettingWrite} from './useSettingWrite'
@@ -19,12 +19,16 @@ type Props = {
     element: Element
     onPatchElement: PatchElement
     seriesId?: number | null
+    // price-ranges-v2-plan.md §B.5 — the active break and a refetch of it after the panel changes
+    // the break's series.
+    activeBreak?: WNBreak | null
+    onBreakRefresh?: () => unknown
     onFireCue?: (cue: DurableCue) => void
 }
 
-export default function PriceSignSettings({elementKey, element, onPatchElement, seriesId, onFireCue}: Props) {
+export default function PriceSignSettings({elementKey, element, onPatchElement, seriesId, activeBreak, onBreakRefresh, onFireCue}: Props) {
     const [series, setSeries] = useState<Series | null>(null)
-    const {save: writeSetting} = useSettingWrite(onFireCue)
+    const {save: writeSetting, saving} = useSettingWrite(onFireCue)
 
     useEffect(() => {
         if (!seriesId) {
@@ -38,8 +42,43 @@ export default function PriceSignSettings({elementKey, element, onPatchElement, 
     const ps = element.kind === 'priceSign' ? element : null
     const fontScale = ps?.fontScale ?? 1
 
+    // Both series-backed spine sources must refetch after the break's series changes.
+    function fireSeriesCues() {
+        onFireCue?.({kind: 'refetch', key: 'seriesPriceRanges'})
+    }
+
+    async function createSeries() {
+        if (!activeBreak) return
+        const r = await writeSetting('series', async () => {
+            const created = await post(getEndpoints().series_create, {
+                name: activeBreak.name, total_cards: 0, default_price: '0', kind: 'price_ranges',
+            })
+            if (!created || 'error' in created) return {error: true}
+            return post(getEndpoints().break_set_series, {break_id: activeBreak.id, series_id: created.id})
+        })
+        if (r.ok) {
+            await onBreakRefresh?.()
+            fireSeriesCues()
+        }
+    }
+
+    async function deleteSeries() {
+        if (!activeBreak || !seriesId) return
+        if (!window.confirm(`Delete series "${series?.name ?? seriesId}"?`)) return
+        const r = await writeSetting('series', async () => {
+            const detached = await post(getEndpoints().break_set_series, {break_id: activeBreak.id, series_id: null})
+            if (!detached || 'error' in detached) return {error: true}
+            return post(getEndpoints().series_delete, {id: seriesId})
+        })
+        if (r.ok) {
+            await onBreakRefresh?.()
+            fireSeriesCues()
+        }
+    }
+
     const elementInputs = (
         <div className="d-flex flex-column gap-2">
+            <h6 className="mb-0">{activeBreak ? activeBreak.name : 'No active break'}</h6>
             <div>
                 <label className="form-label mb-0 small">Font scale</label>
                 <input
@@ -60,16 +99,29 @@ export default function PriceSignSettings({elementKey, element, onPatchElement, 
         </div>
     )
 
-    if (!seriesId) {
+    if (!activeBreak) {
         return (
             <div className="d-flex flex-column gap-2">
                 {elementInputs}
-                <div className="text-secondary small">No active series on the current break.</div>
             </div>
         )
     }
 
-    if (!series) {
+    if (!seriesId) {
+        return (
+            <div className="d-flex flex-column gap-2">
+                {elementInputs}
+                <div className="text-secondary small">No series on this break.</div>
+                <div>
+                    <button className="btn btn-sm btn-primary" disabled={saving} onClick={createSeries}>
+                        Create price-ranges series
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    if (!series || series.id !== seriesId) {
         return (
             <div className="d-flex flex-column gap-2">
                 {elementInputs}
@@ -82,9 +134,19 @@ export default function PriceSignSettings({elementKey, element, onPatchElement, 
         return (
             <div className="d-flex flex-column gap-2">
                 {elementInputs}
-                <div className="text-secondary small">
-                    This break&apos;s series is a cards series — price ranges are only editable
-                    under a price-ranges series.
+                <div className="text-secondary small">This break uses a cards series ({series.name})</div>
+                <div>
+                    <button
+                        className="btn btn-sm btn-warning"
+                        disabled={saving}
+                        onClick={() => {
+                            if (window.confirm(`Replace cards series "${series.name}" on this break with a new price-ranges series?`)) {
+                                void createSeries()
+                            }
+                        }}
+                    >
+                        Replace with price-ranges series
+                    </button>
                 </div>
             </div>
         )
@@ -93,6 +155,10 @@ export default function PriceSignSettings({elementKey, element, onPatchElement, 
     return (
         <div className="d-flex flex-column gap-2">
             {elementInputs}
+            <div className="d-flex align-items-center gap-2">
+                <span className="text-secondary small">{series.name}</span>
+                <button className="btn btn-sm btn-danger" disabled={saving} onClick={deleteSeries}>Delete series</button>
+            </div>
             <SeriesPriceRangesEditor
                 seriesId={seriesId}
                 // useSettingWrite returns {ok, data} rather than the raw response; the editor decides

@@ -1,6 +1,6 @@
 'use client'
 
-import React, {useEffect, useRef, useState} from 'react'
+import React, {useCallback, useEffect, useRef, useState} from 'react'
 import {getEndpoints, post} from '@/app/lib/backend'
 import {WNBreak} from '@/app/entity/entities'
 import {useChannel} from '@/app/hooks/useChannel'
@@ -126,21 +126,24 @@ export default function Page({params}: { params: { id: string } }) {
         return () => { transitionCancelRef.current?.() }
     }, [])
 
+    const activeBreakId = stream?.active_break_id
+    const refetchBreak = useCallback(() => {
+        if (!activeBreakId) return Promise.resolve()
+        return post(getEndpoints().break_get, {id: activeBreakId}).then((b: WNBreak) => setBreakObj(b))
+    }, [activeBreakId])
+    const fetchBreak = refetchBreak
+
     useEffect(() => {
         if (!stream?.active_break_id) {
             setBreakObj(null)
             return
-        }
-        const breakId = stream.active_break_id
-        function fetchBreak() {
-            post(getEndpoints().break_get, {id: breakId}).then((b: WNBreak) => setBreakObj(b))
         }
         fetchBreak()
         // 10s, matching the boards: `breakObj.series_id` is what every series-scoped settings
         // panel keys off, so a stale break shows the operator the previous break's settings.
         const id = setInterval(fetchBreak, 10000)
         return () => clearInterval(id)
-    }, [stream?.active_break_id])
+    }, [stream?.active_break_id, fetchBreak])
 
     useEffect(() => {
         function handler(e: BeforeUnloadEvent) {
@@ -699,6 +702,8 @@ export default function Page({params}: { params: { id: string } }) {
                     controls={controls}
                     channelId={channelId}
                     seriesId={breakObj?.series_id}
+                    activeBreak={breakObj}
+                    onBreakRefresh={refetchBreak}
                     onPushResult={reportPush}
                     obs={obs}
                     isConnected={isConnected}
