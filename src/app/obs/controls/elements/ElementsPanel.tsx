@@ -4,6 +4,7 @@
 // LayoutBuilder tab — see obs-layout-plan.md §1.6/§1.7). Owns add/remove/undo/redo/reset for
 // config.elements and auto-saves every change through controls.pushConfig().
 
+import type {WNBreak} from '@/app/entity/entities'
 import {useEffect, useRef, useState} from 'react'
 import type {Box, DurableCue, Element, LayoutConfig, PlacementKey} from '@/app/obs/layout/schema'
 import {MIRRORABLE_KINDS} from '@/app/obs/layout/schema'
@@ -35,6 +36,9 @@ type Props = {
     controls: Controls
     channelId: number
     seriesId?: number | null
+    // price-ranges-v2-plan.md §B.4 — forwarded to PriceSignSettings only.
+    activeBreak?: WNBreak | null
+    onBreakRefresh?: () => unknown
     /** Reports every save so the page can raise its notice — see doPush(). */
     onPushResult?: (result: {error?: string; warning?: string}) => void
     // Forwarded straight into every ElementBlock/ElementSettings (obs-camera-shelf-plan.md §7).
@@ -44,7 +48,7 @@ type Props = {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
-export default function ElementsPanel({controls, channelId, seriesId, onPushResult, obs, isConnected}: Props) {
+export default function ElementsPanel({controls, channelId, seriesId, activeBreak, onBreakRefresh, onPushResult, obs, isConnected}: Props) {
     const {config, setConfigLocal, pushConfig, apply, state, emitCue, emitDraft} = controls
     const currentPhase = state.phase
 
@@ -609,6 +613,8 @@ export default function ElementsPanel({controls, channelId, seriesId, onPushResu
                         currentPhase={currentPhase}
                         channelId={channelId}
                         seriesId={seriesId}
+                        activeBreak={activeBreak}
+                        onBreakRefresh={onBreakRefresh}
                         config={config}
                         onSetPlacement={setPlacement}
                         onSetPersistent={setPersistent}

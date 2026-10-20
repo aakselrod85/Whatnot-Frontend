@@ -7,13 +7,14 @@
 // write is wrapped: the admin page lets it run bare, the controls panel routes it through
 // useSettingWrite() (via the `onWrite` prop) so a save also pushes an immediate spine refetch.
 //
-// One row per price band, ordered by `price_from` ascending (server-authoritative — see
-// series-price-ranges-plan.md §1.2). An empty "To" input means open-ended and is sent as `null`;
+// One row per price band, in the server's explicit `sort_order` (↑/↓ buttons call the reorder
+// endpoint; price-ranges-v2-plan.md §0.1). An empty "To" input means open-ended and is sent as `null`;
 // it renders as "$500+" everywhere else in the product (OBS render, totals).
 
 import {useEffect, useState} from 'react'
 import {getEndpoints, post} from '@/app/lib/backend'
 import {SeriesPriceRange} from '@/app/entity/entities'
+import {rangeLabel} from '@/app/lib/priceRange'
 
 type Props = {
     seriesId: number
@@ -26,6 +27,7 @@ type RowDraft = {
     priceFrom: string
     priceTo: string
     count: string
+    label: string
 }
 
 function draftFromRange(r: SeriesPriceRange): RowDraft {
@@ -33,11 +35,8 @@ function draftFromRange(r: SeriesPriceRange): RowDraft {
         priceFrom: String(r.price_from),
         priceTo: r.price_to === null ? '' : String(r.price_to),
         count: String(r.count),
+        label: r.label ?? '',
     }
-}
-
-function formatRange(priceFrom: number, priceTo: number | null): string {
-    return priceTo === null ? `$${priceFrom}+` : `$${priceFrom}–$${priceTo}`
 }
 
 function isErrorResponse(v: unknown): boolean {
@@ -49,7 +48,7 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
     const [loading, setLoading] = useState(true)
     const [drafts, setDrafts] = useState<Record<number, RowDraft>>({})
     const [savingId, setSavingId] = useState<number | null>(null)
-    const [addDraft, setAddDraft] = useState<RowDraft>({priceFrom: '', priceTo: '', count: ''})
+    const [addDraft, setAddDraft] = useState<RowDraft>({priceFrom: '', priceTo: '', count: '', label: ''})
     const [adding, setAdding] = useState(false)
 
     function fetchRanges() {
@@ -89,8 +88,20 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
             price_from: priceFrom,
             price_to: priceTo,
             count,
+            label: draft.label,
         }))
         setSavingId(null)
+        if (!isErrorResponse(resp)) {
+            await fetchRanges()
+        }
+    }
+
+    async function moveRow(index: number, delta: number) {
+        const ids = ranges.map((r) => r.id)
+        const target = index + delta
+        if (target < 0 || target >= ids.length) return
+        ;[ids[index], ids[target]] = [ids[target], ids[index]]
+        const resp = await runWrite(() => post(getEndpoints().series_price_ranges_reorder, {series_id: seriesId, ids}))
         if (!isErrorResponse(resp)) {
             await fetchRanges()
         }
@@ -115,10 +126,11 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
             price_from: priceFrom,
             price_to: priceTo,
             count,
+            label: addDraft.label,
         }))
         setAdding(false)
         if (!isErrorResponse(resp)) {
-            setAddDraft({priceFrom: '', priceTo: '', count: ''})
+            setAddDraft({priceFrom: '', priceTo: '', count: '', label: ''})
             await fetchRanges()
         }
     }
@@ -134,18 +146,23 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
             <table className="table table-sm table-dark align-middle" style={{maxWidth: '560px'}}>
                 <thead>
                     <tr>
+                        <th></th>
                         <th>From</th>
                         <th>To</th>
+                        <th>Label</th>
                         <th>Count</th>
-                        <th></th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    {ranges.map((r) => {
+                    {ranges.map((r, i) => {
                         const draft = drafts[r.id] ?? draftFromRange(r)
                         return (
                             <tr key={r.id}>
+                                <td className="text-nowrap">
+                                    <button className="btn btn-sm btn-outline-secondary me-1" disabled={i === 0} onClick={() => moveRow(i, -1)}>↑</button>
+                                    <button className="btn btn-sm btn-outline-secondary" disabled={i === ranges.length - 1} onClick={() => moveRow(i, 1)}>↓</button>
+                                </td>
                                 <td>
                                     <input
                                         type="number"
@@ -167,15 +184,22 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
                                 </td>
                                 <td>
                                     <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        style={{width: '120px'}}
+                                        placeholder={rangeLabel({...r, label: ''})}
+                                        value={draft.label}
+                                        onChange={(e) => updateDraft(r.id, {label: e.target.value})}
+                                    />
+                                </td>
+                                <td>
+                                    <input
                                         type="number"
                                         className="form-control form-control-sm"
                                         style={{width: '80px'}}
                                         value={draft.count}
                                         onChange={(e) => updateDraft(r.id, {count: e.target.value})}
                                     />
-                                </td>
-                                <td className="text-secondary small text-nowrap">
-                                    {formatRange(r.price_from, r.price_to)}
                                 </td>
                                 <td className="text-nowrap">
                                     <button
@@ -193,9 +217,10 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
                         )
                     })}
                     {ranges.length === 0 && (
-                        <tr><td colSpan={5} className="text-secondary">No ranges yet.</td></tr>
+                        <tr><td colSpan={6} className="text-secondary">No ranges yet.</td></tr>
                     )}
                     <tr>
+                        <td></td>
                         <td>
                             <input
                                 type="number"
@@ -218,6 +243,16 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
                         </td>
                         <td>
                             <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                style={{width: '120px'}}
+                                placeholder="Label"
+                                value={addDraft.label}
+                                onChange={(e) => setAddDraft((d) => ({...d, label: e.target.value}))}
+                            />
+                        </td>
+                        <td>
+                            <input
                                 type="number"
                                 className="form-control form-control-sm"
                                 style={{width: '80px'}}
@@ -226,7 +261,6 @@ export default function SeriesPriceRangesEditor({seriesId, onWrite}: Props) {
                                 onChange={(e) => setAddDraft((d) => ({...d, count: e.target.value}))}
                             />
                         </td>
-                        <td></td>
                         <td>
                             <button className="btn btn-sm btn-primary" disabled={adding} onClick={addRow}>
                                 {adding ? 'Adding…' : 'Add range'}

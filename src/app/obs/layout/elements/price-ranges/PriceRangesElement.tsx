@@ -22,9 +22,7 @@ import './PriceRangesElement.css'
 export const DEFAULT_LABEL_FONT_SIZE = 44
 export const DEFAULT_BADGE_FONT_SIZE = 40
 
-function formatRange(priceFrom: number, priceTo: number | null): string {
-    return priceTo === null ? `$${priceFrom}+` : `$${priceFrom}–$${priceTo}`
-}
+import {rangeLabel} from '@/app/lib/priceRange'
 
 export function PriceRangesElement({element}: ElementProps) {
     const {series, seriesPriceRanges} = useLayoutData()
@@ -41,7 +39,7 @@ export function PriceRangesElement({element}: ElementProps) {
             {seriesPriceRanges.map((r, i) => (
                 <div key={r.id} className={`prr-row${i > 0 ? ' prr-row-divider' : ''}`}>
                     <span className="prr-label" style={{fontSize: labelFontSize}}>
-                        {formatRange(r.price_from, r.price_to)}
+                        {rangeLabel(r)}
                     </span>
                     <span
                         className="prr-badge"
