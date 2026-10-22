@@ -31,7 +31,19 @@ import {styleForGroup} from '../board-flat/tiles/manifest'
 import {useManifest} from '../board-flat/tiles/useManifest'
 import {Group} from '../board-flat/tiles/types'
 import {RIPS_BOARD_ART, RIPS_BOARD_INSET} from './boardArt'
-import {DEFAULT_RIPS_TILE_SET, RIPS_TILE_SETS, RipsFlatCell, type RipsTileSet} from './RipsFlatCell'
+import {FlipArtOverlay} from './FlipArtOverlay'
+import {useFlipArt} from './useFlipArt'
+import {
+    DEFAULT_RIPS_BACK_STYLE,
+    DEFAULT_RIPS_TILE_SET,
+    FLIP_ART_FRAME_RATIO,
+    flipArtCover,
+    RIPS_BACK_STYLES,
+    RIPS_TILE_SETS,
+    RipsFlatCell,
+    type RipsBackStyle,
+    type RipsTileSet,
+} from './RipsFlatCell'
 import './RipsFlatBoard.css'
 
 // Every skin renders at this tier regardless of group size — same override as FlatBoard.tsx.
@@ -45,7 +57,13 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  * Integer-pixel layout (FlatBoard.tsx's useIntegerBoardLayout, with BASE_PAD replaced by the
  * backdrop's inset, given in art px and scaled with the stretched backdrop). Callback ref because the "No active stream / break" early returns mount a
  * different root before the real wrapper (same reason as useCobraFlatLayout).
+ *
+ * Returns the same numbers twice: `layoutVars` (CSS vars for the grid / AccentOverlay) and
+ * `metrics` (plain px) for the 'marble_auto' tile set, which needs each cell's position on the
+ * canvas to pick its piece of the marble sheet (RipsFlatCell.tsx `marbleOrigin`).
  */
+type RipsFlatMetrics = {cellPx: number; padLeft: number; padTop: number}
+
 function useRipsFlatLayout(rowCount: number) {
     const [wrapEl, setWrapEl] = useState<HTMLDivElement | null>(null)
     const [wrapSize, setWrapSize] = useState({w: 0, h: 0})
@@ -65,7 +83,7 @@ function useRipsFlatLayout(rowCount: number) {
     }, [wrapEl])
 
     const {w, h} = wrapSize
-    if (w === 0 || h === 0 || rowCount === 0) return {wrapRef: setWrapEl, layoutVars: null}
+    if (w === 0 || h === 0 || rowCount === 0) return {wrapRef: setWrapEl, layoutVars: null, metrics: null}
 
     const insetL = Math.round((w * RIPS_BOARD_INSET) / RIPS_BOARD_ART.w)
     const insetR = insetL
@@ -93,8 +111,9 @@ function useRipsFlatLayout(rowCount: number) {
         '--pad-top': `${padTop}px`,
         '--pad-bottom': `${padBottom}px`,
     } as React.CSSProperties
+    const metrics: RipsFlatMetrics = {cellPx, padLeft, padTop}
 
-    return {wrapRef: setWrapEl, layoutVars}
+    return {wrapRef: setWrapEl, layoutVars, metrics}
 }
 
 // The element's `tileSet` (set in /obs/controls) picks the front-face art; anything unknown falls
@@ -104,10 +123,18 @@ function tileSetOf(element: ElementProps['element']): RipsTileSet {
     return v && (RIPS_TILE_SETS as readonly string[]).includes(v) ? v : DEFAULT_RIPS_TILE_SET
 }
 
+// Same for `backStyle` (the back-face art, RipsFlatCell.tsx); independent of the tile set.
+function backStyleOf(element: ElementProps['element']): RipsBackStyle {
+    const v = element.kind === 'board' ? element.backStyle : undefined
+    return v && (RIPS_BACK_STYLES as readonly string[]).includes(v) ? v : DEFAULT_RIPS_BACK_STYLE
+}
+
 export function RipsFlatBoard({box, element}: ElementProps) {
     const {stream, events: rawEvents, series, priceRanges, teamPrices, lastFetched} = useLayoutData()
     const manifest = useManifest()
     const tileSet = tileSetOf(element)
+    const backStyle = backStyleOf(element)
+    const art = useFlipArt(backStyle === 'flip_art')
 
     // Cells whose sale effect (flip + press burst) has finished — only these join the shared
     // grouping, and the grid is not re-dealt while any sold cell is still outside this set.
@@ -196,7 +223,7 @@ export function RipsFlatBoard({box, element}: ElementProps) {
     const rowSizes = useMemo(() => splitRows(events.length), [events.length])
     const rowCount = rowSizes.length
     const placed = useMemo(() => layoutCells(dealtCells), [dealtCells])
-    const {wrapRef, layoutVars} = useRipsFlatLayout(rowCount)
+    const {wrapRef, layoutVars, metrics} = useRipsFlatLayout(rowCount)
 
     const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events])
 
@@ -252,9 +279,19 @@ export function RipsFlatBoard({box, element}: ElementProps) {
         )
     }
 
+    // 'flip_art' back: the painting in cover over the whole MAX_COLS x rowCount grid (its top-left
+    // is cell (0,0)'s, i.e. (padLeft, padTop) inside the element), and the exposed-side frame's
+    // thickness in whole px. Both only exist in that mode so the 'tiles' markup stays as it was.
+    // The painting is the page's random pick (useFlipArt); until it is known the backs are frame only.
+    const flipArt = backStyle === 'flip_art'
+    const artCover = flipArt && metrics && art
+        ? {src: art.src, ...flipArtCover(art.w, art.h, MAX_COLS * metrics.cellPx, rowCount * metrics.cellPx)}
+        : null
+    const artVars = (flipArt && metrics ? {'--art-frame-px': `${Math.round(metrics.cellPx * FLIP_ART_FRAME_RATIO)}px`} : {}) as React.CSSProperties
+
     return (
-        <div className="rfb-root" ref={wrapRef} style={{...(layoutVars ?? {}), '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
-            {layoutVars && (
+        <div className="rfb-root" ref={wrapRef} style={{...(layoutVars ?? {}), ...artVars, '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
+            {layoutVars && metrics && (
                 <>
                     <div className="rfb-grid">
                         {items.map((it) => {
@@ -265,6 +302,13 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                             if (!group && e.customer !== '') {
                                 group = {r0: it.row, c0: it.col, r1: it.row, c1: it.col, cells: 1, tier: 1, key: `solo-${e.id}`}
                             }
+                            // Where this cell's top-left lands on the 1080x1920 canvas: the element's
+                            // box plus the grid padding plus whole cells (inside the element 1 CSS px
+                            // is 1 canvas px — Stage.tsx scales the canvas as a whole). Only the
+                            // 'marble_auto' set reads it.
+                            const marbleOrigin = tileSet === 'marble_auto'
+                                ? {x: box.x + metrics.padLeft + it.col * metrics.cellPx, y: box.y + metrics.padTop + it.row * metrics.cellPx}
+                                : undefined
                             return (
                                 <RipsFlatCell
                                     key={e.id}
@@ -277,11 +321,22 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                                     onSettled={handleSettled}
                                     style={{gridRow: it.row + 1, gridColumn: it.col + 1}}
                                     tileSet={tileSet}
+                                    marbleOrigin={marbleOrigin}
+                                    backStyle={backStyle}
+                                    // The sheet's top-left relative to THIS cell: the cover offset
+                                    // minus whole cells.
+                                    flipArt={artCover
+                                        ? {src: artCover.src, sheetW: artCover.sheetW, sheetH: artCover.sheetH, x: artCover.offsetX - it.col * metrics.cellPx, y: artCover.offsetY - it.row * metrics.cellPx}
+                                        : undefined}
                                 />
                             )
                         })}
                     </div>
-                    <AccentOverlay manifest={manifest} groups={groups} cols={MAX_COLS} rows={rowCount} />
+                    {/* The settled groups' backs, one box each; the grey skin's decorations have no
+                        place over the painting. */}
+                    {flipArt
+                        ? artCover && <FlipArtOverlay groups={groups} sheet={artCover} cellPx={metrics.cellPx} cols={MAX_COLS} rows={rowCount} />
+                        : <AccentOverlay manifest={manifest} groups={groups} cols={MAX_COLS} rows={rowCount} />}
                 </>
             )}
         </div>

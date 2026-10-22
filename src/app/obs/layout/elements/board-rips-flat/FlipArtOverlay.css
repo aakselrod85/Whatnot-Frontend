@@ -1,0 +1,21 @@
+/* Mirrors .rfb-grid's tracks and padding exactly (vars inherit from .rfb-root), like
+   AccentOverlay.css mirrors .flat-grid, so each group box lands on its cells. Same z-index as the
+   accent layer: above the static cells, below a flipping (100) or bursting (9999) one. */
+.rfb-art-layer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 11), var(--cell-px, 1fr));
+    grid-template-rows: repeat(var(--rows, 1), var(--cell-px, 1fr));
+    padding: var(--pad-top, 0) var(--pad-right, 0) var(--pad-bottom, 0) var(--pad-left, 0);
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 50;
+}
+
+/* .rfb-art-back is shared with the cell's own back (RipsFlatCell.css); as a grid item it needs
+   to be positioned normally, not absolutely. */
+.rfb-art-layer .rfb-art-back {
+    position: relative;
+    inset: auto;
+}
