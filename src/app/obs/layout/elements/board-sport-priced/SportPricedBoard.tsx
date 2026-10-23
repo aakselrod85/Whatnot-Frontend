@@ -8,8 +8,8 @@
 // Tiers come from the same `assignTiers` call (and the same channel-wide thresholds and series
 // default price) as board:cobra/cobra_flat/sport_style, so a team lands on the same tier everywhere.
 // God/Giant/Chaser wear gold/silver/copper (priceMaterials.ts) with their price left rounded up to
-// $25 — cobra's own display price; Side Cards keep the team colour and show the series default
-// price shortened to its floor ("$50-$149" → "$50+").
+// $25 — cobra's own display price; Side Cards are one plain chalk for every team and show the series
+// default price shortened to its floor ("$50-$149" → "$50+").
 //
 // Geometry: the operator sets the box WIDTH, `cols`, `ballCols` and `cellAspect` (tile width ÷
 // height); the cell size, row count and field height are derived, the field is vertically centred
@@ -32,7 +32,7 @@ import type {Event} from '@/app/entity/entities'
 import {TeamIconSrc} from '@/app/common/teams'
 import {getSpotAbbreviation} from '@/app/common/spot_label'
 import {renderTurf} from '@/app/obs/sport_style/turfTexture'
-import {mix, resolveStitch, type RGB} from '@/app/obs/sport_style/patchColors'
+import {mix, type RGB} from '@/app/obs/sport_style/patchColors'
 import {hasLogo, useTeamPalette} from '@/app/obs/sport_style/teamPalette'
 import {DEFAULT_PATCH, DEFAULT_TURF} from '@/app/obs/sport_style/fieldConstants'
 import PricePatchCell, {tileMetrics} from '@/app/obs/sport_style/PricePatchCell'
@@ -58,7 +58,6 @@ const BALL_SRC = '/images/sport_style/ball.png'
 // constant as SportStyleBoard.tsx; the file is 2:1.
 const BALL_ART_FILL = 1592 / 1774
 const FALLBACK_BACKGROUND: RGB = [40, 40, 40]
-const FALLBACK_EDGE: RGB = [230, 230, 230]
 // Price font em-width per character (Teko 600 digits/$/+ are ~0.42em) with a little slack, used to
 // fit the longest price on the board into a tile's price room.
 const PRICE_EM_PER_CHAR = 0.46
@@ -102,24 +101,17 @@ function PricedCell({event, x, y, w, h, tier, price, priceFontPx}: CellProps) {
     const background = palette
         ? (DEFAULT_PATCH.mixEnabled ? mix(palette.background, palette.secondary, DEFAULT_PATCH.mixRatio) : palette.background)
         : FALLBACK_BACKGROUND
-    const edge = palette
-        ? resolveStitch(DEFAULT_PATCH.stitchMode, palette.candidates, background, {
-              minContrast: DEFAULT_PATCH.stitchMinContrast,
-              minLuminance: DEFAULT_PATCH.stitchMinLuminance,
-          })
-        : FALLBACK_EDGE
     return (
         <div className="spp-cell" style={{left: x, top: y, width: w, height: h}}>
             <PricePatchCell
                 w={w}
                 h={h}
                 background={background}
-                edge={edge}
                 logoSrc={withLogo ? TeamIconSrc(event.team) : ''}
                 label={withLogo ? undefined : getSpotAbbreviation(event.team)}
                 price={price}
                 priceFontPx={priceFontPx}
-                material={tier === 'regular' ? undefined : TIER_MATERIALS[tier]}
+                material={TIER_MATERIALS[tier]}
                 sold={sold}
             />
         </div>

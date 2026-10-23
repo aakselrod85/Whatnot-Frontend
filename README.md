@@ -103,7 +103,7 @@ A recipe saved before this change has no wind value and uses `1`.
 The football-field board with a price on every tile, for the priced sports stream (the stream that uses `board:cobra` today). It is a new board: `board:cobra` and `board:sport_style` are unchanged.
 
 - **Tiles:** team logo + price, centred together. The logo has a hard black outline so it survives stream compression.
-- **Tiers:** God = gold, Giant = silver, Chaser = copper, Side Card = the team's own colour. Tiers, prices and thresholds are the same as on `board:cobra` (same price ranges, same series default price). Paid tiers show the price left, rounded up to $25; Side Cards show the default price's floor (`$50-$149` → `$50+`).
+- **Tiers:** God = gold, Giant = silver, Chaser = copper, Side Card = one plain chalk colour, the same for every team. Each tile is split by a solid divider into a logo section (left, same width on every tile) and a price section. Tiers, prices and thresholds are the same as on `board:cobra` (same price ranges, same series default price). Paid tiers show the price left, rounded up to $25; Side Cards show the default price's floor (`$50-$149` → `$50+`).
 - **Layout:** the football sits in the middle of the centre row with a "50" either side. The most valuable teams sit next to it; Side Cards and sold teams go to the edges. A sale re-deals the board.
 - **Stream-safe:** solid tile edges and field lines only, no dashed stitching or fine textures.
 

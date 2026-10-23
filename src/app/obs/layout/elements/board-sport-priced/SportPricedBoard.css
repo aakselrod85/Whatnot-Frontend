@@ -81,14 +81,22 @@
     pointer-events: none;
 }
 
-/* Logo + price as one centred group: the gap between them is the same on every tile and the
-   leftover width splits evenly on both sides. */
-.spp-row {
+/* The two sections (logo | price): each centres its content; left/width come from tileMetrics. */
+.spp-sec {
     position: absolute;
-    inset: 0;
+    top: 0;
+    bottom: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Tint behind the logo section; the tile's radius clips its outer corners. */
+.spp-panel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
 }
 
 .spp-logo,
