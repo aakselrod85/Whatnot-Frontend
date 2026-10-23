@@ -659,3 +659,9 @@ export function LayoutDataProvider({
 
     return <LayoutDataContext.Provider value={value}>{children}</LayoutDataContext.Provider>
 }
+
+/** A fixed `LayoutData`, no polling — for /obs/setup/* playgrounds that render a real layout
+ *  element against mock data (e.g. /obs/setup/sport_priced). Never used by the OBS layout page. */
+export function StaticLayoutDataProvider({value, children}: {value: LayoutData; children: ReactNode}) {
+    return <LayoutDataContext.Provider value={value}>{children}</LayoutDataContext.Provider>
+}

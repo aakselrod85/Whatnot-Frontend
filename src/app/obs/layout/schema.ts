@@ -98,7 +98,7 @@ export type HitStep =
 
 export const HIT_STEP_KINDS = ['video', 'obs', 'reveal', 'ball', 'wait'] as const
 
-export const BOARD_VARIANTS = ['flat', 'classic', 'cobra', 'cobra_flat', 'rips_flat', 'sport_style'] as const
+export const BOARD_VARIANTS = ['flat', 'classic', 'cobra', 'cobra_flat', 'rips_flat', 'sport_style', 'sport_priced'] as const
 export type BoardVariant = (typeof BOARD_VARIANTS)[number]
 
 // `count` split into `boxesLeft`/`chasersLeft` (obs-layout-plan.md §2.7) — mirrors upstream commit
@@ -255,6 +255,11 @@ export type Element = (
           // 'gated': a cell that sells AFTER the mount baseline keeps rendering unsold until a
           // `reveal-sold` cue names its event id, or GATE_TIMEOUT_MS passes. Default 'immediate'.
           soldReveal?: 'immediate' | 'gated'
+          // board:sport_priced only (SportPricedBoard.tsx; `cols`/`margin`/`turf` above are shared
+          // with sport_style): how many cells of the MIDDLE row the football takes (0 = no ball,
+          // default 3), and the tile's width ÷ height (default 2).
+          ballCols?: number
+          cellAspect?: number
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions

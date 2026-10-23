@@ -569,6 +569,13 @@ function validateBoardKind({ key, rawEl, stages }: KindValidatorCtx): { errors: 
     if (rawEl.soldReveal !== undefined && rawEl.soldReveal !== 'immediate' && rawEl.soldReveal !== 'gated') {
         errors.push(`element "${key}": soldReveal must be "immediate" or "gated"`)
     }
+    // board:sport_priced's ball width and tile shape (read only by that variant).
+    if (rawEl.ballCols !== undefined && (!Number.isInteger(rawEl.ballCols) || (rawEl.ballCols as number) < 0 || (rawEl.ballCols as number) > 10)) {
+        errors.push(`element "${key}": ballCols must be an integer in [0, 10]`)
+    }
+    if (rawEl.cellAspect !== undefined && (!isFiniteNumber(rawEl.cellAspect) || rawEl.cellAspect < 1 || rawEl.cellAspect > 4)) {
+        errors.push(`element "${key}": cellAspect must be a number in [1, 4]`)
+    }
     return { errors, regId }
 }
 
