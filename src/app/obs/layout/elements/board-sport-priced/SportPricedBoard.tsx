@@ -20,6 +20,11 @@
 // line, a midfield line and the border. The turf recipe is the operator's (`turf` JSON, same blob
 // as sport_style); its stream-safe preset is the playground's.
 //
+// Shine (`shine`, default on): gold and silver tiles run their material's light sweep, gold also a
+// breathing halo. Delays are staggered from the ball outward — golds ripple one after another,
+// silvers are spread across their cycle so roughly one moves at a time — which keeps the motion
+// readable and the stream's bitrate steady.
+//
 // Anchors: `field`, `grid`, `ball` and the dynamic `cell:<eventId>` family, the same names
 // board:sport_style publishes, so an overlay aimed at one board can be aimed at this one.
 
@@ -91,10 +96,15 @@ type CellProps = {
     tier: Tier
     price: string
     priceFontPx: number
+    shine: boolean
+    shineDelayS: number
 }
 
+// Gold's breathing halo, on top of the tile's own static glow.
+const GOLD_HALO = '0 0 16px 4px rgba(255,214,120,0.6)'
+
 /** One tile, in its own component so `useTeamPalette` (a hook) runs once per event. */
-function PricedCell({event, x, y, w, h, tier, price, priceFontPx}: CellProps) {
+function PricedCell({event, x, y, w, h, tier, price, priceFontPx, shine, shineDelayS}: CellProps) {
     const withLogo = hasLogo(event.team)
     const palette = useTeamPalette(event.team)
     const sold = event.customer !== ''
@@ -103,6 +113,9 @@ function PricedCell({event, x, y, w, h, tier, price, priceFontPx}: CellProps) {
         : FALLBACK_BACKGROUND
     return (
         <div className="spp-cell" style={{left: x, top: y, width: w, height: h}}>
+            {shine && !sold && tier === 'best' && (
+                <div className="spp-halo" style={{borderRadius: tileMetrics(w, h).radius, boxShadow: GOLD_HALO}} />
+            )}
             <PricePatchCell
                 w={w}
                 h={h}
@@ -113,6 +126,8 @@ function PricedCell({event, x, y, w, h, tier, price, priceFontPx}: CellProps) {
                 priceFontPx={priceFontPx}
                 material={TIER_MATERIALS[tier]}
                 sold={sold}
+                shine={shine}
+                shineDelayS={shineDelayS}
             />
         </div>
     )
@@ -127,6 +142,7 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
     const rawAspect = boardElement?.cellAspect
     const aspect = typeof rawAspect === 'number' && Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : DEFAULT_CELL_ASPECT
     const margin = Math.max(0, boardElement?.margin ?? 0)
+    const shine = boardElement?.shine ?? true
     const turf = useMemo(
         () => ({...DEFAULT_TURF, ...(isPlainObject(boardElement?.turf) ? (boardElement?.turf as Partial<typeof DEFAULT_TURF>) : {})}),
         [boardElement?.turf]
@@ -180,11 +196,17 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
     const maxLen = placed.reduce((m, p) => (p.event.customer === '' ? Math.max(m, priceOf(p.event).length) : m), 4)
     const priceFontPx = Math.max(8, Math.floor(Math.min(tileH * 0.56, tileMetrics(tileW, tileH).priceRoom / (maxLen * PRICE_EM_PER_CHAR))))
 
-    const cells = placed.map((p) => ({
-        ...p,
-        x: gridLeft + p.seat.col * cellW + pad,
-        y: gridTop + p.seat.row * cellH + pad,
-    }))
+    // Shine stagger: `placed` runs from the ball outward, so the n-th tile of a tier is the n-th
+    // closest. Gold ripples (0.35s apart); silver spreads evenly over its cycle.
+    const tierCount = {best: 0, good: 0, mid: 0, regular: 0} as Record<Tier, number>
+    for (const p of placed) tierCount[p.tier]++
+    const tierSeen = {best: 0, good: 0, mid: 0, regular: 0} as Record<Tier, number>
+    const cells = placed.map((p) => {
+        const n = tierSeen[p.tier]++
+        const cycle = TIER_MATERIALS[p.tier].shine?.cycleS ?? 0
+        const shineDelayS = p.tier === 'best' ? n * 0.35 : cycle > 0 ? (n * cycle) / Math.max(1, tierCount[p.tier]) : 0
+        return {...p, shineDelayS: Math.round(shineDelayS * 100) / 100, x: gridLeft + p.seat.col * cellW + pad, y: gridTop + p.seat.row * cellH + pad}
+    })
 
     const ballSpan = grid.ballCols > 0
         ? {x: gridLeft + grid.ballStart * cellW, y: gridTop + grid.ballRow * cellH, w: grid.ballCols * cellW, h: cellH}
@@ -271,8 +293,8 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
                         <div key={`yd-${c}`} className="spp-yard" style={{left: gridLeft + c * cellW, top: ballSpan.y, width: cellW, height: cellH, fontSize: yardFont}}>50</div>
                     ))}
 
-                    {cells.map(({event, tier, x, y}) => (
-                        <PricedCell key={event.id} event={event} x={x} y={y} w={tileW} h={tileH} tier={tier} price={priceOf(event)} priceFontPx={priceFontPx} />
+                    {cells.map(({event, tier, x, y, shineDelayS}) => (
+                        <PricedCell key={event.id} event={event} x={x} y={y} w={tileW} h={tileH} tier={tier} price={priceOf(event)} priceFontPx={priceFontPx} shine={shine} shineDelayS={shineDelayS} />
                     ))}
 
                     {ballRect && (

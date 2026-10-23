@@ -576,6 +576,9 @@ function validateBoardKind({ key, rawEl, stages }: KindValidatorCtx): { errors: 
     if (rawEl.cellAspect !== undefined && (!isFiniteNumber(rawEl.cellAspect) || rawEl.cellAspect < 1 || rawEl.cellAspect > 4)) {
         errors.push(`element "${key}": cellAspect must be a number in [1, 4]`)
     }
+    if (rawEl.shine !== undefined && typeof rawEl.shine !== 'boolean') {
+        errors.push(`element "${key}": shine must be a boolean`)
+    }
     return { errors, regId }
 }
 

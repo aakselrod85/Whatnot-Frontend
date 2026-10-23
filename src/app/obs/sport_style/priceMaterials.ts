@@ -7,6 +7,11 @@
 // Stream-safe by construction: every surface is a broad gradient — no dashed stitch, no repeating
 // stripes, no dot/grain tiles (sub-4px patterns crawl and smear under the stream encoder). The edge
 // is one solid line.
+//
+// Brightness ranks with value: gold and silver are the brightest tiles on the board, copper sits
+// below them, and the Side Card chalk is dimmed so the paid tiers pop against it. Gold and silver
+// also carry a `shine` (PricePatchCell / SportPricedBoard.css): a soft light band crossing the
+// tile's background, gold more often and stronger, plus a slow breathing glow on gold.
 
 import type {RGB} from './patchColors'
 import type {Tier} from '@/app/obs/layout/elements/board-cobra/pricing'
@@ -29,32 +34,36 @@ export interface TierMaterial {
     panel: string
     // Outer glow + drop shadow.
     glow: string
+    // Light sweep across the background: which keyframe set (SportPricedBoard.css) and its cycle.
+    shine?: {kind: 'gold' | 'silver'; cycleS: number}
 }
 
 export const TIER_MATERIALS: Record<Tier, TierMaterial> = {
     // God — polished gold, dark engraved price.
     best: {
-        base: ['#fff3c4', '#ecc970', '#c99b3d', '#f6dc93', '#bf8f33', '#94691f'],
+        base: ['#fffadf', '#f8dc86', '#e0b44f', '#ffeaa8', '#d6a644', '#ad7e28'],
         sheen: 'linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.35) 44%, rgba(255,255,255,0) 58%)',
-        mid: [217, 173, 85],
+        mid: [236, 196, 104],
         edge: [92, 62, 10],
         ink: [36, 22, 2],
         inkHighlight: 'rgba(255,246,214,0.8)',
         ring: 'rgba(110,74,12,0.5)',
         panel: 'rgba(120,80,10,0.2)',
-        glow: '0 0 9px 1px rgba(255,208,110,0.55), 0 3px 6px rgba(0,0,0,0.55)',
+        glow: '0 0 12px 2px rgba(255,214,120,0.7), 0 3px 6px rgba(0,0,0,0.55)',
+        shine: {kind: 'gold', cycleS: 6},
     },
     // Giant — polished silver lit from the top, navy price.
     good: {
-        base: ['#ffffff', '#e4e8ee', '#aab1bc', '#f2f4f7', '#9ca3ae', '#757c87'],
+        base: ['#ffffff', '#eef1f5', '#bfc6d0', '#f9fafc', '#b2b9c3', '#8b929d'],
         sheen: 'linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 35%, rgba(0,0,0,0.08) 65%, rgba(255,255,255,0.18) 100%)',
-        mid: [200, 205, 213],
+        mid: [216, 221, 228],
         edge: [24, 40, 76],
         ink: [12, 22, 46],
         inkHighlight: 'rgba(255,255,255,0.85)',
         ring: 'rgba(70,78,92,0.45)',
         panel: 'rgba(40,52,80,0.14)',
-        glow: '0 0 6px rgba(220,236,255,0.35), 0 3px 6px rgba(0,0,0,0.55)',
+        glow: '0 0 8px 1px rgba(225,238,255,0.5), 0 3px 6px rgba(0,0,0,0.55)',
+        shine: {kind: 'silver', cycleS: 10},
     },
     // Chaser — matte copper leather, cream price. The red-brown keeps it off the turf green.
     mid: {
@@ -68,16 +77,17 @@ export const TIER_MATERIALS: Record<Tier, TierMaterial> = {
         panel: 'rgba(0,0,0,0.22)',
         glow: '0 3px 6px rgba(0,0,0,0.55)',
     },
-    // Side Card — flat warm chalk, same for every team. Warm and matte so it never reads as silver.
+    // Side Card — flat warm chalk, same for every team, dimmed so the paid tiers outshine it. Warm
+    // and matte so it never reads as silver.
     regular: {
-        base: ['#f1ebdd', '#e6dece', '#dcd2bf'],
-        sheen: 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(0,0,0,0) 60%)',
-        mid: [229, 221, 205],
+        base: ['#cfc7b6', '#c4bba8', '#b8ae9a'],
+        sheen: 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0) 60%)',
+        mid: [196, 187, 168],
         edge: [74, 66, 54],
         ink: [30, 27, 22],
-        inkHighlight: 'rgba(255,255,255,0.6)',
+        inkHighlight: 'rgba(255,255,255,0.35)',
         ring: 'rgba(60,50,35,0.14)',
         panel: 'rgba(70,58,38,0.1)',
-        glow: '0 3px 6px rgba(0,0,0,0.55)',
+        glow: '0 2px 4px rgba(0,0,0,0.5)',
     },
 }

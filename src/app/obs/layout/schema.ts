@@ -260,6 +260,8 @@ export type Element = (
           // default 3), and the tile's width ÷ height (default 2).
           ballCols?: number
           cellAspect?: number
+          // board:sport_priced: gold/silver light sweep + gold halo (default true).
+          shine?: boolean
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions

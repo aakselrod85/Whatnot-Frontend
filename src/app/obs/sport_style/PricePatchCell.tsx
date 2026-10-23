@@ -6,6 +6,12 @@
 // one plain chalk for Side Cards; a sold tile is the same grey imprint as PatchCell's sold branch
 // (team silhouette in a darker grey), with SOLD in place of the price, in the same two sections.
 //
+// Gold and silver run their material's `shine`: a soft light band that crosses the tile's
+// BACKGROUND only — it sits under the divider, logo and price, so nothing that has to be read
+// moves. Stream-safe on purpose: it animates transform alone (composited in OBS's CEF, no repaint),
+// the band is wide with soft edges and no hard line (low-frequency change the encoder handles
+// without smearing), and the board staggers the tiles so only a few move at once.
+//
 // The logo always gets the hard dark outline from PatchCell's `crisp` logo mode — a brightness edge
 // survives the stream's 4:2:0 chroma subsampling where a logo that only differs from its tile in hue
 // blurs into it. Whole px only: a fractional outline antialiases back into a soft edge.
@@ -26,6 +32,9 @@ type Props = {
     priceFontPx: number
     material: TierMaterial
     sold: boolean
+    // Run the material's shine (the board's `shine` toggle), and this tile's offset into its cycle.
+    shine?: boolean
+    shineDelayS?: number
 }
 
 /** The tile's proportions, shared with the board so it can size the price font once. */
@@ -47,7 +56,7 @@ function outlineFilter(px: number, color: string): string {
     return [`${px}px 0`, `-${px}px 0`, `0 ${px}px`, `0 -${px}px`].map((o) => `drop-shadow(${o} 0 ${color})`).join(' ')
 }
 
-export default function PricePatchCell({w, h, background, logoSrc, label, price, priceFontPx, material, sold}: Props) {
+export default function PricePatchCell({w, h, background, logoSrc, label, price, priceFontPx, material, sold, shine = false, shineDelayS = 0}: Props) {
     const {radius, edgeInset, edgeWidth, logo, section} = tileMetrics(w, h)
     const innerR = Math.max(2, radius - edgeInset)
     const outlinePx = Math.max(1, Math.round(h * 0.035))
@@ -116,6 +125,12 @@ export default function PricePatchCell({w, h, background, logoSrc, label, price,
             }}
         >
             <div className="spp-panel" style={{width: section, background: material.panel}} />
+            {shine && material.shine && (
+                <div
+                    className={`spp-shine spp-shine--${material.shine.kind}`}
+                    style={{animationDuration: `${material.shine.cycleS}s`, animationDelay: `${shineDelayS}s`}}
+                />
+            )}
             <svg className="spp-tile-svg" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
                 <path
                     fillRule="evenodd"

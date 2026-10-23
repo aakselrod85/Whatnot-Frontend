@@ -48,6 +48,7 @@ export default function SportPricedPlayground() {
     const [ballCols, setBallCols] = useState(DEFAULT_BALL_COLS)
     const [aspect, setAspect] = useState(DEFAULT_CELL_ASPECT)
     const [scale, setScale] = useState(1.5)
+    const [shine, setShine] = useState(true)
 
     const events: Event[] = useMemo(
         () => Teams.map((team, i) => ({
@@ -60,7 +61,7 @@ export default function SportPricedPlayground() {
         () => Teams.map((team, i) => ({team, total_price: PRICES[team] ?? 0, price_left: soldIds.has(i + 1) ? 0 : PRICES[team] ?? 0})),
         [soldIds]
     )
-    const element: Element = {kind: 'board', variant: 'sport_priced', cols, ballCols, cellAspect: aspect, placements: {all: BOX}}
+    const element: Element = {kind: 'board', variant: 'sport_priced', cols, ballCols, cellAspect: aspect, shine, placements: {all: BOX}}
     const data = {
         config: {} as LayoutConfig,
         channel: null,
@@ -101,6 +102,9 @@ export default function SportPricedPlayground() {
                                onChange={(e) => { const n = parseFloat(e.target.value); if (Number.isFinite(n)) (set as (n: number) => void)(n) }}/>
                     </label>
                 ))}
+                <label className="small d-flex gap-1 align-items-center">
+                    <input type="checkbox" checked={shine} onChange={(e) => setShine(e.target.checked)}/> Shine
+                </label>
             </div>
             <div style={{width: BOX.w * scale, height: BOX.h * scale}}>
                 <div id="spp-preview" style={{width: BOX.w, height: BOX.h, transform: `scale(${scale})`, transformOrigin: '0 0', position: 'relative'}}>

@@ -75,6 +75,19 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
                     'Transparent band between the element edge and the field.')}
             </div>
 
+            <div className="form-check mb-2">
+                <input
+                    id={`${elementKey}-shine`}
+                    type="checkbox"
+                    className="form-check-input"
+                    checked={element.shine ?? true}
+                    onChange={(e) => onPatchElement(elementKey, {shine: e.target.checked})}
+                />
+                <label className="form-check-label small" htmlFor={`${elementKey}-shine`} title="Soft light sweep across gold and silver tiles, plus a breathing glow on gold.">
+                    Gold / silver shine
+                </label>
+            </div>
+
             <CobraBoardSettings channelId={channelId} seriesId={seriesId} onFireCue={onFireCue}/>
 
             <div className="mb-2 mt-3">
