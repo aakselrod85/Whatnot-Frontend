@@ -4,7 +4,9 @@
 // (boardArt.ts) as a backdrop, one square cell per team slot inside its gold frame
 // (`RIPS_BOARD_INSET`). Ordering is board:cobra_flat's
 // (layoutCells, imported), the sold state is board:flat's (tiles/, CellSkin, AccentOverlay
-// imported); the settled-baseline / grouping logic below is copied from FlatBoard.tsx.
+// imported); the settled-baseline / grouping logic below is copied from FlatBoard.tsx. With the
+// 'flip_art' back the settled cells are grouped differently — into free-form shapes of cells that
+// share a side (flipArtShapes.ts, drawn by FlipArtOverlay) instead of flat's rectangles.
 //
 // No move animation on sale (plan §7.1), but the re-deal waits: a sold cell flips and plays its
 // press burst in the slot it was sold in, and only when that ends (the cell "settles") does the
@@ -32,6 +34,7 @@ import {useManifest} from '../board-flat/tiles/useManifest'
 import {Group} from '../board-flat/tiles/types'
 import {RIPS_BOARD_ART, RIPS_BOARD_INSET} from './boardArt'
 import {FlipArtOverlay} from './FlipArtOverlay'
+import {connectedShapes, shapeGeometry} from './flipArtShapes'
 import {useFlipArt} from './useFlipArt'
 import {
     DEFAULT_RIPS_BACK_STYLE,
@@ -238,13 +241,20 @@ export function RipsFlatBoard({box, element}: ElementProps) {
         [placed]
     )
 
-    const {groups, posGroup} = useMemo(() => {
-        const positions = items
+    // Sold cells whose effect has finished — the only ones that join the 'tiles' groups or the
+    // 'flip_art' shapes; a cell still flipping / bursting stays a piece of its own.
+    const settledPositions = useMemo(
+        () => items
             .map((it) => {
                 const e = eventById.get(it.eventId)
                 return e && e.customer !== '' && settled.has(e.id) ? {row: it.row, col: it.col, order: e.index} : null
             })
-            .filter((p): p is NonNullable<typeof p> => p !== null)
+            .filter((p): p is NonNullable<typeof p> => p !== null),
+        [items, eventById, settled]
+    )
+
+    const {groups, posGroup} = useMemo(() => {
+        const positions = settledPositions
         // A fully flipped complete rows x cols grid is one group, regardless of sale order.
         const boardComplete = events.length > 0
             && positions.length === events.length
@@ -259,7 +269,13 @@ export function RipsFlatBoard({box, element}: ElementProps) {
             }
         })
         return {groups, posGroup}
-    }, [items, eventById, settled, events.length, rowCount])
+    }, [settledPositions, events.length, rowCount])
+
+    // 'flip_art' shapes: settled sold cells grouped by shared sides (flipArtShapes.ts), any outline.
+    const flipShapes = useMemo(
+        () => (backStyle === 'flip_art' ? connectedShapes(settledPositions) : []),
+        [backStyle, settledPositions]
+    )
 
     const waitingFontSize = Math.max(16, box.h * 0.1)
 
@@ -287,7 +303,8 @@ export function RipsFlatBoard({box, element}: ElementProps) {
     const artCover = flipArt && metrics && art
         ? {src: art.src, ...flipArtCover(art.w, art.h, MAX_COLS * metrics.cellPx, rowCount * metrics.cellPx)}
         : null
-    const artVars = (flipArt && metrics ? {'--art-frame-px': `${Math.round(metrics.cellPx * FLIP_ART_FRAME_RATIO)}px`} : {}) as React.CSSProperties
+    const artFramePx = metrics ? Math.round(metrics.cellPx * FLIP_ART_FRAME_RATIO) : 0
+    const artVars = (flipArt && metrics ? {'--art-frame-px': `${artFramePx}px`} : {}) as React.CSSProperties
 
     return (
         <div className="rfb-root" ref={wrapRef} style={{...(layoutVars ?? {}), ...artVars, '--cols': MAX_COLS, '--rows': rowCount} as React.CSSProperties}>
@@ -332,10 +349,19 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                             )
                         })}
                     </div>
-                    {/* The settled groups' backs, one box each; the grey skin's decorations have no
-                        place over the painting. */}
+                    {/* 'flip_art': the settled cells' backs as free-form shapes (touching cells
+                        merged, outline framed in gold) in one SVG; the grey skin's decorations have
+                        no place over the painting. */}
                     {flipArt
-                        ? artCover && <FlipArtOverlay groups={groups} sheet={artCover} cellPx={metrics.cellPx} cols={MAX_COLS} rows={rowCount} />
+                        ? artCover && (
+                            <FlipArtOverlay
+                                shapes={flipShapes.map((cells) => shapeGeometry(cells, metrics.cellPx, artFramePx))}
+                                sheet={artCover}
+                                padLeft={metrics.padLeft}
+                                padTop={metrics.padTop}
+                                framePx={artFramePx}
+                            />
+                        )
                         : <AccentOverlay manifest={manifest} groups={groups} cols={MAX_COLS} rows={rowCount} />}
                 </>
             )}

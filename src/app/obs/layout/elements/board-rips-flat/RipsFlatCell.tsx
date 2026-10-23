@@ -43,10 +43,11 @@ export type MarbleOrigin = {x: number; y: number}
 // the piece under it — same technique as the marble sheet, but relative to the grid, not the
 // canvas (`flipArt` below) — under FlipArtCell.png as a CSS 9-slice frame, corners cut off along
 // the frame's diagonal (RipsFlatCell.css `.rfb-art-back`). The cell itself only ever draws that
-// as a SOLO back (full frame, grayscale): it is what flips and bursts. Once the cell settles into
-// a group, FlipArtOverlay draws the group's painting and frame as one box on top — in colour for
-// a group of 2+, still grey for a group of one — which is why no per-cell seams show inside a
-// group. Chosen per board element in /obs/controls (the element's `backStyle`).
+// as a SOLO back (full frame, grayscale): it is what flips and bursts. Once the cell settles, it
+// joins the shape of sold cells it shares a side with, and FlipArtOverlay draws that shape's
+// painting and gold outline (outer and inner corners) in one SVG on top — in colour for a shape of
+// 2+, still grey for a shape of one — which is why no per-cell seams show inside a shape. Chosen
+// per board element in /obs/controls (the element's `backStyle`).
 export const RIPS_BACK_STYLES = ['tiles', 'flip_art'] as const
 export type RipsBackStyle = typeof RIPS_BACK_STYLES[number]
 export const DEFAULT_RIPS_BACK_STYLE: RipsBackStyle = 'tiles'

@@ -141,8 +141,9 @@
     object-fit: fill;
 }
 
-/* 'flip_art' back (RipsFlatCell.tsx): the painting underneath, the gold frame on top. The same
-   three classes draw a cell's own solo back and FlipArtOverlay's one-box-per-group back.
+/* 'flip_art' back (RipsFlatCell.tsx): the painting underneath, the gold frame on top — the
+   cell's own SOLO back (what flips and bursts). Settled cells are drawn again on top as shapes by
+   FlipArtOverlay.tsx, which reuses the numbers below (flipArtShapes.ts) for its outer corners.
 
    `.rfb-art-back` wraps both; the painting alone (not the frame) is clipped to an octagon that runs UNDER the gold, so
    nothing peeks past the frame's outer edge (the board shows there). Measured on the 412x374
@@ -153,7 +154,7 @@
    through the 9-slice, 34 art px = `--art-frame-px`: 4/34 = 0.118, and the diagonal meets the
    inset sides (30 - 4)/34 = 0.765 of it from the corner. Re-measure if the frame art is replaced.
 
-   The painting is one sheet over the whole cell grid (or group), positioned exactly like
+   The painting is one sheet over the whole cell grid, positioned exactly like
    `.rfb-marble` (background-size / -position inline, the board does the cover maths). */
 .rfb-art-back {
     position: absolute;
@@ -178,14 +179,14 @@
     );
 }
 
-/* A group of one cell (the unsettled solo cell included): its piece in grey. Deliberately no
-   transition — it snaps to colour the moment the cell joins a group of 2+. */
+/* The solo back is always grey; the overlay turns a cell to colour (no transition) the moment it
+   settles into a shape of 2+. */
 .rfb-art-mono .rfb-art {
     filter: grayscale(1);
 }
 
-/* The frame is FlipArtCell.png as a 9-slice border around the whole box — a group's box in the
-   overlay, or the cell itself for the solo back. The band is flat colour along the straight
+/* The frame is FlipArtCell.png as a 9-slice border around the cell. The overlay's shapes cut
+   the same 34 px corners and band edges out of it (flipArtShapes.ts). The band is flat colour along the straight
    runs, so `stretch` leaves no seam.
 
    Measured on the 412x374 art (alpha > 50%, 2026-10-22): the band is 11 px wide with ~2 px of
