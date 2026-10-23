@@ -98,6 +98,19 @@ The two banners on the rips scene's podium are a looping video (`public/videos/r
 
 A recipe saved before this change has no wind value and uses `1`.
 
+## Sport priced board (`board:sport_priced`)
+
+The football-field board with a price on every tile, for the priced sports stream (the stream that uses `board:cobra` today). It is a new board: `board:cobra` and `board:sport_style` are unchanged.
+
+- **Tiles:** team logo + price, centred together. The logo has a hard black outline so it survives stream compression.
+- **Tiers:** God = gold, Giant = silver, Chaser = copper, Side Card = one plain chalk colour, the same for every team. Gold and silver are the brightest tiles, copper sits below them and the chalk is dimmed. **Shine** (setting *Gold / silver shine*, on by default): a soft light band crosses gold tiles every 6 s (staggered outward from the ball, with a slow breathing glow) and silver every 10 s (spread so about one moves at a time). It runs on the tile background only, under the logo and price, and animates transform/opacity only, so OBS draws it without repaints. Each tile is split by a solid divider into a logo section (left, same width on every tile) and a price section. Tiers, prices and thresholds are the same as on `board:cobra` (same price ranges, same series default price). Paid tiers show the price left, rounded up to $25; Side Cards show the default price's floor (`$50-$149` → `$50+`).
+- **Layout:** the football sits in the middle of the centre row with a "50" either side. The most valuable teams sit next to it; Side Cards and sold teams go to the edges. A sale re-deals the board.
+- **Stream-safe:** solid tile edges and field lines only, no dashed stitching or fine textures.
+
+**In OBS:** in `/obs/controls/<id>`, add **Board — Sport priced** to the stage. It defaults to the priced stream's board slot (893 × 342 at 93, 136). Set **Cells per row** (7), **Ball cells** (3, or 0 for no ball) and **Tile shape** (width ÷ height, 2), then click **Fit height**. The price cards in its panel are the same ones as on the cobra board.
+
+**Preview without a stream:** `/obs/setup/sport_priced` renders the real board with the priced stream's 32 teams. **Sell a team** and **Reset** try sales; `?sold=6` opens with six sold.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

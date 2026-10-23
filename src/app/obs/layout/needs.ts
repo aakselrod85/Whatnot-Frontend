@@ -25,6 +25,8 @@ export const NEEDS_BY_ID = {
     // price-range/team-price sources `board:cobra`/`board:cobra_flat` gate behind
     // `needsCobra`/`needsSeries`, so a team lands on the same tier here as on those boards.
     'board:sport_style': ['needsCobra', 'needsSeries'],
+    // Prices and tiers come from the same channel price ranges / team prices / series default price.
+    'board:sport_priced': ['needsCobra', 'needsSeries'],
     'widget:pick2': ['needsPick2'],
     'widget:stashorpass': ['needsStashOrPass'],
     // Only needs the shared `series` source, not a flag of its own — mirrors the old code's local

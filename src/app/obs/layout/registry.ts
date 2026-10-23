@@ -17,6 +17,7 @@ import { CobraFlatBoard } from './elements/board-cobra-flat/CobraFlatBoard'
 import { RipsFlatBoard } from './elements/board-rips-flat/RipsFlatBoard'
 import { RIPS_BOARD_ART } from './elements/board-rips-flat/boardArt'
 import { SportStyleBoard } from './elements/board-sport-style/SportStyleBoard'
+import { SportPricedBoard } from './elements/board-sport-priced/SportPricedBoard'
 import { ResultsElement } from './elements/results/ResultsElement'
 import { ThinResults } from './elements/results-thin/ThinResults'
 import { RIPS_RESULTS_PRELOAD } from './elements/results/ripsStyle'
@@ -58,6 +59,7 @@ export type RegistryId =
     | 'board:cobra_flat'
     | 'board:rips_flat'
     | 'board:sport_style'
+    | 'board:sport_priced'
     | 'widget:pick2'
     | 'widget:stashorpass'
     | 'widget:name'
@@ -179,6 +181,9 @@ const CLASSIC_BOX: Box = { x: 0, y: 620, w: 1080, h: 560 }
 // ever tunes the box's width and the Cells-per-row setting; the Fit height button (§5) resizes the
 // box to whatever the current break's slot count actually needs.
 const SPORT_STYLE_BOX: Box = { x: 0, y: 300, w: 1080, h: 520 }
+// The priced stream's board slot (measured off the current cobra board on that stream): 893 wide
+// at x 93 — 7 columns of 2:1 tiles and 5 rows come out at ~342 tall.
+const SPORT_PRICED_BOX: Box = { x: 93, y: 136, w: 893, h: 342 }
 const FULL_BOX: Box = { x: 0, y: 0, w: 1080, h: 1920 }
 const RIPBAR_BOX: Box = { x: 0, y: 0, w: 1080, h: 120 }
 const RESERVED_BOX: Box = { x: 1080 - 480, y: 0, w: 480, h: 270 }
@@ -339,6 +344,26 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // board-anchors-plan.md §3.3/§3.5: the painted (clipped) turf area, and the cell grid alone
         // — see SportStyleBoard.tsx's `usePublishAnchors` call for what each one resolves to.
         // `ball` only exists when the board has a `hole` (hit-sequence-plan.md §2.3).
+        anchors: ['field', 'grid', 'ball'],
+    },
+    'board:sport_priced': {
+        id: 'board:sport_priced',
+        kind: 'board',
+        label: 'Board — Sport priced',
+        // Not a singleton, same convention as every other board entry.
+        singleton: false,
+        singletonGroup: 'board:sport_priced',
+        defaultBox: SPORT_PRICED_BOX,
+        // The ball art is static; team logos resolve at render time from /images/teams/.
+        preload: ['/images/sport_style/ball.png'],
+        component: SportPricedBoard,
+        available: true,
+        hasBox: true,
+        // Same panel shape as sport_style (cobra's price cards + a turf JSON textarea).
+        wideBlock: true,
+        reactsTo: [],
+        // Same names as board:sport_style, so an overlay aimed at one can be aimed at the other;
+        // plus the dynamic `cell:<eventId>` family (not declared, see SportStyleBoard.tsx).
         anchors: ['field', 'grid', 'ball'],
     },
     'widget:pick2': {

@@ -1,0 +1,198 @@
+/* `board:sport_priced` — box-relative, every class prefixed `spp-`; no `body`/`html` rules, no
+   vh/vw, no `color-mix()` (OBS ships an older CEF). Every rect comes from SportPricedBoard.tsx as
+   whole px. `.spp-root` does not clip: the layout page's ElementFrame crops an overflowing field to
+   the box, same as board:sport_style. */
+
+.spp-root {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    font-family: var(--font-exo2), sans-serif;
+}
+
+.spp-waiting {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+.spp-field {
+    position: absolute;
+    left: 0;
+}
+
+/* The painted field: turf canvas, lines, tiles, ball and border, all in its own coordinates. */
+.spp-inner {
+    position: absolute;
+    overflow: hidden;
+}
+
+.spp-turf {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.spp-line,
+.spp-border,
+.spp-cell,
+.spp-yard,
+.spp-ball {
+    position: absolute;
+}
+
+.spp-border {
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.spp-yard {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.82);
+    font-family: var(--font-teko), 'Arial Narrow', sans-serif;
+    font-weight: 600;
+    line-height: 1;
+    padding-top: 0.08em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.spp-ball {
+    object-fit: contain;
+    transform: rotate(-8deg);
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.4));
+    pointer-events: none;
+}
+
+/* ---- tile (PricePatchCell.tsx) ---------------------------------------------------------------- */
+
+.spp-tile {
+    position: relative;
+    overflow: hidden;
+}
+
+.spp-tile-svg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+/* ---- tier shine (gold / silver) -------------------------------------------------------------------
+   A soft light band crossing the tile background, under the edge, divider, logo and price. Only
+   `transform` animates (composited, no repaint in OBS's CEF); the band is wide with soft edges so
+   the encoder sees broad, low-frequency change. The sweep takes the first part of each cycle and
+   the tile rests for the remainder; the board staggers delays so few tiles move at once. */
+
+.spp-shine {
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: 0;
+    width: 45%;
+    transform: translateX(-150%) skewX(-20deg);
+    animation-name: spp-sweep-gold;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.spp-shine--gold {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 250, 225, 0.45) 30%, rgba(255, 255, 255, 0.95) 50%, rgba(255, 250, 225, 0.45) 70%, rgba(255, 255, 255, 0) 100%);
+}
+
+.spp-shine--silver {
+    animation-name: spp-sweep-silver;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(240, 248, 255, 0.35) 30%, rgba(255, 255, 255, 0.8) 50%, rgba(240, 248, 255, 0.35) 70%, rgba(255, 255, 255, 0) 100%);
+}
+
+/* Gold: a 1.5s sweep in a 6s cycle. */
+@keyframes spp-sweep-gold {
+    0% { transform: translateX(-150%) skewX(-20deg); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+    25% { transform: translateX(300%) skewX(-20deg); }
+    100% { transform: translateX(300%) skewX(-20deg); }
+}
+
+/* Silver: a 1.8s sweep in a 10s cycle — slower and rarer than gold. */
+@keyframes spp-sweep-silver {
+    0% { transform: translateX(-150%) skewX(-20deg); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+    18% { transform: translateX(300%) skewX(-20deg); }
+    100% { transform: translateX(300%) skewX(-20deg); }
+}
+
+/* Gold's breathing glow: a halo behind the tile fading between 45% and 100% over 3.6s. Opacity only. */
+.spp-halo {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    animation: spp-breathe 3.6s ease-in-out infinite alternate;
+    will-change: opacity;
+}
+
+@keyframes spp-breathe {
+    from { opacity: 0.45; }
+    to { opacity: 1; }
+}
+
+/* The two sections (logo | price): each centres its content; left/width come from tileMetrics. */
+.spp-sec {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Tint behind the logo section; the tile's radius clips its outer corners. */
+.spp-panel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.spp-logo,
+.spp-sil,
+.spp-label {
+    flex: none;
+    object-fit: contain;
+}
+
+.spp-sil {
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-position: center;
+    -webkit-mask-position: center;
+}
+
+.spp-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.spp-price,
+.spp-sold {
+    flex: none;
+    font-family: var(--font-teko), 'Arial Narrow', sans-serif;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    /* Teko sits high in its em box; nudge it to the optical centre. */
+    padding-top: 0.1em;
+}
+
+.spp-sold {
+    letter-spacing: 0.06em;
+}
