@@ -101,7 +101,7 @@
     display: block;
 }
 
-/* 'marble_auto' (RipsFlatCell.tsx): marble sheet, gold frame, logo — three full-cell layers.
+/* 'marble_auto' (RipsFlatCell.tsx): marble sheet, logo, gold frame — three full-cell layers.
 
    The marble is clipped to an octagon that sits just UNDER the gold band of CellFrame.png, so no
    marble shows outside the gold and the cut corners stay transparent (the board shows through,

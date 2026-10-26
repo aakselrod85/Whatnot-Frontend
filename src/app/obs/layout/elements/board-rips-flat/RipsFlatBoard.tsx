@@ -2,30 +2,22 @@
 
 // The `board:rips_flat` registry component (rips-flat-board-plan.md). The framed board art
 // (boardArt.ts) as a backdrop, one square cell per team slot inside its gold frame
-// (`RIPS_BOARD_INSET`). Ordering is board:cobra_flat's
-// (layoutCells, imported), the sold state is board:flat's (tiles/, CellSkin, AccentOverlay
+// (`RIPS_BOARD_INSET`). Ordering is ripsOrder.ts (team tiers or alphabet, no prices; built on
+// board:cobra_flat's centre-out deal), the sold state is board:flat's (tiles/, CellSkin, AccentOverlay
 // imported); the settled-baseline / grouping logic below is copied from FlatBoard.tsx. With the
 // 'flip_art' back the settled cells are grouped differently — into free-form shapes of cells that
 // share a side (flipArtShapes.ts, drawn by FlipArtOverlay) instead of flat's rectangles.
 //
-// No move animation on sale (plan §7.1), but the re-deal waits: a sold cell flips and plays its
-// press burst in the slot it was sold in, and only when that ends (the cell "settles") does the
-// grid re-deal and the cell jump to the sold block. `reactsTo` is [] for the same reason as
+// No move animation on sale (plan §7.1), but with `soldPlacement: 'sides'` the re-deal waits: a
+// sold cell flips and plays its press burst in the slot it was sold in, and only when that ends
+// (the cell "settles") does the grid re-deal and the cell jump to the edges. With 'stay' every
+// cell is dealt as unsold, so nothing ever moves. `reactsTo` is [] for the same reason as
 // board:cobra_flat (no `sold` scene event).
 
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import type {ElementProps} from '../../registry'
 import {useLayoutData} from '../../useLayoutData'
-import {
-    assignTiers,
-    BEST_THRESHOLD,
-    DEFAULT_PRICE,
-    GOOD_THRESHOLD,
-    MID_THRESHOLD,
-    type TeamCell,
-    type Tier,
-} from '../board-cobra/pricing'
-import {layoutCells, MAX_COLS, splitRows, type FlatCell} from '../board-cobra-flat/layout'
+import {MAX_COLS, splitRows} from '../board-cobra-flat/layout'
 import {AccentOverlay} from '../board-flat/AccentOverlay'
 import {computeGroups, rectGroup} from '../board-flat/tiles/grouping'
 import {cellExposure} from '../board-flat/tiles/exposure'
@@ -35,6 +27,16 @@ import {Group} from '../board-flat/tiles/types'
 import {RIPS_BOARD_ART, RIPS_BOARD_INSET} from './boardArt'
 import {FlipArtOverlay} from './FlipArtOverlay'
 import {connectedShapes, shapeGeometry} from './flipArtShapes'
+import {
+    DEFAULT_RIPS_CELL_ORDER,
+    DEFAULT_RIPS_SOLD_PLACEMENT,
+    placeRipsCells,
+    RIPS_CELL_ORDERS,
+    RIPS_SOLD_PLACEMENTS,
+    type RipsCell,
+    type RipsCellOrder,
+    type RipsSoldPlacement,
+} from './ripsOrder'
 import {useFlipArt} from './useFlipArt'
 import {
     DEFAULT_RIPS_BACK_STYLE,
@@ -132,11 +134,24 @@ function backStyleOf(element: ElementProps['element']): RipsBackStyle {
     return v && (RIPS_BACK_STYLES as readonly string[]).includes(v) ? v : DEFAULT_RIPS_BACK_STYLE
 }
 
+// The two order selects (ripsOrder.ts); unknown values fall back to the defaults.
+function cellOrderOf(element: ElementProps['element']): RipsCellOrder {
+    const v = element.kind === 'board' ? element.cellOrder : undefined
+    return v && (RIPS_CELL_ORDERS as readonly string[]).includes(v) ? v : DEFAULT_RIPS_CELL_ORDER
+}
+
+function soldPlacementOf(element: ElementProps['element']): RipsSoldPlacement {
+    const v = element.kind === 'board' ? element.soldPlacement : undefined
+    return v && (RIPS_SOLD_PLACEMENTS as readonly string[]).includes(v) ? v : DEFAULT_RIPS_SOLD_PLACEMENT
+}
+
 export function RipsFlatBoard({box, element}: ElementProps) {
-    const {stream, events: rawEvents, series, priceRanges, teamPrices, lastFetched} = useLayoutData()
+    const {stream, events: rawEvents, lastFetched} = useLayoutData()
     const manifest = useManifest()
     const tileSet = tileSetOf(element)
     const backStyle = backStyleOf(element)
+    const cellOrder = cellOrderOf(element)
+    const soldPlacement = soldPlacementOf(element)
     const art = useFlipArt(backStyle === 'flip_art')
 
     // Cells whose sale effect (flip + press burst) has finished — only these join the shared
@@ -169,50 +184,20 @@ export function RipsFlatBoard({box, element}: ElementProps) {
         })
     }, [events, lastFetched.events])
 
-    // Tier block copied from CobraFlatBoard.tsx: same inputs, so tiers (and therefore order) match.
-    const unsoldTeamNames = useMemo(
-        () => events.filter((e) => e.customer === '').map((e) => e.team),
+    const cells: RipsCell[] = useMemo(
+        () => events.map((e) => ({eventId: e.id, team: e.team, sold: e.customer !== ''})),
         [events]
-    )
-    const defaultPrice = series?.default_price || DEFAULT_PRICE
-    const bestThreshold = priceRanges.find((r) => r.tier_id === 'best')?.price_from ?? BEST_THRESHOLD
-    const goodThreshold = priceRanges.find((r) => r.tier_id === 'good')?.price_from ?? GOOD_THRESHOLD
-    const midThreshold  = priceRanges.find((r) => r.tier_id === 'mid')?.price_from  ?? MID_THRESHOLD
-
-    const teamCells: TeamCell[] = useMemo(
-        () => assignTiers(unsoldTeamNames, teamPrices, defaultPrice, {bestThreshold, goodThreshold, midThreshold}),
-        [unsoldTeamNames, teamPrices, defaultPrice, bestThreshold, goodThreshold, midThreshold]
-    )
-    const tierByTeam = useMemo(() => {
-        const m = new Map<string, Tier>()
-        for (const c of teamCells) if (!m.has(c.team)) m.set(c.team, c.tier)
-        return m
-    }, [teamCells])
-    const priceLeftByTeam = useMemo(
-        () => new Map(teamPrices.map((p) => [p.team, p.price_left])),
-        [teamPrices]
-    )
-    const cells: FlatCell[] = useMemo(
-        () =>
-            events.map((e) => ({
-                eventId: e.id,
-                team: e.team,
-                tier: tierByTeam.get(e.team) ?? 'regular',
-                sold: e.customer !== '',
-                priceLeft: priceLeftByTeam.get(e.team) ?? 0,
-            })),
-        [events, tierByTeam, priceLeftByTeam]
     )
 
     // While a sold cell is still playing its effect the deal is frozen at the last one made with
-    // nothing pending — the sale changes tiers and prices as well as `sold`, so holding back that
-    // one flag would not keep the cell in place. Falls back to the live deal if the set of events
-    // itself changed meanwhile (or before the mount baseline, when there is nothing frozen yet).
+    // nothing pending, so a second cell settling meanwhile cannot shift the one still bursting.
+    // Falls back to the live deal if the set of events itself changed meanwhile (or before the
+    // mount baseline, when there is nothing frozen yet). With 'stay' sales never change the deal.
     const hasPending = useMemo(
         () => events.some((e) => e.customer !== '' && !settled.has(e.id)),
         [events, settled]
     )
-    const frozenCellsRef = useRef<FlatCell[] | null>(null)
+    const frozenCellsRef = useRef<RipsCell[] | null>(null)
     useEffect(() => {
         if (!hasPending) frozenCellsRef.current = cells
     }, [hasPending, cells])
@@ -225,18 +210,21 @@ export function RipsFlatBoard({box, element}: ElementProps) {
 
     const rowSizes = useMemo(() => splitRows(events.length), [events.length])
     const rowCount = rowSizes.length
-    const placed = useMemo(() => layoutCells(dealtCells), [dealtCells])
+    const placed = useMemo(
+        () => placeRipsCells(dealtCells, cellOrder, soldPlacement),
+        [dealtCells, cellOrder, soldPlacement]
+    )
     const {wrapRef, layoutVars, metrics} = useRipsFlatLayout(rowCount)
 
     const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events])
 
-    // Flat's grouping, over the {row, col} addresses from layoutCells (+ the integer column
+    // Flat's grouping, over the {row, col} addresses from placeRipsCells (+ the integer column
     // offset that centres a short row, plan §3) instead of posFromIndex.
     const items = useMemo(
         () =>
             placed.flatMap((row) => {
                 const offset = Math.floor((MAX_COLS - row.length) / 2)
-                return row.map((p) => ({eventId: p.cell.eventId, row: p.row, col: p.col + offset}))
+                return row.map((p) => ({eventId: p.eventId, row: p.row, col: p.col + offset}))
             }),
         [placed]
     )

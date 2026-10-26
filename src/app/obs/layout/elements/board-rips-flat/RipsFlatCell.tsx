@@ -1,10 +1,11 @@
-import {FC, useCallback, useEffect, useState} from 'react'
+import {FC, useCallback, useEffect, useRef, useState} from 'react'
 import {Event} from '@/app/entity/entities'
 import {CANVAS} from '../../schema'
 import {Exposure} from '../board-flat/tiles/types'
 import {Manifest} from '../board-flat/tiles/manifest'
 import {CellSkin} from '../board-flat/CellSkin'
 import {RIPS_FRAME_ASSETS} from '../frame/ripsAssets'
+import {ripsTierOf, type RipsTier} from './ripsOrder'
 import './RipsFlatCell.css'
 
 // Front-face art (README "Rips board marble tiles"). 'veined' / 'clean' are the marble stones in
@@ -12,7 +13,7 @@ import './RipsFlatCell.css'
 // touch and the board shows through their cut corners. 'icons' is the earlier new_teams octagon at
 // 92% of the cell. 'marble_auto' is not a baked stone but three layers composed at render time
 // (bottom to top, all edge to edge like the stones): the frame element's marble (BackFlat.png)
-// clipped to an octagon, the gold CellFrame.png, and the team logo from rips_tiles/webp-rips/.
+// clipped to an octagon, the team logo from rips_tiles/webp-rips/, and the gold CellFrame.png on top.
 // The marble is the whole 1080x1920 canvas sheet (`CANVAS`) positioned so each cell shows the
 // piece that lies under it on the canvas — veins run on across neighbours and shift with the
 // board when the operator moves it; `marbleOrigin` (canvas px of the cell's top-left, from
@@ -30,6 +31,15 @@ const tileSrc = (set: RipsTileSet, team: string) =>
 export const MARBLE_AUTO_FRAME_SRC = '/images/rips_tiles/CellFrame.png'
 const marbleAutoLogoSrc = (team: string) =>
     `/images/rips_tiles/webp-rips/${team}.${team === 'Miscellaneous' ? 'png' : 'webp'}`
+
+// 'marble_auto' frame per team tier (ripsOrder.ts, 1 = best): tier 3 has CellFrame above, tiers 1
+// and 2 their own frame. The marble under it is the same for every tier.
+const MARBLE_AUTO_TIER_FRAME: Record<RipsTier, string> = {
+    1: '/images/rips_tiles/CellFrameTier1.png',
+    2: '/images/rips_tiles/CellFrameTier2.png',
+    3: MARBLE_AUTO_FRAME_SRC,
+}
+export const MARBLE_AUTO_TIER_SRCS = [MARBLE_AUTO_TIER_FRAME[1], MARBLE_AUTO_TIER_FRAME[2]]
 
 // Canvas px of a cell's top-left corner (see `marbleOrigin` above).
 export type MarbleOrigin = {x: number; y: number}
@@ -88,12 +98,14 @@ export function flipArtCover(artW: number, artH: number, gridW: number, gridH: n
 //
 // `onSettled` fires when the BURST ends, not the flip: the board holds the cell in its slot (and
 // out of the shared skin grouping) until then, so the whole effect plays where the team was sold.
-// A video that never ends must not hold the board forever, hence the fallback timer: the video's
-// own length plus a margin once known, `PRESS_VIDEO_FALLBACK_MS` until then.
+// A video that never ends must not hold the board forever, hence a watchdog: `PRESS_VIDEO_FALLBACK_MS`
+// for it to start, then re-armed to `PRESS_VIDEO_STALL_MS` on every playback tick, so it only fires
+// once playback has stopped moving. (It used to be a fixed "duration + 1s from metadata" timer, which
+// cut the burst mid-fade whenever the heavy video started late or played slower than real time.)
 const PRESS_VIDEO_SRC = '/videos/press_animation.webm'
 const PRESS_VIDEO_DELAY_MS = 1050
 const PRESS_VIDEO_FALLBACK_MS = 8000
-const PRESS_VIDEO_MARGIN_MS = 1000
+const PRESS_VIDEO_STALL_MS = 4000
 
 interface Props {
     event: Event
@@ -117,7 +129,6 @@ export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tie
     const skipAnimation = flipped && !!alreadySettled
     const [animating, setAnimating] = useState(false)
     const [showVideo, setShowVideo] = useState(false)
-    const [fallbackMs, setFallbackMs] = useState(PRESS_VIDEO_FALLBACK_MS)
 
     useEffect(() => {
         setAnimating(flipped && !skipAnimation)
@@ -142,13 +153,23 @@ export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tie
         onSettled?.(eventId)
     }, [onSettled, eventId])
 
+    const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const armWatchdog = useCallback((ms: number) => {
+        if (watchdogRef.current) clearTimeout(watchdogRef.current)
+        watchdogRef.current = setTimeout(finishBurst, ms)
+    }, [finishBurst])
+
     useEffect(() => {
         if (!showVideo) return
-        const t = setTimeout(finishBurst, fallbackMs)
-        return () => clearTimeout(t)
-    }, [showVideo, fallbackMs, finishBurst])
+        armWatchdog(PRESS_VIDEO_FALLBACK_MS)
+        return () => {
+            if (watchdogRef.current) clearTimeout(watchdogRef.current)
+            watchdogRef.current = null
+        }
+    }, [showVideo, armWatchdog])
 
     const contentClass = flipped ? (skipAnimation ? 'rfb-cell-final' : 'rfb-cell-flipped') : ''
+    const tierFrame = MARBLE_AUTO_TIER_FRAME[ripsTierOf(event.team)]
 
     return (
         <div className={`rfb-cell ${animating ? 'rfb-cell-flipping' : ''} ${showVideo ? 'rfb-cell-active' : ''}`} style={style}>
@@ -165,9 +186,10 @@ export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tie
                                 }}
                             />
                             {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element */}
-                            <img className="rfb-marble-frame" src={MARBLE_AUTO_FRAME_SRC} alt="" />
-                            {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element */}
                             <img className="rfb-icon rfb-marble-logo" src={marbleAutoLogoSrc(event.team)} alt={event.team} />
+                            {/* Frame above the logo. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element */}
+                            <img className="rfb-marble-frame" src={tierFrame} alt="" />
                         </div>
                     ) : (
                         <div className={tileSet === 'icons' ? 'rfb-tile' : 'rfb-tile rfb-tile-stone'}>
@@ -202,10 +224,7 @@ export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tie
                         autoPlay
                         muted
                         playsInline
-                        onLoadedMetadata={(e) => {
-                            const d = e.currentTarget.duration
-                            if (Number.isFinite(d)) setFallbackMs(d * 1000 + PRESS_VIDEO_MARGIN_MS)
-                        }}
+                        onTimeUpdate={() => armWatchdog(PRESS_VIDEO_STALL_MS)}
                         onEnded={finishBurst}
                         onError={finishBurst}
                     >
