@@ -100,3 +100,120 @@
     height: 100%;
     display: block;
 }
+
+/* 'marble_auto' (RipsFlatCell.tsx): marble sheet, logo, gold frame — three full-cell layers.
+
+   The marble is clipped to an octagon that sits just UNDER the gold band of CellFrame.png, so no
+   marble shows outside the gold and the cut corners stay transparent (the board shows through,
+   as with the stones). Measured on the 124x124 art (alpha > 50%, 2026-10-22): the band's inner
+   edge is at 12 px on the straight sides and the corner cuts run along x + y = 42 (so they meet
+   the sides at 30 px); the gold itself spans 1..11 px on the sides and 13..21 px on the diagonal.
+   The polygon below is that inner octagon pushed 2 px outward (sides at 10 / 114, cuts meeting
+   them at 29 / 95), i.e. 2 px of marble tucked under the gold on every edge and still ~7 px
+   short of its outer edge on the diagonal. In fractions of the cell: 10/124 = 8.06%,
+   29/124 = 23.4%, 95/124 = 76.6%, 114/124 = 91.9%. Re-measure if the frame art is replaced.
+
+   The sheet itself (background-image / -size / -position) is set inline per cell, since the
+   position depends on where the cell is on the canvas. `background-attachment: fixed` would do
+   the same with no per-cell maths, but the flip's 3D transforms break it. */
+.rfb-marble {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    clip-path: polygon(
+        23.4% 8.06%,
+        76.6% 8.06%,
+        91.9% 23.4%,
+        91.9% 76.6%,
+        76.6% 91.9%,
+        23.4% 91.9%,
+        8.06% 76.6%,
+        8.06% 23.4%
+    );
+}
+
+.rfb-marble-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: fill;
+}
+
+/* 'flip_art' back (RipsFlatCell.tsx): the painting underneath, the gold frame on top — the
+   cell's own SOLO back (what flips and bursts). Settled cells are drawn again on top as shapes by
+   FlipArtOverlay.tsx, which reuses the numbers below (flipArtShapes.ts) for its outer corners.
+
+   `.rfb-art-back` wraps both; the painting alone (not the frame) is clipped to an octagon that runs UNDER the gold, so
+   nothing peeks past the frame's outer edge (the board shows there). Measured on the 412x374
+   art: the band starts 2 art px in from the image edge (3 on the right), and the gold's outer
+   diagonal runs along x + y = 26 px from the image corner (28 on the right-hand corners), with
+   ~16 px of gold across the diagonal. The clip sits 4 art px in on the straight sides (2 px under
+   the band) and along x + y = 30 on the diagonals (2-4 px under the gold). Scaled to screen
+   through the 9-slice, 34 art px = `--art-frame-px`: 4/34 = 0.118, and the diagonal meets the
+   inset sides (30 - 4)/34 = 0.765 of it from the corner. Re-measure if the frame art is replaced.
+
+   The painting is one sheet over the whole cell grid, positioned exactly like
+   `.rfb-marble` (background-size / -position inline, the board does the cover maths). */
+.rfb-art-back {
+    position: absolute;
+    inset: 0;
+}
+
+.rfb-art {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    --art-in: calc(var(--art-frame-px, 0px) * 0.118);
+    --art-cut: calc(var(--art-frame-px, 0px) * 0.765);
+    clip-path: polygon(
+        var(--art-cut) var(--art-in),
+        calc(100% - var(--art-cut)) var(--art-in),
+        calc(100% - var(--art-in)) var(--art-cut),
+        calc(100% - var(--art-in)) calc(100% - var(--art-cut)),
+        calc(100% - var(--art-cut)) calc(100% - var(--art-in)),
+        var(--art-cut) calc(100% - var(--art-in)),
+        var(--art-in) calc(100% - var(--art-cut)),
+        var(--art-in) var(--art-cut)
+    );
+}
+
+/* The solo back is always grey; the overlay turns a cell to colour (no transition) the moment it
+   settles into a shape of 2+. */
+.rfb-art-mono .rfb-art {
+    filter: grayscale(1);
+}
+
+/* The frame is FlipArtCell.png as a 9-slice border around the cell. The overlay's shapes cut
+   the same 34 px corners and band edges out of it (flipArtShapes.ts). The band is flat colour along the straight
+   runs, so `stretch` leaves no seam.
+
+   Measured on the 412x374 art (alpha > 50%, 2026-10-22): the band is 11 px wide with ~2 px of
+   transparent margin outside it, so its INNER edge is 13 px in from the image's left / top /
+   bottom edge (14 on the right — that margin is 3 px); the ornamented corner cuts reach 30 px
+   in from the left / top and 31-33 px from the right / bottom. Slice 34 covers every corner with
+   at least 1 px of plain band to spare — over-covering costs nothing, the band beyond the
+   ornament is uniform. Scaled on screen so the inner edge lands at 12/124 of the cell, like the
+   front gold of 'marble_auto': border px = round(cellPx * 12/124 * 34/13), computed by
+   RipsFlatBoard (FLIP_ART_FRAME_RATIO) and passed as `--art-frame-px`. Re-measure if the frame art
+   is replaced. */
+.rfb-art-frame {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    pointer-events: none;
+    border: var(--art-frame-px, 0px) solid transparent;
+    border-image: url('/images/rips_tiles/FlipArtCell.png') 34 / 1 / 0 stretch;
+}
+
+/* Logo box inset 11% per side: the gold's inner edge is at 9.7% (12/124, see above) and the logo
+   art keeps a few % of its own transparent padding, so on a ~66 px cell roughly 3 px of marble
+   show between the logo and the gold. Tune the inset if that gap looks wrong. */
+.rfb-marble-logo {
+    top: 11%;
+    left: 11%;
+    width: 78%;
+    height: 78%;
+    object-fit: contain;
+}

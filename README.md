@@ -31,12 +31,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Rips board marble tiles
 
-The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone cut from the board's own cream marble, with a gold octagon inlay and the logo. Stones fill their cells, touch their neighbours, and the board's blue shows through their cut corners. There are two sets:
+The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone cut from the board's own cream marble, with a gold octagon inlay and the logo. Stones fill their cells, touch their neighbours, and the board's blue shows through their cut corners. There are three marble sets:
 
 | Set | Files | Look |
 |---|---|---|
 | `veined` (default) | `public/images/rips_tiles/veined/` | The board's marble across the whole stone, veins included |
 | `clean` | `public/images/rips_tiles/clean/` | Veins softened away inside the gold octagon, so nothing runs behind the logo |
+| `marble_auto` | `public/images/rips_tiles/CellFrame.png` (gold frame), `public/images/rips_tiles/webp-rips/` (logos), `public/images/static/rips/BackFlat.png` (marble) | Not a pre-drawn stone: composed live from the frame element's marble, the gold frame and the logo. The marble is the whole 1080x1920 canvas sheet, so each cell shows the piece that lies under it — veins run on across neighbouring cells and shift when the board is moved. No generator step; replace the three assets to restyle it (re-measure the clip octagon in `RipsFlatCell.css` if the frame changes). |
 
 The board backdrop is the same for every set: `public/images/rips_board/BoardSeparate.png` (the blue board in its gold frame, no marble surround), stretched to the element's box. The team cells sit 15 px in from every edge of the 1473x354 art (`RIPS_BOARD_INSET` in `src/app/obs/layout/elements/board-rips-flat/boardArt.ts`), scaled with the box so they follow the frame at any size; re-check it if the art is replaced.
 
@@ -46,7 +47,15 @@ The board backdrop is the same for every set: `public/images/rips_board/BoardSep
 
 **Pick a set**
 
-In `/obs/controls/<id>`, open the Rips board element's settings and choose **Tiles**: *Marble, veined*, *Marble, clean centre* or *Classic icons*. It is saved with the layout and the stream updates on its own. A board that never had it set shows `DEFAULT_RIPS_TILE_SET` (in `src/app/obs/layout/elements/board-rips-flat/RipsFlatCell.tsx`).
+In `/obs/controls/<id>`, open the Rips board element's settings and choose **Tiles**: *Marble, veined*, *Marble, clean centre*, *Classic icons* or *Marble auto*. It is saved with the layout and the stream updates on its own. A board that never had it set shows `DEFAULT_RIPS_TILE_SET` (in `src/app/obs/layout/elements/board-rips-flat/RipsFlatCell.tsx`).
+
+*Marble auto* shows each team's tier (1 = best, 2, 3; the lists are `TIER_OF` in `src/app/obs/layout/elements/board-rips-flat/ripsOrder.ts`, every team not listed is tier 3) by its frame: `public/images/rips_tiles/CellFrameTier1.png` / `CellFrameTier2.png` for tiers 1 and 2, `CellFrame.png` for tier 3. The marble background is the same for every tier. Replace those files to restyle a tier.
+
+**Pick the back**
+
+The same panel has a second select, **Back**, for what a sold cell shows once it has flipped. It is independent of Tiles — any front goes with either back. *Grey tiles* (default) is the grey sub-tile skin with its decorations, as before. *Flip art* turns the sold cells into one painting: one image picked at random from `public/images/rips_board/FlippedArt/` (png/jpg/webp — drop a new file in and it joins the pool) when the page loads, kept for as long as the page stays open (only a reload picks again), is laid over the whole cell grid (cover fit, centred, empty slots of a short row included so it never shifts on a re-deal) and every flipped cell reveals the piece under it. A cell on its own — including the one still playing its flip — shows its piece in grey, in its own full frame; once its effect ends it joins every sold cell it shares a side with (cells touching only at a corner stay separate) and the whole shape turns to colour. A shape can have any outline — an L, a T, a ring around an unsold cell — and gets one gold frame that follows it: straight runs and outer corners are cut from `public/images/rips_tiles/FlipArtCell.png`, inner corners use `public/images/rips_tiles/FlipArtFrameInnerCorner.png` (its gold cut fills the unsold neighbour's cut corner; a hole gets four). Each shape is drawn in one piece over its cells, so no seams show inside it, and the painting is clipped just under the gold so it never peeks past the frame. Replace any of these files to restyle it; if a frame image changes, re-measure the numbers documented in `RipsFlatCell.css` (`.rfb-art-frame`) and `board-rips-flat/flipArtShapes.ts`.
+
+Two more selects decide where the teams sit. **Grouping type**: *Tier sorting* (default) puts tier 1 in the centre of the board, then tier 2, with tier 3 toward the edges, alphabetical inside a tier; *Alphabet order* lays the teams out alphabetically like text, left to right, row by row. **Replacing after selling**: *After selling cells replace on sides* (default) moves a sold cell to the outermost slots once its flip and burst end, and the rest re-deal around it; *After selling cells stay on its place* never moves anything, a sold cell flips where it is. Prices play no part in the order, so OBS, the controls preview and a reload always show the same board.
 
 **Change or regenerate the tiles**
 

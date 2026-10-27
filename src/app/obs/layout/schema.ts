@@ -235,6 +235,12 @@ export type Element = (
     // (value-centred, sold pushed to the edges) instead of alphabetically.
     // `tileSet` is read only by `rips_flat` (README "Rips board marble tiles"): which front-face art
     // the cells show, chosen from RipsFlatBoardSettings; unset = DEFAULT_RIPS_TILE_SET.
+    // `backStyle` is its back-face counterpart, independent of `tileSet` (any front with either
+    // back): 'tiles' is the grey sub-tile skin, 'flip_art' the shared painting behind a per-group
+    // gold frame (RipsFlatCell.tsx). Same select panel; unset = DEFAULT_RIPS_BACK_STYLE ('tiles').
+    // `cellOrder` / `soldPlacement` (rips_flat only, same panel, two selects; board-rips-flat/
+    // ripsOrder.ts): 'tier' = team tiers centre-out, 'alphabet' = alphabetical like text;
+    // 'sides' = sold cells move to the edges, 'stay' = nothing moves. Unset = 'tier' / 'sides'.
     | {
           kind: 'board'
           variant: BoardVariant
@@ -244,7 +250,10 @@ export type Element = (
           margin?: number
           edgeMode?: 'plain' | 'tiered'
           sortMode?: 'alphabetical' | 'centered'
-          tileSet?: 'veined' | 'clean' | 'icons'
+          tileSet?: 'veined' | 'clean' | 'icons' | 'marble_auto'
+          backStyle?: 'tiles' | 'flip_art'
+          cellOrder?: 'tier' | 'alphabet'
+          soldPlacement?: 'sides' | 'stay'
           // board:sport_style only (every other variant ignores all three; hit-sequence-plan.md §2.1):
           // the ball slot — a `hole.cols x hole.rows` block of grid cells at the TOP CENTRE that no
           // team is dealt into; the ball art renders there and is published as anchor `ball`.
