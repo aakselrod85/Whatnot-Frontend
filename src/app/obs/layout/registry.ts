@@ -16,7 +16,7 @@ import { CobraBoard } from './elements/board-cobra/CobraBoard'
 import { CobraFlatBoard } from './elements/board-cobra-flat/CobraFlatBoard'
 import { RipsFlatBoard } from './elements/board-rips-flat/RipsFlatBoard'
 import { RIPS_BOARD_ART } from './elements/board-rips-flat/boardArt'
-import { FLIP_ART_FRAME_SRC, MARBLE_AUTO_FRAME_SRC, MARBLE_AUTO_TIER_SRCS } from './elements/board-rips-flat/RipsFlatCell'
+import { MARBLE_AUTO_FRAME_SRC, MARBLE_AUTO_TIER_SRCS } from './elements/board-rips-flat/RipsFlatCell'
 import { SportStyleBoard } from './elements/board-sport-style/SportStyleBoard'
 import { ResultsElement } from './elements/results/ResultsElement'
 import { ThinResults } from './elements/results-thin/ThinResults'
@@ -307,7 +307,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // Static art only; team icons and tiled skins resolve at render time. The 'marble_auto'
         // set's frames (tier 0-2) and marble sheet (the latter is also in RIPS_FRAME_PRELOAD — cheap twice),
         // and the 'flip_art' back's frame (its painting is a random pick, loaded by useFlipArt.ts).
-        preload: [RIPS_BOARD_ART.src, MARBLE_AUTO_FRAME_SRC, ...MARBLE_AUTO_TIER_SRCS, RIPS_FRAME_ASSETS.back.src, FLIP_ART_FRAME_SRC],
+        preload: [RIPS_BOARD_ART.src, MARBLE_AUTO_FRAME_SRC, ...MARBLE_AUTO_TIER_SRCS, RIPS_FRAME_ASSETS.back.src],
         // The press burst on a sale is 650% of a cell — taller than this short board.
         unclipped: true,
         component: RipsFlatBoard,

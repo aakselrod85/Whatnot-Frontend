@@ -51,23 +51,20 @@ export type MarbleOrigin = {x: number; y: number}
 // laid in *cover* over the rectangle of the WHOLE cell grid (MAX_COLS x rowCount cells, empty
 // slots of a short row included, so the art never jumps on a re-deal) and each back face shows
 // the piece under it — same technique as the marble sheet, but relative to the grid, not the
-// canvas (`flipArt` below) — under FlipArtCell.png as a CSS 9-slice frame, corners cut off along
-// the frame's diagonal (RipsFlatCell.css `.rfb-art-back`). The cell itself only ever draws that
-// as a SOLO back (full frame, grayscale): it is what flips and bursts. Once the cell settles, it
-// joins the shape of sold cells it shares a side with, and FlipArtOverlay draws that shape's
-// painting and gold outline (outer and inner corners) in one SVG on top — in colour for a shape of
-// 2+, still grey for a shape of one — which is why no per-cell seams show inside a shape. Chosen
-// per board element in /obs/controls (the element's `backStyle`).
+// canvas (`flipArt` below) — a little inside the cell edge, corners cut off into an octagon
+// (RipsFlatCell.css `.rfb-art`), no frame. The cell itself only ever draws that as a SOLO back
+// (grayscale): it is what flips and bursts. Once the cell settles, it joins the shape of sold
+// cells it shares a side with, and FlipArtOverlay draws that shape's painting cut to its outline
+// in one SVG on top — in colour for a shape of 2+, still grey for a shape of one — which is why no
+// per-cell seams show inside a shape. Chosen per board element in /obs/controls (the element's
+// `backStyle`).
 export const RIPS_BACK_STYLES = ['tiles', 'flip_art'] as const
 export type RipsBackStyle = typeof RIPS_BACK_STYLES[number]
 export const DEFAULT_RIPS_BACK_STYLE: RipsBackStyle = 'tiles'
 
 // The painting itself is picked at random per page load (useFlipArt.ts).
-export const FLIP_ART_FRAME_SRC = '/images/rips_tiles/FlipArtCell.png'
-// Exposed-side frame thickness as a fraction of the cell: the band's inner edge should land where
-// the front gold's does in 'marble_auto' (12/124 of the cell, RipsFlatCell.css). In the 9-slice
-// that inner edge sits 13 px into the 34 px slice (measured, see the CSS), hence the 34/13.
-// RipsFlatBoard rounds `cellPx * this` to whole px and hands it down as `--art-frame-px`.
+// Scale of the octagon's corner cut as a fraction of the cell (34 art px of the old frame art =
+// this much). RipsFlatBoard rounds `cellPx * this` to whole px and hands it down as `--art-frame-px`.
 export const FLIP_ART_FRAME_RATIO = (12 / 124) * (34 / 13)
 
 // Where the cover-scaled painting lies relative to ONE cell: the sheet's px size and the offset
@@ -209,7 +206,6 @@ export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tie
                                     backgroundPosition: `${flipArt.x}px ${flipArt.y}px`,
                                 } : undefined}
                             />
-                            <div className="rfb-art-frame" />
                         </div>
                     ) : manifest && exposure && styleId && tier ? (
                         <CellSkin manifest={manifest} exposure={exposure} styleId={styleId} tier={tier} cellKey={String(event.id)} />

@@ -3,13 +3,15 @@
 //   - `cellOrder`:   'tier'     — tier 1 in the centre, then tier 2, tier 3 toward the edges (the
 //                                 centre-out deal of board:cobra_flat, layout.ts §3.3); alphabetical
 //                                 inside a tier.
-//                    'alphabet' — alphabetical, read like text: left to right, row by row.
+//                    'alphabet' — alphabetical, read like text: left to right, row by row; the 32 NFL
+//                                 teams (`IsTeam`) first, then custom spots (Miscellaneous included).
 //   - `soldPlacement`: 'sides'  — sold cells take the outermost slots (the tail of the centre-out
 //                                 deal, as cobra_flat does it) and the rest re-deal around them.
 //                      'stay'   — every cell is dealt as if unsold, so a sale never moves anything.
 // Prices play no part: the order depends only on the teams and their fixed tiers, so every page
 // (OBS, the controls preview, a reload) deals the same board.
 
+import {IsTeam} from '@/app/common/teams'
 import {centreOutOrder, MAX_COLS, splitRows} from '../board-cobra-flat/layout'
 
 export const RIPS_CELL_ORDERS = ['tier', 'alphabet'] as const
@@ -56,6 +58,9 @@ function compare(order: RipsCellOrder) {
         if (order === 'tier') {
             const t = ripsTierOf(a.team) - ripsTierOf(b.team)
             if (t !== 0) return t
+        } else {
+            const aIsTeam = IsTeam(a.team)
+            if (aIsTeam !== IsTeam(b.team)) return aIsTeam ? -1 : 1
         }
         const byName = a.team.localeCompare(b.team)
         return byName !== 0 ? byName : a.eventId - b.eventId
