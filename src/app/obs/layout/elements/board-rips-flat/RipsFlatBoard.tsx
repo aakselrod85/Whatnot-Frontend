@@ -338,7 +338,7 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                         })}
                     </div>
                     {/* 'flip_art': the settled cells' backs as free-form shapes (touching cells
-                        merged, outline framed in gold) in one SVG; the grey skin's decorations have
+                        merged, cut to the outline) in one SVG; the grey skin's decorations have
                         no place over the painting. */}
                     {flipArt
                         ? artCover && (
@@ -347,7 +347,6 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                                 sheet={artCover}
                                 padLeft={metrics.padLeft}
                                 padTop={metrics.padTop}
-                                framePx={artFramePx}
                             />
                         )
                         : <AccentOverlay manifest={manifest} groups={groups} cols={MAX_COLS} rows={rowCount} />}
