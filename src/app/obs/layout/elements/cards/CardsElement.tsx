@@ -919,7 +919,10 @@ export function CardsElement({ box, element }: ElementProps) {
                     `.crd-card-area--dimmed`). Keyed off `hoveredId`, not `elevatedId`, so the dim
                     lifts together with the 200ms zoom-out instead of lingering through the
                     220ms elevation hold. */}
-                <div className={`crd-card-area${hoveredId !== null ? ' crd-card-area--dimmed' : ''}`}>
+                <div
+                    className={`crd-card-area${hoveredId !== null ? ' crd-card-area--dimmed' : ''}`}
+                    style={{ height: `${cardAreaH}px` }}
+                >
                     {rows.map((row, ri) => (
                         <div key={ri} className="crd-row">
                             {row.photos.map((photo, ci) => {
