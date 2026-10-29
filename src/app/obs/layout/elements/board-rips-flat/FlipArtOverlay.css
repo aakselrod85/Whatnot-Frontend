@@ -1,0 +1,11 @@
+/* One SVG over the whole board element, 1 SVG unit = 1 element px (FlipArtOverlay.tsx shifts its
+   content to the grid's top-left). `overflow: visible` because an inner-corner sprite may reach a
+   little past the last cell. Same z-index as the 'tiles' accent layer: above the static cells,
+   below a flipping (100) or bursting (9999) one. */
+.rfb-art-layer {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 50;
+}

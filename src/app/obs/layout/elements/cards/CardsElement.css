@@ -22,9 +22,18 @@
     overflow: visible;
 }
 
+/* List mode: rows are anchored to the BOTTOM of the area cards pack into (decision 2026-10-28), so the
+   lowest row always touches it and any spare height sits above the top row. The height is set inline
+   to that area — the box, or the main area when the card-count threshold applies — so with the main
+   area active the stack ends at the main-area line, not at the (covered) box bottom. */
 .crd-card-area {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
     overflow: visible;
 }
 
@@ -56,6 +65,7 @@
 }
 
 .crd-row {
+    flex-shrink: 0;
     display: flex;
     width: 100%;
     justify-content: center;
