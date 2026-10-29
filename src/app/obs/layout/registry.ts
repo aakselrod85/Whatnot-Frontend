@@ -365,7 +365,8 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // Same panel shape as sport_style (cobra's price cards + a turf JSON textarea).
         wideBlock: true,
         reactsTo: [],
-        // Same names as board:sport_style, so an overlay aimed at one can be aimed at the other;
+        // Same names as board:sport_style, so an overlay aimed at one can be aimed at the other,
+        // and it honours `ball-visible` / `reveal-sold` cues;
         // plus the dynamic `cell:<eventId>` family (not declared, see SportStyleBoard.tsx).
         anchors: ['field', 'grid', 'ball'],
     },

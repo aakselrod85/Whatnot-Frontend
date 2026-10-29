@@ -50,7 +50,7 @@ export const TIER_MATERIALS: Record<Tier, TierMaterial> = {
         ring: 'rgba(110,74,12,0.5)',
         panel: 'rgba(120,80,10,0.2)',
         glow: '0 0 12px 2px rgba(255,214,120,0.7), 0 3px 6px rgba(0,0,0,0.55)',
-        shine: {kind: 'gold', cycleS: 6},
+        shine: {kind: 'gold', cycleS: 9},
     },
     // Giant — polished silver lit from the top, navy price.
     good: {
@@ -63,7 +63,7 @@ export const TIER_MATERIALS: Record<Tier, TierMaterial> = {
         ring: 'rgba(70,78,92,0.45)',
         panel: 'rgba(40,52,80,0.14)',
         glow: '0 0 8px 1px rgba(225,238,255,0.5), 0 3px 6px rgba(0,0,0,0.55)',
-        shine: {kind: 'silver', cycleS: 10},
+        shine: {kind: 'silver', cycleS: 13},
     },
     // Chaser — matte copper leather, cream price. The red-brown keeps it off the turf green.
     mid: {

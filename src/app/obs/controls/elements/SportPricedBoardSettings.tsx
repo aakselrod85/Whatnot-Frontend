@@ -88,6 +88,18 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
                 </label>
             </div>
 
+            <div className="mb-2">
+                <label className="form-label mb-0 small" title="gated: cells turn sold only when a Hit sequence reveals them (90 s safety)">Sold reveal</label>
+                <select
+                    className="form-select form-select-sm"
+                    value={element.soldReveal === 'gated' ? 'gated' : 'immediate'}
+                    onChange={(e) => onPatchElement(elementKey, {soldReveal: e.target.value as 'immediate' | 'gated'})}
+                >
+                    <option value="immediate">Immediate</option>
+                    <option value="gated">Gated</option>
+                </select>
+            </div>
+
             <CobraBoardSettings channelId={channelId} seriesId={seriesId} onFireCue={onFireCue}/>
 
             <div className="mb-2 mt-3">

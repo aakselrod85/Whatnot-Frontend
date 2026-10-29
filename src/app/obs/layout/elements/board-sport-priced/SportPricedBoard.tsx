@@ -28,7 +28,7 @@
 // Anchors: `field`, `grid`, `ball` and the dynamic `cell:<eventId>` family, the same names
 // board:sport_style publishes, so an overlay aimed at one board can be aimed at this one.
 
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import type {ElementProps} from '../../registry'
 import {useLayoutData} from '../../useLayoutData'
 import {useCueBus} from '../../cueBus'
@@ -67,6 +67,11 @@ const FALLBACK_BACKGROUND: RGB = [40, 40, 40]
 // fit the longest price on the board into a tile's price room.
 const PRICE_EM_PER_CHAR = 0.46
 
+// hit-sequence-plan.md §2.3: the sold gate's safety net — a gated cell that was seen sold but never
+// got a `reveal-sold` cue (sequence aborted, hitSequence missing from the stage, queue overflow in
+// another tab) turns sold on its own after this long, so a mis-set-up gate can never freeze a cell.
+const GATE_TIMEOUT_MS = 90_000
+
 // One turf seed per page load, re-rolled by the panel's Regenerate turf (the same
 // `sport-style-regenerate` cue sport_style listens to).
 const seeds = {turf: Math.floor(Math.random() * 2 ** 31)}
@@ -98,16 +103,16 @@ type CellProps = {
     priceFontPx: number
     shine: boolean
     shineDelayS: number
+    sold: boolean
 }
 
 // Gold's breathing halo, on top of the tile's own static glow.
 const GOLD_HALO = '0 0 16px 4px rgba(255,214,120,0.6)'
 
 /** One tile, in its own component so `useTeamPalette` (a hook) runs once per event. */
-function PricedCell({event, x, y, w, h, tier, price, priceFontPx, shine, shineDelayS}: CellProps) {
+function PricedCell({event, x, y, w, h, tier, price, priceFontPx, shine, shineDelayS, sold}: CellProps) {
     const withLogo = hasLogo(event.team)
     const palette = useTeamPalette(event.team)
-    const sold = event.customer !== ''
     const background = palette
         ? (DEFAULT_PATCH.mixEnabled ? mix(palette.background, palette.secondary, DEFAULT_PATCH.mixRatio) : palette.background)
         : FALLBACK_BACKGROUND
@@ -150,8 +155,20 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
 
     const events = useMemo(() => rawEvents.filter((e) => !e.is_giveaway && !e.note), [rawEvents])
 
+    // ---- sold gate (hit-sequence-plan.md §2.3), copied from SportStyleBoard ----------------------
+    // `revealed` = sold event ids allowed to RENDER sold. The baseline marks everything already sold
+    // at mount (or on a break change) revealed, so only sales seen afterwards are held back.
+    const gated = boardElement?.soldReveal === 'gated'
+    const activeBreakId = stream?.active_break_id ?? null
+    const [revealed, setRevealed] = useState<Set<number>>(() => new Set())
+    const baselineBreakRef = useRef<number | null>(null)
+    const isShownSold = (e: Event) => e.customer !== '' && (!gated || revealed.has(e.id))
+
     // Same tier inputs and threshold fallbacks as SportStyleBoard/CobraFlatBoard.
-    const unsoldTeamNames = useMemo(() => events.filter((e) => e.customer === '').map((e) => e.team), [events])
+    const unsoldTeamNames = useMemo(
+        () => events.filter((e) => !(e.customer !== '' && (!gated || revealed.has(e.id)))).map((e) => e.team),
+        [events, gated, revealed]
+    )
     const defaultPrice = series?.default_price || DEFAULT_PRICE
     const bestThreshold = priceRanges.find((r) => r.tier_id === 'best')?.price_from ?? BEST_THRESHOLD
     const goodThreshold = priceRanges.find((r) => r.tier_id === 'good')?.price_from ?? GOOD_THRESHOLD
@@ -184,16 +201,18 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
             eventId: e.id,
             team: e.team,
             tier: cellByTeam.get(e.team)?.tier ?? 'regular',
-            sold: e.customer !== '',
+            sold: isShownSold(e),
             priceLeft: priceLeftByTeam.get(e.team) ?? 0,
         }))
         return pricedOrder(flat).map((c, rank) => ({event: eventById.get(c.eventId)!, tier: c.sold ? 'regular' as Tier : c.tier, seat: grid.seats[rank]}))
             .filter((p) => p.seat !== undefined)
-    }, [events, cellByTeam, priceLeftByTeam, grid])
+        // `isShownSold` is rebuilt every render; its inputs are the deps.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [events, cellByTeam, priceLeftByTeam, grid, gated, revealed])
 
     const priceOf = (e: Event) => cellByTeam.get(e.team)?.price ?? shortRange(defaultPrice)
     // One price size for the whole board, fitted to its longest price, so every tile lines up.
-    const maxLen = placed.reduce((m, p) => (p.event.customer === '' ? Math.max(m, priceOf(p.event).length) : m), 4)
+    const maxLen = placed.reduce((m, p) => (!isShownSold(p.event) ? Math.max(m, priceOf(p.event).length) : m), 4)
     const priceFontPx = Math.max(8, Math.floor(Math.min(tileH * 0.56, tileMetrics(tileW, tileH).priceRoom / (maxLen * PRICE_EM_PER_CHAR))))
 
     // Shine stagger: `placed` runs from the ball outward, so the n-th tile of a tier is the n-th
@@ -232,7 +251,9 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
             field: {x: originX, y: originY, w: innerW, h: innerH, rx: fieldRadius, ry: fieldRadius},
             grid: {x: originX + gridLeft, y: originY + gridTop, w: cols * cellW, h: rows * cellH, rx: 0, ry: 0},
         }
-        if (ballRect) out.ball = {x: originX + ballRect.x, y: originY + ballRect.y, w: ballRect.w, h: ballRect.h, rx: ballRect.w / 2, ry: ballRect.h / 2}
+        // Square so `match: 'size'` hands off the video ball at the same size as on sport_style;
+        // the art itself is `ballW × ballW/2`.
+        if (ballRect) out.ball = {x: originX + ballRect.x, y: originY + ballRect.y + ballRect.h / 2 - ballRect.w / 2, w: ballRect.w, h: ballRect.w, rx: ballRect.w / 2, ry: ballRect.w / 2}
         for (const c of cells) out[`cell:${c.event.id}`] = {x: originX + c.x, y: originY + c.y, w: tileW, h: tileH, rx: 0, ry: 0}
         return out
         // `cells`/`ballRect` are rebuilt every render; their inputs are the deps.
@@ -249,6 +270,82 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
             setTurfTick((t) => t + 1)
         })
     }, [cueBus])
+
+    // hit-sequence-plan.md §2.3: the ball art's visibility, driven by `ball-visible` cues from the
+    // hitSequence element. Hidden = `visibility: hidden` only (the node and the `ball` anchor stay).
+    // Back to visible on mount and on a break change.
+    const [ballVisible, setBallVisible] = useState(true)
+    useEffect(() => {
+        setBallVisible(true)
+    }, [activeBreakId])
+    useEffect(() => {
+        return cueBus.subscribe((cue) => {
+            if (cue.kind !== 'ball-visible') return
+            if (cue.boardKey !== undefined && cue.boardKey !== elementKey) return
+            setBallVisible(cue.visible)
+        })
+    }, [cueBus, elementKey])
+
+    // Sold gate baseline (layout effect: no painted frame shows an already-sold cell as unsold).
+    // Events of a previous break can linger until the new fetch lands, so only events carrying the
+    // ACTIVE break id count as the baseline.
+    useLayoutEffect(() => {
+        if (!gated) return
+        if (activeBreakId === null) {
+            baselineBreakRef.current = null
+            return
+        }
+        if (baselineBreakRef.current === activeBreakId) return
+        const current = rawEvents.filter((e) => e.break_id === activeBreakId)
+        if (current.length === 0) return
+        baselineBreakRef.current = activeBreakId
+        setRevealed(new Set(current.filter((e) => e.customer !== '').map((e) => e.id)))
+    }, [gated, activeBreakId, rawEvents])
+
+    // `reveal-sold` cues from hitSequence.
+    useEffect(() => {
+        return cueBus.subscribe((cue) => {
+            if (cue.kind !== 'reveal-sold') return
+            if (cue.boardKey !== undefined && cue.boardKey !== elementKey) return
+            setRevealed((prev) => (prev.has(cue.eventId) ? prev : new Set(prev).add(cue.eventId)))
+        })
+    }, [cueBus, elementKey])
+
+    // Safety timeouts + re-arming: every gated-but-unrevealed sold id is revealed GATE_TIMEOUT_MS
+    // after it was first seen; an id that goes back to unsold is dropped from `revealed` so a later
+    // re-sale gates again.
+    const gateTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+    useEffect(() => {
+        const timers = gateTimersRef.current
+        if (!gated || baselineBreakRef.current === null) return
+        const soldIds = new Set(rawEvents.filter((e) => e.customer !== '').map((e) => e.id))
+        for (const e of rawEvents) {
+            if (e.customer === '' || revealed.has(e.id) || timers.has(e.id)) continue
+            timers.set(
+                e.id,
+                setTimeout(() => {
+                    timers.delete(e.id)
+                    setRevealed((prev) => (prev.has(e.id) ? prev : new Set(prev).add(e.id)))
+                }, GATE_TIMEOUT_MS)
+            )
+        }
+        timers.forEach((t, id) => {
+            if (revealed.has(id) || !soldIds.has(id)) {
+                clearTimeout(t)
+                timers.delete(id)
+            }
+        })
+        if (Array.from(revealed).some((id) => !soldIds.has(id) && rawEvents.some((e) => e.id === id))) {
+            setRevealed((prev) => new Set(Array.from(prev).filter((id) => soldIds.has(id) || !rawEvents.some((e) => e.id === id))))
+        }
+    }, [gated, rawEvents, revealed])
+    useEffect(() => {
+        const timers = gateTimersRef.current
+        return () => {
+            timers.forEach((t) => clearTimeout(t))
+            timers.clear()
+        }
+    }, [])
 
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const turfKey = JSON.stringify(turf)
@@ -294,12 +391,12 @@ export function SportPricedBoard({elementKey, element, box}: ElementProps) {
                     ))}
 
                     {cells.map(({event, tier, x, y, shineDelayS}) => (
-                        <PricedCell key={event.id} event={event} x={x} y={y} w={tileW} h={tileH} tier={tier} price={priceOf(event)} priceFontPx={priceFontPx} shine={shine} shineDelayS={shineDelayS} />
+                        <PricedCell key={event.id} event={event} x={x} y={y} w={tileW} h={tileH} tier={tier} price={priceOf(event)} priceFontPx={priceFontPx} shine={shine} shineDelayS={shineDelayS} sold={isShownSold(event)} />
                     ))}
 
                     {ballRect && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="spp-ball" src={BALL_SRC} alt="" style={{left: ballRect.x, top: ballRect.y, width: ballRect.w, height: ballRect.h}} />
+                        <img className="spp-ball" src={BALL_SRC} alt="" style={{left: ballRect.x, top: ballRect.y, width: ballRect.w, height: ballRect.h, visibility: ballVisible ? 'visible' : 'hidden'}} />
                     )}
 
                     <div className="spp-border" style={{left: borderInset, top: borderInset, width: innerW - 2 * borderInset, height: innerH - 2 * borderInset, border: `${borderW}px solid rgba(255,255,255,0.85)`, borderRadius: Math.max(0, fieldRadius - borderInset)}} />

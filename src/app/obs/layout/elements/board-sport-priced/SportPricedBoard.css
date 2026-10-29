@@ -110,17 +110,27 @@
     background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(240, 248, 255, 0.35) 30%, rgba(255, 255, 255, 0.8) 50%, rgba(240, 248, 255, 0.35) 70%, rgba(255, 255, 255, 0) 100%);
 }
 
-/* Gold: a 1.5s sweep in a 6s cycle. */
+/* Sweep profile (both tiers): the band is 45% of the tile wide, so its centre enters the tile at
+   translateX(-50%) and leaves at 172%. It crosses fast until the centre is 60% across (83%), crawls
+   from 60% to 80% (83% -> 128%), then finishes fast. "Fast" is 150%/s for gold and 125%/s for
+   silver (half the old average speed); "slow" is a fifth of that. Linear per segment so each
+   speed holds steady; the keyframe percentages below are those segment times over the cycle. */
+
+/* Gold: 9s cycle — fast 1.55s, slow 1.5s, fast 1.15s, rest ~4.8s. */
 @keyframes spp-sweep-gold {
-    0% { transform: translateX(-150%) skewX(-20deg); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
-    25% { transform: translateX(300%) skewX(-20deg); }
+    0% { transform: translateX(-150%) skewX(-20deg); }
+    17% { transform: translateX(83%) skewX(-20deg); }
+    34% { transform: translateX(128%) skewX(-20deg); }
+    47% { transform: translateX(300%) skewX(-20deg); }
     100% { transform: translateX(300%) skewX(-20deg); }
 }
 
-/* Silver: a 1.8s sweep in a 10s cycle — slower and rarer than gold. */
+/* Silver: 13s cycle — fast 1.85s, slow 1.8s, fast 1.4s, rest ~8s; slower and rarer than gold. */
 @keyframes spp-sweep-silver {
-    0% { transform: translateX(-150%) skewX(-20deg); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
-    18% { transform: translateX(300%) skewX(-20deg); }
+    0% { transform: translateX(-150%) skewX(-20deg); }
+    14% { transform: translateX(83%) skewX(-20deg); }
+    28% { transform: translateX(128%) skewX(-20deg); }
+    39% { transform: translateX(300%) skewX(-20deg); }
     100% { transform: translateX(300%) skewX(-20deg); }
 }
 
