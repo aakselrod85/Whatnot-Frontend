@@ -24,6 +24,7 @@ import CardsSettings from './CardsSettings'
 import CobraBoardSettings from './CobraBoardSettings'
 import RipsFlatBoardSettings from './RipsFlatBoardSettings'
 import SportStyleBoardSettings from './SportStyleBoardSettings'
+import SportPricedBoardSettings from './SportPricedBoardSettings'
 import FrameSettings from './FrameSettings'
 import StashOrPassWrapSettings from './StashOrPassWrapSettings'
 import ResultsSettings from './ResultsSettings'
@@ -97,6 +98,9 @@ const SETTINGS_PANELS = {
     'board:rips_flat': ({elementKey, element, onPatchElement}) => <RipsFlatBoardSettings elementKey={elementKey} element={element} onPatchElement={onPatchElement}/>,
     'board:sport_style': ({elementKey, element, currentPhase, channelId, seriesId, onPatchElement, onEmitCue, onFireCue}) => (
         <SportStyleBoardSettings elementKey={elementKey} element={element} currentPhase={currentPhase} channelId={channelId} seriesId={seriesId} onPatchElement={onPatchElement} onEmitCue={onEmitCue} onFireCue={onFireCue}/>
+    ),
+    'board:sport_priced': ({elementKey, element, currentPhase, channelId, seriesId, onPatchElement, onEmitCue, onFireCue}) => (
+        <SportPricedBoardSettings elementKey={elementKey} element={element} currentPhase={currentPhase} channelId={channelId} seriesId={seriesId} onPatchElement={onPatchElement} onEmitCue={onEmitCue} onFireCue={onFireCue}/>
     ),
     'widget:pick2': ({channelId, onFireCue}) => <Pick2Settings channelId={channelId} onFireCue={onFireCue}/>,
     'widget:stashorpass': ({channelId, onFireCue}) => <StashOrPassSettings channelId={channelId} onFireCue={onFireCue}/>,

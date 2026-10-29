@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Exo_2, Handjet, Orbitron } from "next/font/google";
+import { Inter, Exo_2, Handjet, Orbitron, Teko } from "next/font/google";
 import "./globals.css";
 import 'bootstrap/dist/css/bootstrap.css';
 import BootstrapClient from "@/components/BootstrapClient";
@@ -15,6 +15,9 @@ const handjet = Handjet({ subsets: ["latin"], variable: "--font-handjet", axes: 
 // Solid sci-fi face for the ticker (its default since 2026-09-29): same LED feel as Handjet but
 // built from solid strokes, so moving text is cheap to redraw and survives stream compression.
 const orbitron = Orbitron({ subsets: ["latin"], weight: ["700", "800"], variable: "--font-orbitron" });
+// Tall condensed sports face for board:sport_priced's prices — a "$375" fits a small tile at a size
+// that still reads on a phone. Self-hosted by next/font like the faces above.
+const teko = Teko({ subsets: ["latin"], weight: ["600"], variable: "--font-teko" });
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -28,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} ${exo2.variable} ${handjet.variable} ${orbitron.variable} my-body`} data-bs-theme="dark">
+      <body className={`${inter.className} ${exo2.variable} ${handjet.variable} ${orbitron.variable} ${teko.variable} my-body`} data-bs-theme="dark">
         <BreadcrumbsComponent/>
         {children}
         <BootstrapClient />

@@ -27,6 +27,7 @@ import { useResolvedAnchor, useTargetShape, type Shape } from '../../anchors'
 import { useLayoutObs } from '../../obsConnection'
 import type { Event } from '@/app/entity/entities'
 import { runSteps, type ObsStep, type RunHandle, type VideoStep } from './runner'
+import { isHitBoard } from './targets'
 import { chooseVariant, videoRect, type VideoMeta } from './placement'
 import { executeObsStep, hideShown, type ShownItem } from './obsSteps'
 import { useHitDetector } from './useHitDetector'
@@ -66,13 +67,13 @@ export function HitSequenceElement({ elementKey, element }: ElementProps) {
     const obs = useLayoutObs()
     const activeBreakId = stream?.active_break_id ?? null
 
-    // Default target: the first sport-style board in the config (the only variant that publishes
-    // the anchors this element needs).
-    const firstSportStyleKey = useMemo(
-        () => Object.entries(config.elements).find(([, el]) => el.kind === 'board' && el.variant === 'sport_style')?.[0],
+    // Default target: the first sport_style / sport_priced board in the config (the only variants
+    // that publish the anchors this element needs).
+    const firstHitBoardKey = useMemo(
+        () => Object.entries(config.elements).find(([, el]) => isHitBoard(el))?.[0],
         [config]
     )
-    const targetKey = seq?.target ?? firstSportStyleKey
+    const targetKey = seq?.target ?? firstHitBoardKey
 
     const [active, setActive] = useState<Active | null>(null)
     const ballShape = useResolvedAnchor(targetKey ?? '', 'ball')

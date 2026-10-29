@@ -15,6 +15,7 @@ import type { MyOBSWebsocket } from '@/app/entity/my_obs_websocket'
 import type { Event, WNChannel, WNStream, GetEventsByBreakResponse } from '@/app/entity/entities'
 import { getEndpoints, isBackendFailure, post } from '@/app/lib/backend'
 import { TIER_LABEL, type Tier } from '@/app/obs/layout/elements/board-cobra/pricing'
+import { isHitBoard } from '@/app/obs/layout/elements/hit-sequence/targets'
 import type { PatchElement } from './ElementBlock'
 
 type Props = {
@@ -178,7 +179,7 @@ export default function HitSequenceSettings({ channelId, elementKey, element, co
 
     // ---- target info ----------------------------------------------------------------------------
     const boardKeys = Object.entries(config.elements)
-        .filter(([, el]) => el.kind === 'board' && el.variant === 'sport_style')
+        .filter(([, el]) => isHitBoard(el))
         .map(([key]) => key)
     const resolvedTargetKey = seq.target ?? boardKeys[0]
     const targetEl = resolvedTargetKey ? config.elements[resolvedTargetKey] : undefined
@@ -415,7 +416,7 @@ export default function HitSequenceSettings({ channelId, elementKey, element, co
                 <div>
                     <label className="form-label mb-0 small">Target board</label>
                     <select className="form-select form-select-sm" value={seq.target ?? ''} onChange={(e) => onPatchElement(elementKey, { target: e.target.value || undefined })}>
-                        <option value="">(first sport style board)</option>
+                        <option value="">(first sport board)</option>
                         {targetMissing && <option value={seq.target}>{seq.target} (missing)</option>}
                         {boardKeys.map((k) => <option key={k} value={k}>{k}</option>)}
                     </select>
@@ -439,7 +440,7 @@ export default function HitSequenceSettings({ channelId, elementKey, element, co
                 Teams below this are marked sold immediately, with no animation. A series without prices has only Side Card teams.
             </div>
             <div className="small text-secondary">
-                {resolvedTargetKey ? `Board sold reveal: ${targetReveal}` : 'No sport style board in this layout'}
+                {resolvedTargetKey ? `Board sold reveal: ${targetReveal}` : 'No sport style / sport priced board in this layout'}
                 {resolvedTargetKey && targetReveal === 'immediate' && ' — set to gated for the fall video to land on the cell'}
             </div>
 
