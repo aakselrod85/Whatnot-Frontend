@@ -269,8 +269,10 @@ export type Element = (
           // default 3), and the tile's width ÷ height (default 2).
           ballCols?: number
           cellAspect?: number
-          // board:sport_priced: gold/silver light sweep + gold halo (default true).
+          // board:sport_priced: continuous gold sweeps + halo / occasional silver sweep (default true).
           shine?: boolean
+          // board:sport_priced: gold 120%, silver 110%, others 100%; wraps into taller rows.
+          tierSizing?: boolean
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions
