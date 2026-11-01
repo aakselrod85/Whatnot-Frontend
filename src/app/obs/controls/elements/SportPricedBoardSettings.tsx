@@ -1,8 +1,8 @@
 'use client'
 
-// Settings for `board:sport_priced`. Same model as SportStyleBoardSettings: the operator sets the
-// box WIDTH (Box section) plus Cells per row / Ball cells / Tile shape / Margin here; height is
-// derived and Fit height sizes the box to it. Config fields go through `onPatchElement`; the price
+// Settings for `board:sport_priced`. The operator sets the box WIDTH AND HEIGHT (Box section); the
+// tiles size themselves to fill it (pricedFillLayout.ts). Reference columns / Tile shape
+// size the football and the field ticks, Margin insets the field. Config fields go through `onPatchElement`; the price
 // cards (Side Cards Price, Board: Price Ranges, Presets) are cobra's own panel rendered as-is — this
 // board reads the same channel-wide thresholds and series default price.
 
@@ -10,11 +10,10 @@ import {useState} from 'react'
 import type {DurableCue, Element, Phase, TransientCue} from '@/app/obs/layout/schema'
 import {DEFAULT_PRICED_TURF} from '@/app/obs/sport_style/fieldConstants'
 import {
-    DEFAULT_BALL_COLS,
     DEFAULT_CELL_ASPECT,
     DEFAULT_PRICED_COLS,
-    pricedFieldSize,
 } from '@/app/obs/layout/elements/board-sport-priced/SportPricedBoard'
+import {fillSummary} from '@/app/obs/sport_style/pricedFillLayout'
 import type {PatchElement} from './ElementBlock'
 import CobraBoardSettings from './CobraBoardSettings'
 import {JsonField, isCustomBlob} from './JsonField'
@@ -40,11 +39,10 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
     if (element.kind !== 'board') return null
 
     const cols = Math.max(2, Math.min(12, element.cols ?? DEFAULT_PRICED_COLS))
-    const ballCols = Math.max(0, Math.min(cols - 1, element.ballCols ?? DEFAULT_BALL_COLS))
     const aspect = element.cellAspect ?? DEFAULT_CELL_ASPECT
     const margin = Math.max(0, element.margin ?? 0)
     const box = element.placements[currentPhase] ?? element.placements.all
-    const {rows, fieldH} = pricedFieldSize(box?.w ?? 0, slots, cols, ballCols, aspect, margin, element.tierSizing ? {best: goldSlots, good: silverSlots} : undefined)
+    const summary = box ? fillSummary(slots, box.w, box.h, element, {cols: DEFAULT_PRICED_COLS, aspect: DEFAULT_CELL_ASPECT}, element.tierSizing ? {best: goldSlots, good: silverSlots} : undefined) : undefined
 
     const num = (label: string, value: number, min: number, max: number, step: number, apply: (v: number) => void, title?: string) => (
         <div>
@@ -68,9 +66,8 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
     return (
         <div>
             <div className="d-flex gap-3 mb-2 flex-wrap">
-                {num('Cells per row', cols, 2, 12, 1, (v) => onPatchElement(elementKey, {cols: Math.round(v)}))}
-                {num('Ball cells', ballCols, 0, Math.min(10, cols - 1), 1, (v) => onPatchElement(elementKey, {ballCols: Math.round(v)}),
-                    'Cells of the middle row the football takes. 3 = ball with a "50" either side; 0 = no ball.')}
+                {num('Reference columns', cols, 2, 12, 1, (v) => onPatchElement(elementKey, {cols: Math.round(v)}),
+                    'Sizes the field ticks and padding; tiles size themselves to the box')}
                 {num('Tile shape', aspect, 1, 4, 0.1, (v) => onPatchElement(elementKey, {cellAspect: Math.round(v * 10) / 10}),
                     'Tile width ÷ height. 2 fits logo + "$375" at a readable size on 7 columns.')}
                 {num('Margin', margin, 0, 200, 1, (v) => onPatchElement(elementKey, {margin: Math.round(v)}),
@@ -84,8 +81,7 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
                 <label className="form-check-label small" htmlFor={`${elementKey}-tier-sizing`}>Larger gold / silver tiles</label>
             </div>
             {element.tierSizing && <div className="small text-muted mb-2">
-                Gold 120%, silver 110%; other tiles keep their normal size. Rows wrap to fit the width.
-                Use Fit height below to make room for the taller board.
+                Gold 120%, silver 110%; other tiles keep their normal size. Tiles grow to fill the box.
             </div>}
 
             <div className="form-check mb-2">
@@ -116,8 +112,8 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
             <CobraBoardSettings channelId={channelId} seriesId={seriesId} onFireCue={onFireCue}/>
 
             <div className="mb-2 mt-3">
-                <label className="form-label mb-0 small" title="Display-only — not saved. Feeds the height readout below, since this panel has no live event data.">
-                    Slots (for height readout)
+                <label className="form-label mb-0 small" title="Display-only — not saved. Feeds the tile-size readout below, since this panel has no live event data.">
+                    Slots (for tile-size readout)
                 </label>
                 <input
                     type="number"
@@ -133,18 +129,9 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
                 {num('Silver slots (estimate)', silverSlots, 0, Math.max(0, slots - goldSlots), 1, v => setSilverSlots(Math.round(v)))}
             </div>}
             <div className="small text-muted mb-2">
-                Estimated field needs {fieldH}px for {rows} row{rows === 1 ? '' : 's'}
-                {box ? ` (current box ${box.h}px)` : ' — not placed in this stage'}
+                {summary ? `With ${slots} slots: base tiles ${summary.tileW}×${summary.tileH} px (rows stretch to full width) in ${summary.rows} row${summary.rows === 1 ? '' : 's'}` : 'Not placed in this stage'}
             </div>
             <div className="d-flex gap-2 mb-3">
-                <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    disabled={!box}
-                    onClick={() => box && onPatchElement(elementKey, {placements: {...element.placements, [currentPhase]: {...box, h: fieldH}}})}
-                >
-                    Fit height
-                </button>
                 <button
                     type="button"
                     className="btn btn-sm btn-outline-secondary"

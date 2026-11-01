@@ -22,6 +22,7 @@
 .spp-field {
     position: absolute;
     left: 0;
+    top: 0;
 }
 
 /* The painted field: turf canvas, lines, tiles, ball and border, all in its own coordinates. */
@@ -39,9 +40,21 @@
 .spp-line,
 .spp-border,
 .spp-cell,
-.spp-yard,
 .spp-ball {
     position: absolute;
+}
+
+.spp-cell {
+    will-change: transform;
+}
+
+/* A sold tile leaves in place (priced-board-fill-plan.md §3); the survivors glide via an inline
+   FLIP transform set by the board. */
+.spp-cell--leaving {
+    opacity: 0;
+    transform: scale(0.6) !important;
+    transform-origin: center !important;
+    transition: opacity 500ms ease-out, transform 500ms ease-in !important;
 }
 
 .spp-border {
@@ -49,17 +62,6 @@
     pointer-events: none;
 }
 
-.spp-yard {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255, 255, 255, 0.82);
-    font-family: var(--font-teko), 'Arial Narrow', sans-serif;
-    font-weight: 600;
-    line-height: 1;
-    padding-top: 0.08em;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
 
 .spp-ball {
     object-fit: contain;

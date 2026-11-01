@@ -265,9 +265,10 @@ export type Element = (
           // `reveal-sold` cue names its event id, or GATE_TIMEOUT_MS passes. Default 'immediate'.
           soldReveal?: 'immediate' | 'gated'
           // board:sport_priced only (SportPricedBoard.tsx; `cols`/`margin`/`turf` above are shared
-          // with sport_style): how many cells of the MIDDLE row the football takes (0 = no ball,
-          // default 3), and the tile's width ÷ height (default 2).
-          ballCols?: number
+          // with sport_style): the base tile's width ÷ height (default 2). `cols` is the REFERENCE
+          // column count (field ticks and padding); tiles size themselves to the box
+          // (priced-board-fill-plan.md). The football is always one seat of the bottom row — the
+          // old `ballCols` key is ignored if an existing config still carries it.
           cellAspect?: number
           // board:sport_priced: continuous gold sweeps + halo / occasional silver sweep (default true).
           shine?: boolean
