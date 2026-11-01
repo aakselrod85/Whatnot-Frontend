@@ -6,11 +6,8 @@
 // one plain chalk for Side Cards; a sold tile is the same grey imprint as PatchCell's sold branch
 // (team silhouette in a darker grey), with SOLD in place of the price, in the same two sections.
 //
-// Gold and silver run their material's `shine`: a soft light band that crosses the tile's
-// BACKGROUND only — it sits under the divider, logo and price, so nothing that has to be read
-// moves. Stream-safe on purpose: it animates transform alone (composited in OBS's CEF, no repaint),
-// the band is wide with soft edges and no hard line (low-frequency change the encoder handles
-// without smearing), and the board staggers the tiles so only a few move at once.
+// Gold has continuous overlapping champagne sweeps beneath the border, logo and price.
+// Silver uses a softer sweep with a pause between passes.
 //
 // The logo always gets the hard dark outline from PatchCell's `crisp` logo mode — a brightness edge
 // survives the stream's 4:2:0 chroma subsampling where a logo that only differs from its tile in hue
@@ -40,13 +37,13 @@ type Props = {
 /** The tile's proportions, shared with the board so it can size the price font once. */
 export function tileMetrics(w: number, h: number) {
     const radius = Math.round(h * 0.2)
-    const edgeInset = Math.max(3, Math.round(h * 0.09))
+    const edgeInset = Math.max(3, Math.round(h * 0.07))
     const edgeWidth = Math.max(2, Math.round(h * 0.035))
-    const logo = Math.round(h * 0.6)
+    const logo = Math.round(h * 0.74)
     // Logo section: from the tile's left edge to the divider. Wide enough for the logo plus the
     // edge band and an even margin either side of it.
-    const section = edgeInset + logo + 2 * Math.round(h * 0.11)
-    const pad = Math.round(h * 0.12)
+    const section = edgeInset + logo + 2 * Math.max(2, Math.round(h * 0.035))
+    const pad = Math.max(2, Math.round(h * 0.04))
     // Room for the price between the divider and the right edge line, with `pad` either side.
     const priceRoom = Math.max(1, w - section - edgeWidth - edgeInset - 2 * pad)
     return {radius, edgeInset, edgeWidth, logo, section, priceRoom}
@@ -115,7 +112,7 @@ export default function PricePatchCell({w, h, background, logoSrc, label, price,
 
     return (
         <div
-            className="spp-tile"
+            className={`spp-tile${material.shine?.kind === 'gold' ? ' spp-tile--gold' : ''}`}
             style={{
                 width: w,
                 height: h,
@@ -124,13 +121,22 @@ export default function PricePatchCell({w, h, background, logoSrc, label, price,
                 boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.35), ${material.glow}`,
             }}
         >
-            <div className="spp-panel" style={{width: section, background: material.panel}} />
-            {shine && material.shine && (
+            <div className="spp-panel" style={{width: section, background: material.panel, borderTopLeftRadius: radius, borderBottomLeftRadius: radius}} />
+            {shine && material.shine?.kind === 'silver' && (
                 <div
-                    className={`spp-shine spp-shine--${material.shine.kind}`}
+                    className="spp-shine"
+                    aria-hidden="true"
                     style={{animationDuration: `${material.shine.cycleS}s`, animationDelay: `${shineDelayS}s`}}
                 />
             )}
+            {shine && material.shine?.kind === 'gold' && [0, 1].map((pass) => (
+                <div
+                    key={pass}
+                    className="spp-shine spp-shine--gold"
+                    aria-hidden="true"
+                    style={{animationDuration: `${material.shine!.cycleS}s`, animationDelay: `${shineDelayS - pass * material.shine!.cycleS / 2}s`}}
+                />
+            ))}
             <svg className="spp-tile-svg" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
                 <path
                     fillRule="evenodd"
@@ -139,6 +145,7 @@ export default function PricePatchCell({w, h, background, logoSrc, label, price,
                 />
                 {edgeRect(edgeShadow, 1, 1)}
                 {divider(edgeShadow, 1)}
+                {material.shine?.kind === 'gold' && edgeRect('rgba(255, 242, 164, 0.95)', 0, 2)}
                 {edgeRect(edgeColor)}
                 {divider(edgeColor)}
             </svg>
@@ -151,7 +158,9 @@ export default function PricePatchCell({w, h, background, logoSrc, label, price,
                 )}
             </div>
             <div className="spp-sec" style={priceBox}>
-                <span className="spp-price" style={{fontSize: priceFontPx, color: rgbToCss(material.ink), textShadow: inkShadow}}>{price}</span>
+                <span className="spp-price" style={{fontSize: priceFontPx, color: rgbToCss(material.ink), textShadow: inkShadow}}>
+                    {price.startsWith('$') ? <><span className="spp-currency">$</span>{price.slice(1)}</> : price}
+                </span>
             </div>
         </div>
     )
