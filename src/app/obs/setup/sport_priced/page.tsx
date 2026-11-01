@@ -17,6 +17,7 @@ import {
     DEFAULT_CELL_ASPECT,
     DEFAULT_PRICED_COLS,
     SportPricedBoard,
+    pricedFieldSize,
 } from '@/app/obs/layout/elements/board-sport-priced/SportPricedBoard'
 
 // Price left per team on the priced stream (0 = Side Card: no price of its own, shows the series
@@ -49,6 +50,7 @@ export default function SportPricedPlayground() {
     const [aspect, setAspect] = useState(DEFAULT_CELL_ASPECT)
     const [scale, setScale] = useState(1.5)
     const [shine, setShine] = useState(true)
+    const [tierSizing, setTierSizing] = useState(true)
 
     const events: Event[] = useMemo(
         () => Teams.map((team, i) => ({
@@ -61,7 +63,14 @@ export default function SportPricedPlayground() {
         () => Teams.map((team, i) => ({team, total_price: PRICES[team] ?? 0, price_left: soldIds.has(i + 1) ? 0 : PRICES[team] ?? 0})),
         [soldIds]
     )
-    const element: Element = {kind: 'board', variant: 'sport_priced', cols, ballCols, cellAspect: aspect, shine, placements: {all: BOX}}
+    const best = teamPrices.filter(p => p.price_left >= 350).length
+    const good = teamPrices.filter(p => p.price_left >= 250 && p.price_left < 350).length
+    const safeCols = Math.max(2, Math.min(12, Math.round(cols)))
+    const safeBallCols = Math.max(0, Math.min(safeCols - 1, Math.round(ballCols)))
+    const safeAspect = Math.max(1, Math.min(4, aspect))
+    const {fieldH} = pricedFieldSize(BOX.w, events.length, safeCols, safeBallCols, safeAspect, 0, tierSizing ? {best, good} : undefined)
+    const previewBox = {...BOX, h: fieldH}
+    const element: Element = {kind: 'board', variant: 'sport_priced', cols: safeCols, ballCols: safeBallCols, cellAspect: safeAspect, shine, tierSizing, placements: {all: previewBox}}
     const data = {
         config: {} as LayoutConfig,
         channel: null,
@@ -103,15 +112,18 @@ export default function SportPricedPlayground() {
                     </label>
                 ))}
                 <label className="small d-flex gap-1 align-items-center">
+                    <input type="checkbox" checked={tierSizing} onChange={(e) => setTierSizing(e.target.checked)}/> Larger gold / silver
+                </label>
+                <label className="small d-flex gap-1 align-items-center">
                     <input type="checkbox" checked={shine} onChange={(e) => setShine(e.target.checked)}/> Shine
                 </label>
             </div>
-            <div style={{width: BOX.w * scale, height: BOX.h * scale}}>
-                <div id="spp-preview" style={{width: BOX.w, height: BOX.h, transform: `scale(${scale})`, transformOrigin: '0 0', position: 'relative'}}>
+            <div style={{width: BOX.w * scale, height: previewBox.h * scale}}>
+                <div id="spp-preview" style={{width: BOX.w, height: previewBox.h, transform: `scale(${scale})`, transformOrigin: '0 0', position: 'relative'}}>
                     <CueBusProvider>
                         <AnchorsProvider>
                             <StaticLayoutDataProvider value={data}>
-                                <SportPricedBoard elementKey="preview" element={element} box={BOX} phase="all"/>
+                                <SportPricedBoard elementKey="preview" element={element} box={previewBox} phase="all"/>
                             </StaticLayoutDataProvider>
                         </AnchorsProvider>
                     </CueBusProvider>
