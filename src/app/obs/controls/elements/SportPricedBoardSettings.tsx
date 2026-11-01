@@ -8,7 +8,7 @@
 
 import {useState} from 'react'
 import type {DurableCue, Element, Phase, TransientCue} from '@/app/obs/layout/schema'
-import {DEFAULT_TURF} from '@/app/obs/sport_style/fieldConstants'
+import {DEFAULT_PRICED_TURF} from '@/app/obs/sport_style/fieldConstants'
 import {
     DEFAULT_BALL_COLS,
     DEFAULT_CELL_ASPECT,
@@ -35,6 +35,8 @@ const DEFAULT_SLOTS = 32
 
 export default function SportPricedBoardSettings({elementKey, element, currentPhase, channelId, seriesId, onPatchElement, onEmitCue, onFireCue}: Props) {
     const [slots, setSlots] = useState(DEFAULT_SLOTS)
+    const [goldSlots, setGoldSlots] = useState(3)
+    const [silverSlots, setSilverSlots] = useState(9)
     if (element.kind !== 'board') return null
 
     const cols = Math.max(2, Math.min(12, element.cols ?? DEFAULT_PRICED_COLS))
@@ -42,7 +44,7 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
     const aspect = element.cellAspect ?? DEFAULT_CELL_ASPECT
     const margin = Math.max(0, element.margin ?? 0)
     const box = element.placements[currentPhase] ?? element.placements.all
-    const {rows, fieldH} = pricedFieldSize(box?.w ?? 0, slots, cols, ballCols, aspect, margin)
+    const {rows, fieldH} = pricedFieldSize(box?.w ?? 0, slots, cols, ballCols, aspect, margin, element.tierSizing ? {best: goldSlots, good: silverSlots} : undefined)
 
     const num = (label: string, value: number, min: number, max: number, step: number, apply: (v: number) => void, title?: string) => (
         <div>
@@ -76,6 +78,17 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
             </div>
 
             <div className="form-check mb-2">
+                <input id={`${elementKey}-tier-sizing`} type="checkbox" className="form-check-input"
+                    checked={element.tierSizing ?? false}
+                    onChange={(e) => onPatchElement(elementKey, {tierSizing: e.target.checked})}/>
+                <label className="form-check-label small" htmlFor={`${elementKey}-tier-sizing`}>Larger gold / silver tiles</label>
+            </div>
+            {element.tierSizing && <div className="small text-muted mb-2">
+                Gold 120%, silver 110%; other tiles keep their normal size. Rows wrap to fit the width.
+                Use Fit height below to make room for the taller board.
+            </div>}
+
+            <div className="form-check mb-2">
                 <input
                     id={`${elementKey}-shine`}
                     type="checkbox"
@@ -83,7 +96,7 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
                     checked={element.shine ?? true}
                     onChange={(e) => onPatchElement(elementKey, {shine: e.target.checked})}
                 />
-                <label className="form-check-label small" htmlFor={`${elementKey}-shine`} title="Soft light sweep across gold and silver tiles, plus a breathing glow on gold.">
+                <label className="form-check-label small" htmlFor={`${elementKey}-shine`} title="Continuous champagne sweep and strong glow on gold; occasional sweep on silver.">
                     Gold / silver shine
                 </label>
             </div>
@@ -115,8 +128,12 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
                     onChange={(e) => setSlots(Math.max(0, parseInt(e.target.value, 10) || 0))}
                 />
             </div>
+            {element.tierSizing && <div className="d-flex gap-3 mb-2">
+                {num('Gold slots (estimate)', goldSlots, 0, slots, 1, v => setGoldSlots(Math.round(v)))}
+                {num('Silver slots (estimate)', silverSlots, 0, Math.max(0, slots - goldSlots), 1, v => setSilverSlots(Math.round(v)))}
+            </div>}
             <div className="small text-muted mb-2">
-                Field needs {fieldH}px for {rows} row{rows === 1 ? '' : 's'}
+                Estimated field needs {fieldH}px for {rows} row{rows === 1 ? '' : 's'}
                 {box ? ` (current box ${box.h}px)` : ' — not placed in this stage'}
             </div>
             <div className="d-flex gap-2 mb-3">
@@ -138,11 +155,11 @@ export default function SportPricedBoardSettings({elementKey, element, currentPh
             </div>
 
             <details className="mb-3">
-                <summary className="small">Turf recipe ({isCustomBlob(element.turf, DEFAULT_TURF) ? 'custom' : 'default'})</summary>
+                <summary className="small">Turf recipe ({isCustomBlob(element.turf, DEFAULT_PRICED_TURF) ? 'custom' : 'default'})</summary>
                 <JsonField
                     label="Turf recipe (JSON)"
                     value={element.turf}
-                    defaultValue={DEFAULT_TURF}
+                    defaultValue={DEFAULT_PRICED_TURF}
                     onApply={(parsed) => onPatchElement(elementKey, {turf: parsed})}
                 />
             </details>
