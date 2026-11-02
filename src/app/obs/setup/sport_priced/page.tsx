@@ -13,7 +13,6 @@ import {StaticLayoutDataProvider, type LayoutData} from '@/app/obs/layout/useLay
 import {CueBusProvider} from '@/app/obs/layout/cueBus'
 import {AnchorsProvider} from '@/app/obs/layout/anchors'
 import {
-    DEFAULT_BALL_COLS,
     DEFAULT_CELL_ASPECT,
     DEFAULT_PRICED_COLS,
     SportPricedBoard,
@@ -34,7 +33,7 @@ const PRICE_RANGES: PriceRange[] = [
     {id: 2, channel_id: 1, tier_id: 'good', price_from: 250},
     {id: 3, channel_id: 1, tier_id: 'mid', price_from: 100},
 ]
-const BOX = {x: 0, y: 0, w: 893, h: 342}
+const BOX = {x: 0, y: 0, w: 893, h: 1100}
 
 
 export default function SportPricedPlayground() {
@@ -45,10 +44,10 @@ export default function SportPricedPlayground() {
         if (n > 0) setSoldIds(new Set(Array.from({length: n}, (_, i) => i + 1)))
     }, [])
     const [cols, setCols] = useState(DEFAULT_PRICED_COLS)
-    const [ballCols, setBallCols] = useState(DEFAULT_BALL_COLS)
     const [aspect, setAspect] = useState(DEFAULT_CELL_ASPECT)
     const [scale, setScale] = useState(1.5)
     const [shine, setShine] = useState(true)
+    const [tierSizing, setTierSizing] = useState(true)
 
     const events: Event[] = useMemo(
         () => Teams.map((team, i) => ({
@@ -61,7 +60,10 @@ export default function SportPricedPlayground() {
         () => Teams.map((team, i) => ({team, total_price: PRICES[team] ?? 0, price_left: soldIds.has(i + 1) ? 0 : PRICES[team] ?? 0})),
         [soldIds]
     )
-    const element: Element = {kind: 'board', variant: 'sport_priced', cols, ballCols, cellAspect: aspect, shine, placements: {all: BOX}}
+    const safeCols = Math.max(2, Math.min(12, Math.round(cols)))
+    const safeAspect = Math.max(1, Math.min(4, aspect))
+    const previewBox = BOX
+    const element: Element = {kind: 'board', variant: 'sport_priced', cols: safeCols, cellAspect: safeAspect, shine, tierSizing, placements: {all: previewBox}}
     const data = {
         config: {} as LayoutConfig,
         channel: null,
@@ -90,12 +92,19 @@ export default function SportPricedPlayground() {
         setSoldIds((s) => new Set(s).add(pick.id))
     }
 
+    const sellMany = (count: number) => {
+        const left = events.filter((e) => e.customer === '')
+        const picks = [...left].sort(() => Math.random() - 0.5).slice(0, count)
+        if (picks.length) setSoldIds((s) => new Set([...Array.from(s), ...picks.map((e) => e.id)]))
+    }
+
     return (
         <div style={{padding: 16, background: '#0b0f17', minHeight: '100vh', color: '#ddd'}}>
             <div className="d-flex gap-3 align-items-end mb-3 flex-wrap" id="spp-controls">
                 <button className="btn btn-sm btn-outline-light" onClick={sellRandom}>Sell a team</button>
+                <button className="btn btn-sm btn-outline-light" onClick={() => sellMany(5)}>Sell 5</button>
                 <button className="btn btn-sm btn-outline-light" onClick={() => setSoldIds(new Set())}>Reset</button>
-                {([['Cols', cols, setCols, 1], ['Ball cells', ballCols, setBallCols, 1], ['Tile shape', aspect, setAspect, 0.1], ['Preview scale', scale, setScale, 0.25]] as const).map(([label, v, set, step]) => (
+                {([['Cols', cols, setCols, 1], ['Tile shape', aspect, setAspect, 0.1], ['Preview scale', scale, setScale, 0.25]] as const).map(([label, v, set, step]) => (
                     <label key={label} className="small">
                         {label}
                         <input type="number" step={step} className="form-control form-control-sm" style={{width: 90}} value={v}
@@ -103,22 +112,25 @@ export default function SportPricedPlayground() {
                     </label>
                 ))}
                 <label className="small d-flex gap-1 align-items-center">
+                    <input type="checkbox" checked={tierSizing} onChange={(e) => setTierSizing(e.target.checked)}/> Larger gold / silver
+                </label>
+                <label className="small d-flex gap-1 align-items-center">
                     <input type="checkbox" checked={shine} onChange={(e) => setShine(e.target.checked)}/> Shine
                 </label>
             </div>
-            <div style={{width: BOX.w * scale, height: BOX.h * scale}}>
-                <div id="spp-preview" style={{width: BOX.w, height: BOX.h, transform: `scale(${scale})`, transformOrigin: '0 0', position: 'relative'}}>
+            <div style={{width: BOX.w * scale, height: previewBox.h * scale}}>
+                <div id="spp-preview" style={{width: BOX.w, height: previewBox.h, transform: `scale(${scale})`, transformOrigin: '0 0', position: 'relative'}}>
                     <CueBusProvider>
                         <AnchorsProvider>
                             <StaticLayoutDataProvider value={data}>
-                                <SportPricedBoard elementKey="preview" element={element} box={BOX} phase="all"/>
+                                <SportPricedBoard elementKey="preview" element={element} box={previewBox} phase="all"/>
                             </StaticLayoutDataProvider>
                         </AnchorsProvider>
                     </CueBusProvider>
                 </div>
             </div>
             <p className="small mt-2" style={{color: '#8a93a3'}}>
-                Real board component, mock data (the priced stream&apos;s 32 teams). 893 × 342 is that stream&apos;s board slot.
+                Real board component, mock data (the priced stream&apos;s 32 teams). Preview box 893 × 1100; tiles fill it and sold teams leave.
             </p>
         </div>
     )

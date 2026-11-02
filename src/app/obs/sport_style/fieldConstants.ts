@@ -89,6 +89,19 @@ export const DEFAULT_TURF: TurfParams & {
     spotLightRatio: 0.6,
 }
 
+/** Dark, two-tone mown pitch for the metallic price board; other boards keep DEFAULT_TURF. */
+export const DEFAULT_PRICED_TURF = {
+    ...DEFAULT_TURF,
+    dark: '#061b15',
+    light: '#315a35',
+    baseLum: 0.46,
+    // Keep the same dark average, with distinct alternating mowing bands.
+    stripeStrength: 0.42,
+    patchContrast: 0.16,
+    grainStrength: 0.01,
+    spotStrength: 0.1,
+}
+
 /** Patch style, absent an operator-pasted `element.patch` — the team playground's own
  *  `defaultPatchStyle` (PatchCell.tsx) wrapped in the same `GeneralSettings` shape the team page
  *  exports/imports, minus `grainSeed` (per-render, not a style knob). */
