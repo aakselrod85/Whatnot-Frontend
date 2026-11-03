@@ -132,6 +132,7 @@ export interface WNStream {
     name: string
     is_ended: boolean
     active_break_id: number | null
+    whatnot_show_id: string | null
 }
 
 export interface StreamResponse extends WNStream {}
@@ -288,3 +289,10 @@ export interface LayoutImage {
     size_bytes: number
     created_at: string
 }
+
+export interface WhatnotShow { id: string; title: string; status: string; scheduled_start_at: string | null; ended_at: string | null }
+export interface WhatnotBreakOrder { order_id: string; team: string; username: string; price: number; created_at: string }
+export interface WhatnotBreakOrders { name: string; orders: WhatnotBreakOrder[] }
+export interface WhatnotGiveawayOrder { order_id: string; title: string; username: string; created_at: string }
+export interface WhatnotUnparsedOrder { order_id: string; title: string; username: string; price: number; created_at: string }
+export interface WhatnotOrdersResponse { show: WhatnotShow; orders_scanned: number; breaks: WhatnotBreakOrders[]; giveaways: WhatnotGiveawayOrder[]; unparsed: WhatnotUnparsedOrder[] }

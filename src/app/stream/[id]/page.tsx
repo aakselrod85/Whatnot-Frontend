@@ -3,7 +3,7 @@
 import React, {useEffect, useState} from "react";
 import {Teams} from "@/app/common/teams";
 import {getEndpoints, get, post} from "@/app/lib/backend";
-import {AddBreakResponse, Event, GetChannelsChannel, GiveawayTypeNone, Series, SeriesPreset, WNBreak} from "@/app/entity/entities";
+import {AddBreakResponse, Event, GetChannelsChannel, GiveawayTypeNone, Series, WhatnotShow, SeriesPreset, WNBreak} from "@/app/entity/entities";
 import {useRouter} from "next/navigation";
 import {sortBreaksById} from "@/app/common/breaks";
 import {useStream} from "@/app/hooks/useStream";
@@ -23,6 +23,7 @@ export default function Page({params} : {params: {id: string}}) {
     const [presetId, setPresetId] = useState<number | null>(null)
     const [presetSeriesIds, setPresetSeriesIds] = useState<number[]>([])
     const [applying, setApplying] = useState(false)
+    const [shows, setShows] = useState<WhatnotShow[]>([])
     let router = useRouter()
 
     useEffect(() => {
@@ -40,6 +41,21 @@ export default function Page({params} : {params: {id: string}}) {
             if (data) setChannelId(data.id)
         })
     }, []);
+
+    // The Whatnot API key lives on the channel (DB-only column), so shows can only be
+    // listed once the stream's channel id is known.
+    useEffect(() => {
+        if (!channelId) return
+        Promise.all(['live', 'ended'].map(status =>
+            post(getEndpoints().whatnot_shows, {channel_id: channelId, status}).then((r: {shows: WhatnotShow[]}) => r?.shows ?? []).catch(() => [] as WhatnotShow[])
+        )).then(([live, ended]) => setShows([...live, ...ended]))
+    }, [channelId]);
+
+    async function changeWhatnotShow(value: string) {
+        await post(getEndpoints().stream_set_whatnot_show, {stream_id: streamId, whatnot_show_id: value || null})
+        refreshStream()
+        toast(value ? 'Whatnot show linked' : 'Whatnot show unlinked')
+    }
 
     async function addNewBreak(name: string, customSpots: string[] = []) {
         if (!name) return
@@ -218,8 +234,43 @@ export default function Page({params} : {params: {id: string}}) {
                     <label className="form-check-label" htmlFor="devModeSwitch">dev</label>
                 </div>
             </div>
-            <div className="d-flex justify-content-center">
+            {/* Two equal halves: the centre line of the viewport is the seam. Buttons hug it from the left,
+                the breaks list starts from it on the right. */}
+            <div className="d-flex">
+                <div className="w-50 d-flex justify-content-end">
                 <div className='pe-3 d-flex flex-column gap-2'>
+                    <div>
+                        <label className="form-label mb-1">Whatnot show</label>
+                        <select
+                            className="form-select form-select-sm"
+                            value={stream?.whatnot_show_id ?? ''}
+                            onChange={(e) => changeWhatnotShow(e.target.value)}
+                        >
+                            <option value="">— not linked —</option>
+                            {shows.map(sh => (
+                                <option key={sh.id} value={sh.id}>
+                                    {`${sh.status === 'live' ? '🔴 ' : ''}${sh.title} · ${sh.scheduled_start_at ? new Date(sh.scheduled_start_at).toLocaleString() : ''}`}
+                                </option>
+                            ))}
+                            {stream?.whatnot_show_id && !shows.some(sh => sh.id === stream.whatnot_show_id) && (
+                                <option value={stream.whatnot_show_id}>{stream.whatnot_show_id}</option>
+                            )}
+                        </select>
+                        <small className="text-muted">
+                            {stream?.whatnot_show_id
+                                ? (shows.find(sh => sh.id === stream.whatnot_show_id)?.title ?? stream.whatnot_show_id)
+                                : 'No Whatnot show linked'}
+                        </small>
+                    </div>
+                    <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={!stream?.whatnot_show_id}
+                        title={stream?.whatnot_show_id ? '' : 'Link a Whatnot show first'}
+                        onClick={() => router.push(`/stream/${streamId}/whatnot-verify`)}
+                    >
+                        Start verification
+                    </button>
                     <button type="button" className="btn btn-primary" onClick={() => router.push(`/package/${streamId}`)}>
                         Package all
                     </button>
@@ -259,7 +310,8 @@ export default function Page({params} : {params: {id: string}}) {
                         Create preset
                     </button>
                 </div>
-                <div className="d-flex flex-column">
+                </div>
+                <div className="w-50 ps-3 d-flex flex-column align-items-start">
                     <ul className="list-group">
                         {
                             breaks.map(
