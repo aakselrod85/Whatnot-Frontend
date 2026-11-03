@@ -47,6 +47,7 @@ const TIER_OF: Record<string, RipsTier> = {
     'Philadelphia Eagles': 2,
     'Las Vegas Raiders': 2,
     'Atlanta Falcons': 2,
+    'Cleveland Browns': 2,
 }
 export const ripsTierOf = (team: string): RipsTier => TIER_OF[team] ?? 3
 
