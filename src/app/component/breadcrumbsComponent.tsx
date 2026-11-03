@@ -46,10 +46,19 @@ export default function BreadcrumbsComponent() {
                 }
             }
         } else if (isStreamPage()) {
-            const streamId = parseInt(pathPart[pathPart.length - 1])
-            newBreadcrumbs.push(slash('c0'), channelsLink)
-            newBreadcrumbs.push(slash('c1'))
-            newBreadcrumbs.push(<ChannelBreadcrumbsComponent key='channel' streamId={streamId}/>)
+            // The id is the segment after "stream", not the last one: sub-pages such as
+            // /stream/3/verify-teams or /stream/3/whatnot-verify end with a word, which parsed to NaN
+            // and was sent to the backend as `stream_id: null`.
+            const streamId = parseInt(pathPart[pathPart.indexOf('stream') + 1])
+            if (!isNaN(streamId)) {
+                newBreadcrumbs.push(slash('c0'), channelsLink)
+                newBreadcrumbs.push(slash('c1'))
+                newBreadcrumbs.push(<ChannelBreadcrumbsComponent key='channel' streamId={streamId}/>)
+                if (pathPart.length > pathPart.indexOf('stream') + 2) {
+                    newBreadcrumbs.push(slash('c2'))
+                    newBreadcrumbs.push(<StreamBreadcrumbsComponent key='stream' streamId={streamId}/>)
+                }
+            }
         } else if (isBreakPage()) {
             const breakO: WNBreak = await post(getEndpoints().break_get, {id: parseInt(pathPart[pathPart.length - 1])})
             newBreadcrumbs.push(slash('c0'), channelsLink)

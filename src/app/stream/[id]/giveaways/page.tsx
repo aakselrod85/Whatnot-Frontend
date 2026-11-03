@@ -5,44 +5,19 @@ import {useRouter} from "next/navigation";
 import Papa from "papaparse";
 import {getEndpoints, post} from "@/app/lib/backend";
 import {Event, WNBreak} from "@/app/entity/entities";
-import {getGiveawayType, isGiveaway} from "@/app/utils/whatnot_product";
+import {isGiveaway} from "@/app/utils/whatnot_product";
 import {sortBreaksById} from "@/app/common/breaks";
+import {
+    Bucket, GiveawayMismatch, GiveawayRow, GiveawayBucketsEditor, GiveawayMismatchesTable,
+    GAP_THRESHOLD_MS, addMissingGiveaways, computeGiveawayMismatches, deleteExtraGiveaways,
+} from "../giveawayAssignment";
 
-const GAP_THRESHOLD_MS = 10 * 60 * 1000
 const TIMEZONE_KEY = 'giveaway_tz'
 const PATTERN_KEY = 'giveaway_pattern'
 const DEFAULT_PATTERN = 'giveaway'
 
-interface GiveawayRow {
-    orderId: string
-    productName: string
-    buyer: string
-    placedAt: Date
-    csvBefore: string
-    csvAfter: string
-}
-
-interface Bucket {
-    break: WNBreak
-    rows: GiveawayRow[]
-}
-
-interface GiveawayMismatch {
-    type: 'missing' | 'extra'
-    breakName: string
-    breakId: number
-    buyer: string
-    productName: string
-    giveawayType: number
-    eventId?: number
-}
-
 function parseUtc(s: string): Date {
     return new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z')
-}
-
-function formatTime(d: Date, tz: string): string {
-    return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz})
 }
 
 function parseAndBucket(content: string, breaks: WNBreak[], pattern: string): Bucket[] {
@@ -133,7 +108,10 @@ export default function Page({params}: {params: {id: string}}) {
     }
 
     function processContent(content: string, pattern: string) {
-        const parsed = parseAndBucket(content, breaks, pattern)
+        applyBuckets(parseAndBucket(content, breaks, pattern))
+    }
+
+    function applyBuckets(parsed: Bucket[]) {
         const emptyBuyerRows = parsed.flatMap(b => b.rows).filter(r => !r.buyer)
         if (emptyBuyerRows.length > 0) {
             setFileErrors(emptyBuyerRows.map(r => ({orderId: r.orderId || '—', error: `No buyer for "${r.productName}"`})))
@@ -159,33 +137,6 @@ export default function Page({params}: {params: {id: string}}) {
         e.target.value = ''
     }
 
-    function moveRow(fromBreakId: number, rowIndex: number, toBreakId: number) {
-        setBuckets(old => {
-            if (!old) return old
-            const row = old.find(b => b.break.id === fromBreakId)!.rows[rowIndex]
-            return old.map(b => {
-                if (b.break.id === fromBreakId) return {...b, rows: b.rows.filter((_, i) => i !== rowIndex)}
-                if (b.break.id === toBreakId) return {...b, rows: [...b.rows, row].sort((a, c) => a.placedAt.getTime() - c.placedAt.getTime())}
-                return b
-            })
-        })
-    }
-
-    function moveFromRow(fromBreakId: number, rowIndex: number, toBreakId: number) {
-        setBuckets(old => {
-            if (!old) return old
-            const rows = old.find(b => b.break.id === fromBreakId)!.rows
-            const pivotTime = rows[rowIndex].placedAt.getTime()
-            const toKeep = rows.filter(r => r.placedAt.getTime() < pivotTime)
-            const toMove = rows.filter(r => r.placedAt.getTime() >= pivotTime)
-            return old.map(b => {
-                if (b.break.id === fromBreakId) return {...b, rows: toKeep}
-                if (b.break.id === toBreakId) return {...b, rows: [...b.rows, ...toMove].sort((a, c) => a.placedAt.getTime() - c.placedAt.getTime())}
-                return b
-            })
-        })
-    }
-
     async function handleVerify() {
         if (!buckets) return
 
@@ -197,60 +148,12 @@ export default function Page({params}: {params: {id: string}}) {
             breakDb.set(bucket.break.id, (resp.events ?? []).filter(e => e.is_giveaway))
         }
         setProgress(null)
-
-        const results: GiveawayMismatch[] = []
-        for (const bucket of buckets) {
-            const breakId = bucket.break.id
-            const breakName = bucket.break.name
-            const dbEvents = breakDb.get(breakId) ?? []
-
-            const csvByBuyer = new Map<string, GiveawayRow[]>()
-            for (const row of bucket.rows) {
-                if (!csvByBuyer.has(row.buyer)) csvByBuyer.set(row.buyer, [])
-                csvByBuyer.get(row.buyer)!.push(row)
-            }
-            const dbByCustomer = new Map<string, number[]>()
-            for (const e of dbEvents) {
-                if (!dbByCustomer.has(e.customer)) dbByCustomer.set(e.customer, [])
-                dbByCustomer.get(e.customer)!.push(e.id)
-            }
-
-            const buyers = new Set([...Array.from(csvByBuyer.keys()), ...Array.from(dbByCustomer.keys())])
-            for (const buyer of Array.from(buyers)) {
-                const csvRows = csvByBuyer.get(buyer) ?? []
-                const dbIds = dbByCustomer.get(buyer) ?? []
-                const surplusCsv = csvRows.slice(dbIds.length)
-                const surplusDb = dbIds.slice(csvRows.length)
-                for (const row of surplusCsv) {
-                    results.push({type: 'missing', breakName, breakId, buyer, productName: row.productName, giveawayType: getGiveawayType(row.productName)})
-                }
-                for (const eventId of surplusDb) {
-                    results.push({type: 'extra', breakName, breakId, buyer, productName: '', giveawayType: 0, eventId})
-                }
-            }
-        }
-        setMismatches(results)
+        setMismatches(computeGiveawayMismatches(buckets, breakDb))
     }
 
     async function handleAddMissing() {
         if (!mismatches) return
-        const toFix = mismatches.filter(m => m.type === 'missing')
-        for (let i = 0; i < toFix.length; i++) {
-            const mm = toFix[i]
-            setProgress(`Adding ${i + 1} of ${toFix.length}: ${mm.buyer}…`)
-            await post(getEndpoints().event_add, {
-                id: 0,
-                index: -1,
-                break_id: mm.breakId,
-                customer: mm.buyer,
-                price: 0,
-                team: '',
-                is_giveaway: true,
-                note: '',
-                quantity: 1,
-                giveaway_type: mm.giveawayType,
-            })
-        }
+        await addMissingGiveaways(mismatches, setProgress)
         setMismatches(m => m!.filter(x => x.type !== 'missing'))
         setDidFix(true)
         setProgress(null)
@@ -258,12 +161,7 @@ export default function Page({params}: {params: {id: string}}) {
 
     async function handleDeleteExtra() {
         if (!mismatches) return
-        const toDelete = mismatches.filter(m => m.type === 'extra' && m.eventId !== undefined)
-        for (let i = 0; i < toDelete.length; i++) {
-            const mm = toDelete[i]
-            setProgress(`Deleting ${i + 1} of ${toDelete.length}: ${mm.buyer}…`)
-            await post(getEndpoints().event_delete, {id: mm.eventId})
-        }
+        await deleteExtraGiveaways(mismatches, setProgress)
         setMismatches(m => m!.filter(x => x.type !== 'extra'))
         setDidFix(true)
         setProgress(null)
@@ -319,7 +217,9 @@ export default function Page({params}: {params: {id: string}}) {
                             </table>
                         )}
 
-                        <div className="mb-3">
+                        {progress && <div className="alert alert-info">{progress}</div>}
+
+                        <div className="mb-3 d-flex gap-2">
                             <input type="file" accept=".csv" ref={fileInputRef} className="d-none" onChange={handleFileSelected}/>
                             <button
                                 className="btn btn-secondary"
@@ -365,67 +265,7 @@ export default function Page({params}: {params: {id: string}}) {
 
                 {buckets && totalRows > 0 && mismatches === null && (
                     <>
-                        {buckets.map(bucket => (
-                            <div key={bucket.break.id} className="border rounded p-3 mb-3">
-                                <strong className="d-block mb-2">
-                                    {bucket.break.name} ({bucket.rows.length} giveaway{bucket.rows.length !== 1 ? 's' : ''})
-                                </strong>
-                                {bucket.rows.length > 0 && (
-                                    <table className="table table-sm mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>Product</th>
-                                                <th>Buyer</th>
-                                                <th>Time</th>
-                                                <th>Move to break</th>
-                                                <th>Move this + all next to break</th>
-                                                <th>Event before</th>
-                                                <th>Event after</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {bucket.rows.map((row, rowIdx) => (
-                                                <tr key={rowIdx}>
-                                                    <td>{row.productName}</td>
-                                                    <td>{row.buyer}</td>
-                                                    <td>{formatTime(row.placedAt, timezone)}</td>
-                                                    <td>
-                                                        <select
-                                                            className="form-select form-select-sm"
-                                                            value=""
-                                                            onChange={e => {
-                                                                if (e.target.value) moveRow(bucket.break.id, rowIdx, parseInt(e.target.value))
-                                                            }}
-                                                        >
-                                                            <option value="">— stay —</option>
-                                                            {breaks.filter(b => b.id !== bucket.break.id).map(b => (
-                                                                <option key={b.id} value={b.id}>{b.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                    <td>
-                                                        <select
-                                                            className="form-select form-select-sm"
-                                                            value=""
-                                                            onChange={e => {
-                                                                if (e.target.value) moveFromRow(bucket.break.id, rowIdx, parseInt(e.target.value))
-                                                            }}
-                                                        >
-                                                            <option value="">— stay —</option>
-                                                            {breaks.filter(b => b.id !== bucket.break.id).map(b => (
-                                                                <option key={b.id} value={b.id}>{b.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                    <td className="text-muted">{row.csvBefore || '—'}</td>
-                                                    <td className="text-muted">{row.csvAfter || '—'}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-                        ))}
+                        <GiveawayBucketsEditor buckets={buckets} breaks={breaks} timezone={timezone} onChange={setBuckets}/>
 
                         {progress && (
                             <div className="alert alert-info">{progress}</div>
@@ -461,31 +301,7 @@ export default function Page({params}: {params: {id: string}}) {
 
                         {mismatches.length > 0 && (
                             <>
-                                <table className="table table-bordered mt-3">
-                                    <thead>
-                                        <tr>
-                                            <th>Break</th>
-                                            <th>Buyer</th>
-                                            <th>Product</th>
-                                            <th>Type</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {mismatches.map((mm, i) => (
-                                            <tr key={i}>
-                                                <td>{mm.breakName}</td>
-                                                <td>{mm.buyer}</td>
-                                                <td>{mm.productName || '—'}</td>
-                                                <td>
-                                                    {mm.type === 'missing'
-                                                        ? <span className="text-danger">Missing in DB</span>
-                                                        : <span className="text-warning">Extra in DB</span>
-                                                    }
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                <GiveawayMismatchesTable mismatches={mismatches}/>
 
                                 {progress && <div className="alert alert-info">{progress}</div>}
 
