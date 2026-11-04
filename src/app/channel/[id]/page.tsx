@@ -1,5 +1,6 @@
 'use client'
 
+import {StreamStatusBadge} from "@/app/stream/[id]/statusBadges";
 import {getEndpoints, post} from "@/app/lib/backend";
 import React, {useEffect, useState} from "react";
 import moment from "moment/moment";
@@ -186,7 +187,7 @@ export default function Page({params}: {params: {id: string}}) {
                                                 <div className="col" onClick={e => {
                                                     router.push(`/stream/${stream.id}`)
                                                 }}>
-                                                    {stream.name}
+                                                    {stream.name}{' '}<StreamStatusBadge status={stream.status}/>
                                                     <span
                                                         className='text-secondary'>{` at ${moment(new Date(stream.created_at)).format("YYYY/MM/DD")}`}</span>
                                                 </div>

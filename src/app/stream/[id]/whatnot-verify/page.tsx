@@ -1,14 +1,14 @@
 'use client'
 
-import React, {useEffect, useState} from "react";
-import {useRouter} from "next/navigation";
+import React, {Suspense, useEffect, useState} from "react";
+import {useRouter, useSearchParams} from "next/navigation";
 import {getEndpoints, post} from "@/app/lib/backend";
-import {AddBreakResponse, Event, GiveawayTypeNone, WNBreak, WhatnotBreakOrders, WhatnotOrdersResponse} from "@/app/entity/entities";
+import {AddBreakResponse, Event, GiveawayTypeNone, ReconciliationManualMap, WNBreak, WhatnotBreakOrders, WhatnotOrdersResponse, ShowReconciliation} from "@/app/entity/entities";
 import {Teams} from "@/app/common/teams";
 import {sortBreaksById} from "@/app/common/breaks";
 import {
     Bucket, GiveawayMismatch, GiveawayBucketsEditor, GiveawayMismatchesTable,
-    addMissingGiveaways, bucketFromWhatnot, computeGiveawayMismatches, deleteExtraGiveaways,
+    addMissingGiveaways, applyGiveawayOverrides, bucketFromWhatnot, computeGiveawayMismatches, deleteExtraGiveaways,
 } from "../giveawayAssignment";
 
 const SKIP = -1
@@ -20,6 +20,7 @@ const EMPTY_CUSTOMERS = ['', '?']
 type TeamStatus = 'mismatch' | 'price_mismatch' | 'no_event' | 'extra'
 interface TeamRow {
     breakName: string
+    breakId: number
     team: string
     wnCustomer: string
     dbCustomer: string
@@ -41,9 +42,17 @@ const statusClass: Record<string, string> = {
 }
 const badge = (s: string) => <span className={`badge ${statusClass[s] ?? 'bg-secondary'}`}>{s}</span>
 
-export default function Page({params}: {params: {id: string}}) {
+function VerifyPage({params}: {params: {id: string}}) {
     const streamId = parseInt(params.id)
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const reconParam = parseInt(searchParams?.get('reconciliation') ?? '')
+    const reconciliationId = Number.isFinite(reconParam) && reconParam > 0 ? reconParam : null
+    const [recon, setRecon] = useState<ShowReconciliation | null>(null)
+    const [savedMap, setSavedMap] = useState<ReconciliationManualMap | null>(null)
+    const [rerunning, setRerunning] = useState(false)
+    const [streamStatus, setStreamStatus] = useState<string | null>(null)
+    const [verifiedDone, setVerifiedDone] = useState(false)
     const [breaks, setBreaks] = useState<WNBreak[] | null>(null)
     const [orders, setOrders] = useState<WhatnotOrdersResponse | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -73,7 +82,17 @@ export default function Page({params}: {params: {id: string}}) {
             try {
                 const br: WNBreak[] = await post(getEndpoints().stream_breaks, {id: streamId})
                 const sorted = sortBreaksById(Array.isArray(br) ? br : [])
-                const resp = await post(getEndpoints().stream_whatnot_orders, {stream_id: streamId})
+                const resp = await post(getEndpoints().stream_whatnot_orders,
+                    reconciliationId ? {stream_id: streamId, reconciliation_id: reconciliationId} : {stream_id: streamId})
+                let reconRow: ShowReconciliation | null = null
+                if (reconciliationId) {
+                    const rr = await post(getEndpoints().reconciliation_get, {id: reconciliationId})
+                    if (rr && rr.id) reconRow = rr as ShowReconciliation
+                }
+                const item = (await post(getEndpoints().stream_reconciliation, {stream_id: streamId}))?.item
+                const saved: ReconciliationManualMap | null = item?.manual_map ?? null
+                const st = await post(getEndpoints().stream_get, {id: streamId})
+                if (!cancelled) { setRecon(reconRow); setSavedMap(saved); setStreamStatus(st?.status ?? null) }
                 if (cancelled) return
                 if (!resp || resp.error) {
                     setError(resp?.error ?? 'Failed to fetch orders from Whatnot')
@@ -102,14 +121,34 @@ export default function Page({params}: {params: {id: string}}) {
                     const candidates = sorted.filter(x => !used.has(x.id) && lastNumber(x.name) === n)
                     if (candidates.length === 1) { used.add(candidates[0].id); ids[i] = candidates[0].id }
                 })
-                setMatchIds(ids)
+                // Reconciliation mode: the auto run's guesses (report.breaks[i].break_id) win when present.
+                const rb = reconRow?.report?.breaks ?? []
+                const known = new Set(sorted.map(x => x.id))
+                const taken = new Set<number>()
+                const pre = ids.map((fallback, i) => {
+                    const bid = rb[i]?.break_id ?? 0
+                    if (bid > 0 && known.has(bid) && !taken.has(bid)) { taken.add(bid); return bid }
+                    return NOT_CHOSEN
+                })
+                const merged = ids.map((fallback, i) => {
+                    if (pre[i] !== NOT_CHOSEN) return pre[i]
+                    return fallback !== NOT_CHOSEN && !taken.has(fallback) ? fallback : NOT_CHOSEN
+                })
+                // An earlier manual mapping beats every guess.
+                const base = reconRow ? merged : ids
+                const savedIds = (r.breaks ?? []).map(wb => {
+                    const v = saved?.breaks?.[wb.name]
+                    return v !== undefined && (v === SKIP || known.has(v)) ? v : null
+                })
+                const pinned = new Set(savedIds.filter(v => v !== null))
+                setMatchIds(base.map((id, i) => savedIds[i] ?? (pinned.has(id) ? NOT_CHOSEN : id)))
             } catch (e) {
                 if (!cancelled) setError(String(e))
             }
         }
         load()
         return () => { cancelled = true }
-    }, [streamId])
+    }, [streamId, reconciliationId])
 
     const wnBreaks: WhatnotBreakOrders[] = orders?.breaks ?? []
     const allChosen = matchIds.length > 0 && matchIds.every(id => id !== NOT_CHOSEN)
@@ -172,22 +211,23 @@ export default function Page({params}: {params: {id: string}}) {
             for (const o of wb.orders) {
                 const ev = events.find(e => e.team === o.team && !claimed.has(e.id))
                 if (!ev) {
-                    teamRows.push({breakName: wb.name, team: o.team, wnCustomer: o.username, dbCustomer: '', wnPrice: o.price, dbPrice: null, status: 'no_event', event: null})
+                    // Not an error: Auto-fix adds the order to the break as a new event.
+                    teamRows.push({breakName: wb.name, breakId, team: o.team, wnCustomer: o.username, dbCustomer: '', wnPrice: o.price, dbPrice: null, status: 'no_event', event: null})
                     continue
                 }
                 claimed.add(ev.id)
                 if (norm(ev.customer) !== norm(o.username)) {
-                    teamRows.push({breakName: wb.name, team: o.team, wnCustomer: o.username, dbCustomer: ev.customer, wnPrice: o.price, dbPrice: ev.price, status: 'mismatch', event: ev})
+                    teamRows.push({breakName: wb.name, breakId, team: o.team, wnCustomer: o.username, dbCustomer: ev.customer, wnPrice: o.price, dbPrice: ev.price, status: 'mismatch', event: ev})
                 } else if (Math.round((ev.price ?? 0) * 100) !== Math.round(o.price * 100)) {
                     // Customer is right but the price differs (typically 0 in the DB): still fixable.
-                    teamRows.push({breakName: wb.name, team: o.team, wnCustomer: o.username, dbCustomer: ev.customer, wnPrice: o.price, dbPrice: ev.price, status: 'price_mismatch', event: ev})
+                    teamRows.push({breakName: wb.name, breakId, team: o.team, wnCustomer: o.username, dbCustomer: ev.customer, wnPrice: o.price, dbPrice: ev.price, status: 'price_mismatch', event: ev})
                 } else {
                     matchedTeams++
                 }
             }
             for (const ev of events) {
                 if (claimed.has(ev.id) || !isRealCustomer(ev.customer)) continue
-                teamRows.push({breakName: wb.name, team: ev.team, wnCustomer: '', dbCustomer: ev.customer, wnPrice: null, dbPrice: ev.price, status: 'extra', event: ev})
+                teamRows.push({breakName: wb.name, breakId, team: ev.team, wnCustomer: '', dbCustomer: ev.customer, wnPrice: null, dbPrice: ev.price, status: 'extra', event: ev})
             }
         })
 
@@ -196,9 +236,10 @@ export default function Page({params}: {params: {id: string}}) {
         if (!buckets) {
             const wnNameToBreakId = new Map<string, number>()
             wnBreaks.forEach((wb, idx) => { if (matchIds_[idx] > 0) wnNameToBreakId.set(wb.name, matchIds_[idx]) })
-            buckets = bucketFromWhatnot(orders, allBreaks, wnNameToBreakId)
+            buckets = applyGiveawayOverrides(bucketFromWhatnot(orders, allBreaks, wnNameToBreakId), savedMap?.giveaways ?? {})
             setGiveBuckets(buckets)
         }
+        await saveManualMap(matchIds_, buckets)
         const giveEvents = new Map<number, Event[]>()
         eventsByBreak.forEach((evs, id) => giveEvents.set(id, evs.filter(e => e.is_giveaway)))
         setGiveMismatches(computeGiveawayMismatches(buckets, giveEvents))
@@ -206,18 +247,55 @@ export default function Page({params}: {params: {id: string}}) {
         setProgress(null)
     }
 
+    // Saved on the stream's reconciliation so that a re-run follows the human's decisions.
+    async function saveManualMap(ids: number[], buckets: Bucket[] | null) {
+        const breaksMap: Record<string, number> = {}
+        wnBreaks.forEach((wb, i) => { if (ids[i] > 0 || ids[i] === SKIP) breaksMap[wb.name] = ids[i] })
+        const giveaways: Record<string, number> = {}
+        for (const b of buckets ?? []) for (const row of b.rows) giveaways[row.orderId] = b.break.id
+        await post(getEndpoints().reconciliation_save_manual_map, {stream_id: streamId, breaks: breaksMap, giveaways})
+    }
+
+    function handleBucketsChange(buckets: Bucket[]) {
+        setGiveBuckets(buckets)
+        saveManualMap(matchIds, buckets)
+    }
+
+    async function rerunReconciliation() {
+        setRerunning(true)
+        setError(null)
+        try {
+            await saveManualMap(matchIds, giveBuckets)
+            const r = await post(getEndpoints().stream_reconcile, {stream_id: streamId})
+            if (r?.id) router.push(`/stream/${streamId}/reconciliation`)
+            else setError(r?.error ?? 'Reconciliation failed')
+        } catch (e) {
+            setError(String(e))
+        } finally {
+            setRerunning(false)
+        }
+    }
+
     async function handleAutoFix() {
         if (!results) return
-        const fixes = results.teamRows.filter(r => (r.status === 'mismatch' || r.status === 'price_mismatch') && r.event)
+        const fixes = results.teamRows.filter(r => r.status === 'no_event' || ((r.status === 'mismatch' || r.status === 'price_mismatch') && r.event))
         for (let i = 0; i < fixes.length; i++) {
             setProgress(`Fixing ${i + 1} of ${fixes.length}: ${fixes[i].team}…`)
+            if (fixes[i].status === 'no_event') {
+                const ev: Event = {
+                    id: 0, index: -1, giveaway_type: GiveawayTypeNone, break_id: fixes[i].breakId, customer: fixes[i].wnCustomer,
+                    price: fixes[i].wnPrice ?? 0, team: fixes[i].team, is_giveaway: false, note: '', quantity: 0
+                }
+                await post(getEndpoints().event_add, ev)
+                continue
+            }
             await post(getEndpoints().event_update, {...fixes[i].event!, customer: fixes[i].wnCustomer, ...(fixes[i].wnPrice != null ? {price: fixes[i].wnPrice} : {})})
         }
         await runVerify()
         setFixDone(true)
     }
 
-    const mismatchCount = results?.teamRows.filter(r => r.status === 'mismatch' || r.status === 'price_mismatch').length ?? 0
+    const mismatchCount = results?.teamRows.filter(r => r.status === 'mismatch' || r.status === 'price_mismatch' || r.status === 'no_event').length ?? 0
     const count = (s: TeamStatus) => results?.teamRows.filter(r => r.status === s).length ?? 0
     const giveMissing = giveMismatches?.filter(m => m.type === 'missing').length ?? 0
     const giveExtra = giveMismatches?.filter(m => m.type === 'extra').length ?? 0
@@ -245,11 +323,23 @@ export default function Page({params}: {params: {id: string}}) {
         await recheckGiveaways()
     }
 
+    async function markVerified() {
+        const r = await post(getEndpoints().stream_set_status, {stream_id: streamId, status: 'verified'})
+        if (r?.success) { setStreamStatus('verified'); setVerifiedDone(true) }
+        else setError(r?.error ?? 'Failed to mark verified')
+    }
+
     return (
         <main className="d-flex justify-content-center mt-4">
             <div style={{width: '70%', maxWidth: '100%'}}>
                 <h4>Whatnot verification</h4>
 
+                {reconciliationId && recon && (
+                    <div className="text-muted small mb-2">
+                        Data from reconciliation #{recon.id} ({recon.trigger}, {new Date(recon.started_at).toLocaleString()}){' '}
+                        <a href={`/stream/${streamId}/whatnot-verify`}>Refresh from Whatnot</a>
+                    </div>
+                )}
                 {error && <div className="alert alert-danger">{error}</div>}
                 {!error && !orders && <div className="alert alert-info">Fetching orders from Whatnot…</div>}
 
@@ -305,66 +395,87 @@ export default function Page({params}: {params: {id: string}}) {
                             {results.matchedTeams} teams match, {count('mismatch')} mismatches, {count('price_mismatch')} price mismatches, {count('no_event')} no_event, {count('extra')} extra ·
                             giveaways: {giveMissing} missing, {giveExtra} extra
                         </div>
-                        <h6>Teams</h6>
-                        {results.teamRows.length === 0 ? (
-                            <div className="alert alert-success">All teams match!</div>
-                        ) : (
-                            <table className="table table-bordered table-sm ">
-                                <thead>
-                                    <tr><th>Break</th><th>Team</th><th>Whatnot customer</th><th>Your customer</th><th>WN $</th><th>DB $</th><th>Status</th></tr>
-                                </thead>
-                                <tbody>
-                                    {results.teamRows.map((r, i) => (
-                                        <tr key={i}>
-                                            <td>{r.breakName}</td><td>{r.team}</td><td>{r.wnCustomer}</td><td>{r.dbCustomer}</td>
-                                            <td>{r.wnPrice ?? ''}</td><td>{r.dbPrice ?? ''}</td><td>{badge(r.status)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                        <h6>Giveaways</h6>
-                        {giveBuckets && (
-                            <>
-                                <div className="mb-3 d-flex align-items-center gap-2">
-                                    <label className="form-label mb-0">Timezone</label>
-                                    <select
-                                        className="form-select form-select-sm w-auto"
-                                        value={timezone}
-                                        onChange={e => handleTimezoneChange(e.target.value)}
-                                    >
-                                        {timezoneList.map(tz => (
-                                            <option key={tz} value={tz}>{tz}</option>
+                        {/* Sticky: the giveaway action buttons can sit a long way below this, past the fold. */}
+                        {progress && <div className="alert alert-info position-sticky top-0 z-3">{progress}</div>}
+                        {/* Native <details> keeps its content mounted, so giveaway edits survive collapsing. */}
+                        <details className="mb-2">
+                            <summary className="h6" style={{cursor: 'pointer'}}>Teams</summary>
+                            {results.teamRows.length === 0 ? (
+                                <div className="alert alert-success">All teams match!</div>
+                            ) : (
+                                <table className="table table-bordered table-sm ">
+                                    <thead>
+                                        <tr><th>Break</th><th>Team</th><th>Whatnot customer</th><th>Your customer</th><th>WN $</th><th>DB $</th><th>Status</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {results.teamRows.map((r, i) => (
+                                            <tr key={i}>
+                                                <td>{r.breakName}</td><td>{r.team}</td><td>{r.wnCustomer}</td><td>{r.dbCustomer}</td>
+                                                <td>{r.wnPrice ?? ''}</td><td>{r.dbPrice ?? ''}</td><td>{badge(r.status)}</td>
+                                            </tr>
                                         ))}
-                                    </select>
-                                </div>
-                                <GiveawayBucketsEditor buckets={giveBuckets} breaks={breaks ?? []} timezone={timezone} onChange={setGiveBuckets}/>
-                                <button className="btn btn-primary mb-2" disabled={!!progress} onClick={() => recheckGiveaways()}>
-                                    Re-check giveaways
+                                    </tbody>
+                                </table>
+                            )}
+                        </details>
+                        <div className="d-flex gap-2 mb-2">
+                            {mismatchCount > 0 && (
+                                <button className="btn btn-warning" disabled={!!progress} onClick={handleAutoFix}>
+                                    Auto-fix {mismatchCount} team{mismatchCount !== 1 ? 's' : ''}
                                 </button>
-                            </>
+                            )}
+                            <button className="btn btn-primary" disabled={!!progress} onClick={runVerify}>
+                                Re-verify
+                            </button>
+                        </div>
+                        {mismatchCount > 0 && (
+                            <div className="text-muted small mb-2">
+                                Auto-fix sets the DB customer and price to the Whatnot values for every mismatch and price mismatch, and adds orders with no event to the break as new events.
+                            </div>
                         )}
-                        {giveMismatches && (giveMismatches.length === 0 ? (
-                            <div className="alert alert-success">All giveaways match!</div>
-                        ) : (
-                            <>
-                                <GiveawayMismatchesTable mismatches={giveMismatches}/>
-                                <div className="d-flex gap-2 mb-3">
-                                    {giveMissing > 0 && (
-                                        <button className="btn btn-warning" disabled={!!progress} onClick={handleAddMissing}>
-                                            Add {giveMissing} missing giveaway{giveMissing !== 1 ? 's' : ''}
-                                        </button>
-                                    )}
-                                    {giveExtra > 0 && (
-                                        <button className="btn btn-danger" disabled={!!progress} onClick={handleDeleteExtra}>
-                                            Delete {giveExtra} extra
-                                        </button>
-                                    )}
-                                </div>
-                            </>
-                        ))}
                         {fixDone && <div className="alert alert-success">Fixed successfully.</div>}
-                        {progress && <div className="alert alert-info">{progress}</div>}
+                        <details className="mb-3">
+                            <summary className="h6" style={{cursor: 'pointer'}}>Giveaways</summary>
+                            {giveBuckets && (
+                                <>
+                                    <div className="mb-3 d-flex align-items-center gap-2">
+                                        <label className="form-label mb-0">Timezone</label>
+                                        <select
+                                            className="form-select form-select-sm w-auto"
+                                            value={timezone}
+                                            onChange={e => handleTimezoneChange(e.target.value)}
+                                        >
+                                            {timezoneList.map(tz => (
+                                                <option key={tz} value={tz}>{tz}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <GiveawayBucketsEditor buckets={giveBuckets} breaks={breaks ?? []} timezone={timezone} onChange={handleBucketsChange}/>
+                                    <button className="btn btn-primary mb-2" disabled={!!progress} onClick={() => recheckGiveaways()}>
+                                        Re-check giveaways
+                                    </button>
+                                </>
+                            )}
+                            {giveMismatches && (giveMismatches.length === 0 ? (
+                                <div className="alert alert-success">All giveaways match!</div>
+                            ) : (
+                                <>
+                                    <GiveawayMismatchesTable mismatches={giveMismatches}/>
+                                    <div className="d-flex gap-2 mb-3">
+                                        {giveMissing > 0 && (
+                                            <button className="btn btn-warning" disabled={!!progress} onClick={handleAddMissing}>
+                                                Add {giveMissing} missing giveaway{giveMissing !== 1 ? 's' : ''}
+                                            </button>
+                                        )}
+                                        {giveExtra > 0 && (
+                                            <button className="btn btn-danger" disabled={!!progress} onClick={handleDeleteExtra}>
+                                                Delete {giveExtra} extra
+                                            </button>
+                                        )}
+                                    </div>
+                                </>
+                            ))}
+                        </details>
                     </>
                 )}
 
@@ -374,26 +485,30 @@ export default function Page({params}: {params: {id: string}}) {
                             Verify
                         </button>
                     )}
-                    {results && mismatchCount > 0 && (
-                        <button className="btn btn-warning" disabled={!!progress} onClick={handleAutoFix}>
-                            Auto-fix {mismatchCount} team{mismatchCount !== 1 ? 's' : ''}
-                        </button>
-                    )}
                     {results && (
-                        <button className="btn btn-primary" disabled={!!progress} onClick={runVerify}>
-                            Re-verify
+                        <button className="btn btn-primary" disabled={!!progress || rerunning} onClick={rerunReconciliation}>
+                            {rerunning ? 'Re-running… (~1 min)' : 'Re-run reconciliation'}
                         </button>
                     )}
+                    {results && streamStatus === 'ended' && (
+                        <button className="btn btn-success" disabled={!!progress} onClick={markVerified}>
+                            Mark verified
+                        </button>
+                    )}
+                    {verifiedDone && <span className="align-self-center text-success">Marked verified.</span>}
                     <button className="btn btn-secondary" onClick={() => router.push(`/stream/${streamId}`)}>
                         Back to stream
                     </button>
                 </div>
-                {results && mismatchCount > 0 && (
-                    <div className="text-muted small mt-2">
-                        Auto-fix sets the DB customer and price to the Whatnot values for every mismatch and price mismatch.
-                    </div>
-                )}
             </div>
         </main>
+    )
+}
+
+export default function Page({params}: {params: {id: string}}) {
+    return (
+        <Suspense fallback={null}>
+            <VerifyPage params={params}/>
+        </Suspense>
     )
 }
