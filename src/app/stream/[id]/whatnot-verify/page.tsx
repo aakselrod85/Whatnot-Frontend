@@ -50,7 +50,7 @@ function VerifyPage({params}: {params: {id: string}}) {
     const reconciliationId = Number.isFinite(reconParam) && reconParam > 0 ? reconParam : null
     const [recon, setRecon] = useState<ShowReconciliation | null>(null)
     const [savedMap, setSavedMap] = useState<ReconciliationManualMap | null>(null)
-    const [rerunning, setRerunning] = useState(false)
+    const [rerunning, setRerunning] = useState<'apply' | 'report' | null>(null)
     const [streamStatus, setStreamStatus] = useState<string | null>(null)
     const [verifiedDone, setVerifiedDone] = useState(false)
     const [breaks, setBreaks] = useState<WNBreak[] | null>(null)
@@ -101,25 +101,18 @@ function VerifyPage({params}: {params: {id: string}}) {
                 const r = resp as WhatnotOrdersResponse
                 setBreaks(sorted)
                 setOrders(r)
-                // Auto-match: exact (case-insensitive) name first; otherwise by the last number in the
-                // name, e.g. Whatnot "💥 🏈 Multi-year Multi-Sport 3🏈💥" ↔ our "Break 3", but only when
-                // exactly one unused break carries that number.
-                const lastNumber = (name: string): string | null => {
-                    const nums = name.match(/\d+/g)
-                    return nums ? String(parseInt(nums[nums.length - 1])) : null
+                // Auto-match by the "Break N" phrase in both names, same rule as the backend's MatchBreaks.
+                // A number carried by more than one name on either side stays unmatched.
+                const breakNumber = (name: string): string | null => {
+                    const m = name.match(/\bbreak\s+0*(\d+)\b/i)
+                    return m ? m[1] : null
                 }
-                const used = new Set<number>()
-                const ids = (r.breaks ?? []).map(wb => {
-                    const m = sorted.find(x => !used.has(x.id) && norm(x.name) === norm(wb.name))
-                    if (m) { used.add(m.id); return m.id }
-                    return NOT_CHOSEN
-                })
-                ;(r.breaks ?? []).forEach((wb, i) => {
-                    if (ids[i] !== NOT_CHOSEN) return
-                    const n = lastNumber(wb.name)
-                    if (n === null) return
-                    const candidates = sorted.filter(x => !used.has(x.id) && lastNumber(x.name) === n)
-                    if (candidates.length === 1) { used.add(candidates[0].id); ids[i] = candidates[0].id }
+                const wnNumbers = (r.breaks ?? []).map(wb => breakNumber(wb.name))
+                const ids = (r.breaks ?? []).map((wb, i) => {
+                    const n = wnNumbers[i]
+                    if (n === null || wnNumbers.filter(x => x === n).length !== 1) return NOT_CHOSEN
+                    const candidates = sorted.filter(x => breakNumber(x.name) === n)
+                    return candidates.length === 1 ? candidates[0].id : NOT_CHOSEN
                 })
                 // Reconciliation mode: the auto run's guesses (report.breaks[i].break_id) win when present.
                 const rb = reconRow?.report?.breaks ?? []
@@ -261,18 +254,18 @@ function VerifyPage({params}: {params: {id: string}}) {
         saveManualMap(matchIds, buckets)
     }
 
-    async function rerunReconciliation() {
-        setRerunning(true)
+    async function rerunReconciliation(dryRun: boolean) {
+        setRerunning(dryRun ? 'report' : 'apply')
         setError(null)
         try {
             await saveManualMap(matchIds, giveBuckets)
-            const r = await post(getEndpoints().stream_reconcile, {stream_id: streamId})
+            const r = await post(getEndpoints().stream_reconcile, {stream_id: streamId, dry_run: dryRun})
             if (r?.id) router.push(`/stream/${streamId}/reconciliation`)
             else setError(r?.error ?? 'Reconciliation failed')
         } catch (e) {
             setError(String(e))
         } finally {
-            setRerunning(false)
+            setRerunning(null)
         }
     }
 
@@ -486,8 +479,13 @@ function VerifyPage({params}: {params: {id: string}}) {
                         </button>
                     )}
                     {results && (
-                        <button className="btn btn-primary" disabled={!!progress || rerunning} onClick={rerunReconciliation}>
-                            {rerunning ? 'Re-running… (~1 min)' : 'Re-run reconciliation'}
+                        <button className="btn btn-primary" disabled={!!progress || !!rerunning} onClick={() => rerunReconciliation(false)}>
+                            {rerunning === 'apply' ? 'Re-running… (~1 min)' : 'Re-run reconciliation'}
+                        </button>
+                    )}
+                    {results && (
+                        <button className="btn btn-outline-primary" disabled={!!progress || !!rerunning} onClick={() => rerunReconciliation(true)}>
+                            {rerunning === 'report' ? 'Building report… (~1 min)' : 'Re-run report'}
                         </button>
                     )}
                     {results && streamStatus === 'ended' && (
