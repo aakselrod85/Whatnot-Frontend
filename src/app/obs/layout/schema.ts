@@ -230,9 +230,11 @@ export type Element = (
     // `edgeGap` key of the `turf` blob, the same knob the board playground exports.
     // `edgeMode`/`sortMode` (R3.4) are chosen from two selects in SportStyleBoardSettings, same
     // config path (`onPatchElement`), no validation — the component narrows with defaults exactly
-    // like `cols`. `edgeMode: 'tiered'` draws a per-tier medal edge (tierSkins.ts) instead of
-    // today's auto-palette wear; `sortMode: 'centered'` deals cells `board:cobra_flat`'s way
-    // (value-centred, sold pushed to the edges) instead of alphabetically.
+    // like `cols`. `edgeMode: 'tiered'` draws a per-tier neon edge (tierSkins.ts) instead of
+    // today's auto-palette wear; `edgeMode: 'metal'` swaps the whole cell for a square metal tile
+    // in board:sport_priced's materials (MetalPatchCell.tsx, priceMaterials.ts — gold/silver/
+    // copper/chalk by tier) and reads `shine` below; `sortMode: 'centered'` deals cells
+    // `board:cobra_flat`'s way (value-centred, sold pushed to the edges) instead of alphabetically.
     // `tileSet` is read only by `rips_flat` (README "Rips board marble tiles"): which front-face art
     // the cells show, chosen from RipsFlatBoardSettings; unset = DEFAULT_RIPS_TILE_SET.
     // `backStyle` is its back-face counterpart, independent of `tileSet` (any front with either
@@ -248,7 +250,7 @@ export type Element = (
           turf?: unknown
           patch?: unknown
           margin?: number
-          edgeMode?: 'plain' | 'tiered'
+          edgeMode?: 'plain' | 'tiered' | 'metal'
           sortMode?: 'alphabetical' | 'centered'
           tileSet?: 'veined' | 'clean' | 'icons' | 'marble_auto'
           backStyle?: 'tiles' | 'flip_art'
@@ -270,7 +272,8 @@ export type Element = (
           // (priced-board-fill-plan.md). The football is always one seat of the bottom row — the
           // old `ballCols` key is ignored if an existing config still carries it.
           cellAspect?: number
-          // board:sport_priced: continuous gold sweeps + halo / occasional silver sweep (default true).
+          // board:sport_priced, and board:sport_style in `edgeMode: 'metal'`: continuous gold
+          // sweeps + halo / occasional silver sweep (default true).
           shine?: boolean
           // board:sport_priced: gold 120%, silver 110%, others 100%; wraps into taller rows.
           tierSizing?: boolean

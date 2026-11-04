@@ -40,6 +40,14 @@
 // too — the field is a flat black fill instead (see the turf effect, `.sps-field-black`, and the
 // `.sps-clip-lines`/`.sps-border` guards below) so the neon tier skins read clearly against a plain
 // backdrop. `edgeMode: 'plain'` always paints turf, including in 'centered' sortMode.
+// `edgeMode: 'metal'` is the third mode: the PatchCell is not used at all — every slot is a SQUARE
+// metal tile (MetalPatchCell.tsx) in board:sport_priced's tier materials (priceMaterials.ts: gold =
+// best, silver = good, copper = mid, chalk = regular), with sport_priced's gold/silver sweeps when
+// the element's `shine` is on (default true). Each tile's outer glow (and gold's breathing halo) is
+// drawn by a separate glow layer UNDER the cells (`.sps-glow`), so no bloom sits on a neighbour. The
+// cell footprint/positions are unchanged (still `patchSizeFor(cellPx, patch.style.padding)`), so
+// `cell:<id>` anchors and hit-sequence targets land exactly where they do in the other modes. The
+// field itself (turf/lines/black fill) treats 'metal' exactly like 'tiered'.
 // Either way, a short last row is CENTRED CELL-WISE (R1 fix 2, revised): it is shifted right by
 // `floor((cols - rowLen) / 2)` WHOLE cells, so its cells still sit on the same column formation
 // (and column strips) as every other row — only the middle columns are occupied; with an odd number
@@ -63,7 +71,7 @@
 // cue fired by the settings panel's "Regenerate turf"/"Regenerate teams" buttons — every mounted
 // board subscribes to the cue bus and bumps its own render-forcing counter on a match.
 
-import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import type {ElementProps} from '../../registry'
 import {useLayoutData} from '../../useLayoutData'
 import {useCueBus} from '../../cueBus'
@@ -80,6 +88,8 @@ import {hasLogo, useTeamPalette} from '@/app/obs/sport_style/teamPalette'
 import {patchSizeFor, scalePatchStyle} from '@/app/obs/sport_style/scalePatchStyle'
 import {DEFAULT_COLS, DEFAULT_PATCH, DEFAULT_TURF, FIELD, PATCH_REFERENCE_SIZE} from '@/app/obs/sport_style/fieldConstants'
 import {EDGE_TIER_BY_TIER, type EdgeTier} from '@/app/obs/sport_style/tierSkins'
+import MetalPatchCell, {metalMetrics} from '@/app/obs/sport_style/MetalPatchCell'
+import {TIER_MATERIALS, type TierMaterial} from '@/app/obs/sport_style/priceMaterials'
 import {
     assignTiers,
     BEST_THRESHOLD,
@@ -221,6 +231,49 @@ function SportStyleCell({event, x, y, patchSize, patch, edgeTier, sold}: CellPro
     )
 }
 
+type MetalCellProps = {
+    event: Event
+    x: number
+    y: number
+    patchSize: number
+    logoScale: number
+    material: TierMaterial
+    sold: boolean
+    shine: boolean
+    shineDelayS: number
+}
+
+// Gold's glow and breathing halo, drawn in the glow layer under the cells: priceMaterials.ts's
+// gold glow and SportPricedBoard.tsx's halo with the yellow bloom's blur/spread at 80%. Kept here
+// rather than in the shared material so board:sport_priced stays unchanged.
+const GOLD_GLOW = '0 0 0 2px #fff2a0, 0 0 0 3px #713600, 0 0 11.2px 5.6px rgba(255,194,0,0.95), 0 0 22.4px 8px rgba(255,139,0,0.65), 0 5px 8px rgba(0,0,0,0.85)'
+const GOLD_HALO = '0 0 16px 5.6px rgba(255,198,24,0.9), 0 0 27.2px 8.8px rgba(255,147,0,0.5)'
+
+/** One `edgeMode: 'metal'` tile — its own component for the same rules-of-hooks reason as
+ *  `SportStyleCell`: `useTeamPalette` runs once per event (only the sold grey needs the palette). */
+function MetalCell({event, x, y, patchSize, logoScale, material, sold, shine, shineDelayS}: MetalCellProps) {
+    const withLogo = hasLogo(event.team)
+    const palette = useTeamPalette(event.team)
+    const background = palette
+        ? (DEFAULT_PATCH.mixEnabled ? mix(palette.background, palette.secondary, DEFAULT_PATCH.mixRatio) : palette.background)
+        : FALLBACK_BACKGROUND
+    return (
+        <div className="sps-cell" style={{left: x, top: y, width: patchSize, height: patchSize}}>
+            <MetalPatchCell
+                size={patchSize}
+                background={background}
+                logoSrc={withLogo ? TeamIconSrc(event.team) : ''}
+                label={withLogo ? undefined : getSpotAbbreviation(event.team)}
+                logoScale={logoScale}
+                material={material}
+                sold={sold}
+                shine={shine}
+                shineDelayS={shineDelayS}
+            />
+        </div>
+    )
+}
+
 export function SportStyleBoard({elementKey, element, box}: ElementProps) {
     const {stream, events: rawEvents, series, priceRanges, teamPrices} = useLayoutData()
 
@@ -231,8 +284,11 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
 
     const cols = Math.max(1, Math.round(boardElement?.cols ?? DEFAULT_COLS))
     // R3.4: two selects in SportStyleBoardSettings, no validation — narrowed with defaults exactly
-    // like `cols`/`turf`/`patch` above.
-    const edgeMode = boardElement?.edgeMode === 'tiered' ? 'tiered' : 'plain'
+    // like `cols`/`turf`/`patch` above. 'metal' (see the header) is the third edge mode.
+    const edgeMode: 'plain' | 'tiered' | 'metal' =
+        boardElement?.edgeMode === 'tiered' ? 'tiered' : boardElement?.edgeMode === 'metal' ? 'metal' : 'plain'
+    // Metal mode only: gold sweeps + halo / silver sweep (the same `shine` field sport_priced reads).
+    const shine = boardElement?.shine ?? true
     // hit-sequence-plan.md §2.1: ball slot + sold gate, all opt-in. A hole as wide as the grid
     // would leave no room to deal into, so it is ignored (gridSlots warns too).
     const holeRaw = boardElement?.hole
@@ -418,6 +474,27 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
         })
     }, [geometry, placedEvents, cols, patchSize])
 
+    // Metal mode: each placed cell's material (by tier), sold state and shine stagger. The n-th
+    // tile of a tier (in `cellPositions` order) starts `-((n + 0.5) * cycle) / count` seconds into
+    // its sweep cycle — SportPricedBoard.tsx's stagger — so a tier's tiles never flash in unison.
+    // Computed in every mode (cheap) and only rendered in 'metal'; hooks stay unconditional.
+    const metalCells = useMemo(() => {
+        const tierCount = {best: 0, good: 0, mid: 0, regular: 0} as Record<Tier, number>
+        const tierOf = (team: string): Tier => tierByTeam.get(team) ?? 'regular'
+        for (const {event} of cellPositions) tierCount[tierOf(event.team)]++
+        const tierSeen = {best: 0, good: 0, mid: 0, regular: 0} as Record<Tier, number>
+        return cellPositions.map(({event, x, y}) => {
+            const tier = tierOf(event.team)
+            const n = tierSeen[tier]++
+            const material = TIER_MATERIALS[tier]
+            const cycle = material.shine?.cycleS ?? 0
+            const shineDelayS = cycle > 0 ? Math.round((-((n + 0.5) * cycle) / Math.max(1, tierCount[tier])) * 100) / 100 : 0
+            return {event, x, y, material, sold: isShownSold(event), shineDelayS}
+        })
+        // `isShownSold` is a plain closure over `gated`/`revealed`, listed as deps in its place.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cellPositions, tierByTeam, gated, revealed])
+
     // The ball's square img box, centred on the hole's footprint, in `.sps-inner` coordinates
     // (hit-sequence-plan.md §2.3). `undefined` without a hole. The art lies along the hole's
     // diagonal (rotated -45deg in the CSS), its long axis `ballScale` of that diagonal, so the box
@@ -490,12 +567,12 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
     // `enabled` flag — the field is a flat black fill instead (the `.sps-field-black` div below,
     // same clip group as the canvas) so the neon tier skins read against a plain backdrop. This is
     // an `edgeMode` decision, not a `sortMode` one — 'centered' paints turf again like any other mode
-    // when `edgeMode` is 'plain'.
-    // TEMPORARY (revert me): turf + white lines are forced ON in tiered mode too, to compare the
-    // neon tier skins against the football field. Restore the three `edgeMode` guards marked
+    // when `edgeMode` is 'plain'. 'metal' behaves exactly like 'tiered' here.
+    // TEMPORARY (revert me): turf + white lines are forced ON in tiered/metal mode too, to compare
+    // the tier skins against the football field. Restore the three `edgeMode` guards marked
     // "TEMPORARY" in this file to go back to the black field with no lines.
     const TEMP_FIELD_IN_TIERED = true
-    const paintTurf = turf.enabled && (TEMP_FIELD_IN_TIERED || edgeMode !== 'tiered')
+    const paintTurf = turf.enabled && (TEMP_FIELD_IN_TIERED || edgeMode === 'plain')
 
     // R1 fix 6: re-rolling `seeds.turf`/`seeds.wear` (module state) doesn't by itself trigger a
     // re-render — each mounted board keeps its own counter, bumped when a matching cue arrives, so
@@ -619,7 +696,7 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
         // re-run on every render just because `mergeTurf` returns a fresh object — same trick
         // /obs/setup/sport_style/board's own turf effect uses via `geometry.field.*` primitives.
         // `regenTick.turf` re-runs this effect on a "Regenerate turf" cue, without a reload.
-        // `edgeMode` is a dep so switching into/out of 'tiered' re-runs this effect even when the
+        // `edgeMode` is a dep so switching into/out of 'plain' re-runs this effect even when the
         // recipe (`turfKey`) hasn't changed (`paintTurf` above).
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [innerW, innerH, cols, geometry, turfKey, regenTick.turf, edgeMode])
@@ -649,12 +726,12 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
                   {/* Everything painted lives in the inner field, inset by `margin` — its own origin, so
                       fieldGeometry's integer rects (computed for innerW × innerH) apply unchanged. */}
                   <div className="sps-inner" style={{left: margin, top: margin, width: innerW, height: innerH}}>
-                    {/* Layer 1 — clip group A: turf canvas (or, in `edgeMode: 'tiered'`, a flat
-                        black fill instead) only, clipped to the oval field. */}
+                    {/* Layer 1 — clip group A: turf canvas (or, in `edgeMode: 'tiered'`/'metal', a
+                        flat black fill instead) only, clipped to the oval field. */}
                     <div className="sps-clip-turf" style={{clipPath: fieldClip, WebkitClipPath: fieldClip}}>
                         <canvas ref={canvasRef} className="sps-turf-canvas" width={innerW} height={innerH} />
                         {/* TEMPORARY: `&& !TEMP_FIELD_IN_TIERED` keeps the black fill off while the field is forced on. */}
-                        {edgeMode === 'tiered' && !TEMP_FIELD_IN_TIERED && (
+                        {edgeMode !== 'plain' && !TEMP_FIELD_IN_TIERED && (
                             <div
                                 className="sps-field-black"
                                 style={{left: geometry.field.x, top: geometry.field.y, width: geometry.field.w, height: geometry.field.h}}
@@ -662,8 +739,40 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
                         )}
                     </div>
 
-                    {/* Layer 2 — cells, unclipped by the oval. */}
-                    {cellPositions.map(({event, x, y}) => {
+                    {/* Layer 2a (metal only) — glow layer UNDER every cell: each unsold tile's
+                        material glow, plus gold's breathing halo when shine is on, at the tile's own
+                        footprint/radius. Drawn before the cells so no bloom lands on a neighbour. */}
+                    {edgeMode === 'metal' && metalCells.map(({event, x, y, material, sold, shineDelayS}) => {
+                        if (sold) return null
+                        const radius = metalMetrics(patchSize).radius
+                        const rect = {left: x, top: y, width: patchSize, height: patchSize, borderRadius: radius}
+                        return (
+                            <Fragment key={`glow-${event.id}`}>
+                                <div className="sps-glow" style={{...rect, boxShadow: material.shine?.kind === 'gold' ? GOLD_GLOW : material.glow}} />
+                                {shine && material.shine?.kind === 'gold' && (
+                                    <div className="sps-glow spm-halo" style={{...rect, boxShadow: GOLD_HALO, animationDelay: `${shineDelayS}s`}} />
+                                )}
+                            </Fragment>
+                        )
+                    })}
+
+                    {/* Layer 2 — cells, unclipped by the oval. Metal mode: square metal tiles, no
+                        PatchCell at all (see the header). */}
+                    {edgeMode === 'metal' && metalCells.map(({event, x, y, material, sold, shineDelayS}) => (
+                        <MetalCell
+                            key={event.id}
+                            event={event}
+                            x={x}
+                            y={y}
+                            patchSize={patchSize}
+                            logoScale={patch.style.logoScale}
+                            material={material}
+                            sold={sold}
+                            shine={shine}
+                            shineDelayS={shineDelayS}
+                        />
+                    ))}
+                    {edgeMode !== 'metal' && cellPositions.map(({event, x, y}) => {
                         // R3.2: tiered edge only when the operator has switched edgeMode on — every
                         // tier, including 'regular', now has its own neon skin (EDGE_TIER_BY_TIER is
                         // a total map), so every cell gets a skin in tiered mode. A custom spot with
@@ -695,10 +804,10 @@ export function SportStyleBoard({elementKey, element, box}: ElementProps) {
 
                     {/* Layer 3 — clip group B: column/row strips + hash ticks + seam ticks, above
                         the cells, clipped to the same oval field as clip group A above. Task spec
-                        part 2: every white line is hidden in `edgeMode: 'tiered'` — the black field
-                        and the cells are all that remain. */}
-                    {/* TEMPORARY: `TEMP_FIELD_IN_TIERED ||` forces the white lines on in tiered mode. */}
-                    {(TEMP_FIELD_IN_TIERED || edgeMode !== 'tiered') && (
+                        part 2: every white line is hidden in `edgeMode: 'tiered'`/'metal' — the
+                        black field and the cells are all that remain. */}
+                    {/* TEMPORARY: `TEMP_FIELD_IN_TIERED ||` forces the white lines on in tiered/metal mode. */}
+                    {(TEMP_FIELD_IN_TIERED || edgeMode === 'plain') && (
                         <div className="sps-clip-lines" style={{clipPath: fieldClip, WebkitClipPath: fieldClip}}>
                           <div className="sps-clip-lines" style={{clipPath: linesCut, WebkitClipPath: linesCut}}>
                             {geometry.vStrips.map((s, i) => (

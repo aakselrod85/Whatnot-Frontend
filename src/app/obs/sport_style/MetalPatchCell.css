@@ -1,0 +1,116 @@
+/* MetalPatchCell.tsx — the square metal tile `board:sport_style` draws in `edgeMode: 'metal'`.
+   Every class prefixed `spm-` (distinct from sport_priced's `spp-` and the board's `sps-`); no
+   `body`/`html` rules, no vh/vw, no `color-mix()` (OBS ships an older CEF). The sweep/halo rules are
+   copies of SportPricedBoard.css's `spp-shine`/`spp-halo` under their own names so the two boards
+   can be tuned apart. */
+
+.spm-tile {
+    position: relative;
+    overflow: hidden;
+    flex: 0 0 auto;
+}
+
+.spm-tile-svg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+/* The gold tile's bright outline (the only glow-like thing the tile draws itself — the real
+   glow/halo live in the board's glow layer UNDER the cells, SportStyleBoard.tsx `.sps-glow`). */
+.spm-tile--gold {
+    outline: 2px solid #fff2a0;
+}
+
+/* Panel tint over the whole body — sport_priced tints only its logo section; a square tile has no
+   split, so the tint covers everything (the tile's radius clips its corners). */
+.spm-panel {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+/* ---- tier motion: gold's overlapping bands keep light moving continuously; silver rests between
+   passes. Both are clipped to the tile and sit beneath the static logo. */
+.spm-shine {
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: 0;
+    width: 45%;
+    transform: translateX(-150%) skewX(-20deg);
+    background: linear-gradient(90deg, transparent, rgba(240, 248, 255, 0.42) 30%, rgba(255, 255, 255, 0.9) 50%, rgba(240, 248, 255, 0.42) 70%, transparent);
+    animation: spm-sweep-silver 7s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes spm-sweep-silver {
+    0% { transform: translateX(-150%) skewX(-20deg); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+    34.29%, 100% { transform: translateX(300%) skewX(-20deg); }
+}
+
+.spm-shine--gold {
+    width: 80%;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 168, 16, 0.12) 12%,
+        rgba(255, 237, 155, 0.65) 30%,
+        rgba(255, 255, 239, 0.95) 44%,
+        #fff 50%,
+        rgba(255, 255, 239, 0.95) 56%,
+        rgba(255, 237, 155, 0.65) 70%,
+        rgba(255, 168, 16, 0.12) 88%,
+        transparent 100%);
+    animation: spm-sweep-gold 3.2s linear infinite;
+}
+
+@keyframes spm-sweep-gold {
+    from { transform: translateX(-130%) skewX(-20deg); }
+    to { transform: translateX(255%) skewX(-20deg); }
+}
+
+/* Gold's breathing halo — rendered by the BOARD in its glow layer under the cells (not by the
+   tile), but the keyframes live here next to the other tier motion. */
+.spm-halo {
+    position: absolute;
+    pointer-events: none;
+    animation: spm-breathe 3.6s ease-in-out infinite alternate;
+    will-change: opacity;
+}
+
+@keyframes spm-breathe {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spm-shine, .spm-halo { animation: none; }
+    .spm-halo { opacity: 0.6; }
+    .spm-shine { display: none; }
+}
+
+/* Logo / silhouette / initials, centred in the tile. */
+.spm-logo,
+.spm-sil,
+.spm-label {
+    position: absolute;
+    object-fit: contain;
+}
+
+.spm-sil {
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-position: center;
+    -webkit-mask-position: center;
+}
+
+.spm-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    line-height: 1;
+    white-space: nowrap;
+}
