@@ -9,6 +9,10 @@
 // exception: tier thresholds are channel-wide backend state (`useBoardPriceRanges.ts`, shared with
 // CobraBoardSettings.tsx), not part of this element's own config.
 //
+// Edge has three modes: Plain (auto-palette patch), Tiered (neon tier edge on the patch) and Metal
+// (square gold/silver/copper/chalk tiles in board:sport_priced's materials, no patch at all). A
+// "gold/silver blick" checkbox (the same `shine` element field sport_priced uses) is shown for Metal only.
+//
 // Turf recipe / patch style are opaque JSON blobs (schema.ts: `turf?: unknown; patch?: unknown`) —
 // this panel is deliberately copy/paste, not a knob-by-knob editor: paste the Export output from
 // /obs/setup/sport_style/board or /obs/setup/sport_style/team verbatim. Apply only ever checks that
@@ -80,7 +84,7 @@ export default function SportStyleBoardSettings({elementKey, element, currentPha
 
     // R3.4: two selects, config path like every other setting here — no validation, the component
     // narrows with a default exactly like `cols`/`turf`/`patch`.
-    const edgeMode = element.edgeMode === 'tiered' ? 'tiered' : 'plain'
+    const edgeMode = element.edgeMode === 'tiered' ? 'tiered' : element.edgeMode === 'metal' ? 'metal' : 'plain'
     const sortMode = element.sortMode === 'centered' ? 'centered' : 'alphabetical'
 
     function setMargin(next: number) {
@@ -131,12 +135,25 @@ export default function SportStyleBoardSettings({elementKey, element, currentPha
                     <select
                         className="form-select form-select-sm"
                         value={edgeMode}
-                        onChange={(e) => onPatchElement(elementKey, {edgeMode: e.target.value as 'plain' | 'tiered'})}
+                        onChange={(e) => onPatchElement(elementKey, {edgeMode: e.target.value as 'plain' | 'tiered' | 'metal'})}
                     >
                         <option value="plain">Plain</option>
                         <option value="tiered">Tiered</option>
+                        <option value="metal">Metal</option>
                     </select>
                 </div>
+                {edgeMode === 'metal' && (
+                    <div className="form-check align-self-end mb-1">
+                        <input
+                            type="checkbox"
+                            id={`${elementKey}-shine`}
+                            className="form-check-input"
+                            checked={element.shine ?? true}
+                            onChange={(e) => onPatchElement(elementKey, {shine: e.target.checked})}
+                        />
+                        <label className="form-check-label small" htmlFor={`${elementKey}-shine`} title="Gold sweeps + halo, occasional silver sweep (Metal edge only)">gold/silver blick</label>
+                    </div>
+                )}
                 <div>
                     <label className="form-label mb-0 small">Sort</label>
                     <select

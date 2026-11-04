@@ -96,6 +96,14 @@
     position: absolute;
 }
 
+/* `edgeMode: 'metal'` — the glow layer: one box-shadow-only div per unsold tile (its material's
+   outer glow; gold also gets a breathing halo div, `.spm-halo` from MetalPatchCell.css), at the
+   tile's own footprint and radius, rendered BEFORE the cells so no bloom sits on a neighbour. */
+.sps-glow {
+    position: absolute;
+    pointer-events: none;
+}
+
 /* hit-sequence-plan.md §2.3: the NFL ball sitting in the board's `hole`. Positioned like a cell
    (absolute inside .sps-inner, in the cells layer); hidden with visibility, never display, so its
    anchor and layout stay put while a hit sequence plays. Rotated about its centre to lie along the
