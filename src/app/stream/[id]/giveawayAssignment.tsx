@@ -90,6 +90,19 @@ export function bucketFromWhatnot(resp: WhatnotOrdersResponse, breaks: WNBreak[]
     return breaks.map(b => ({break: b, rows: rowsByBreak.get(b.id) ?? []}))
 }
 
+/** Moves rows to the breaks saved by an earlier manual mapping (order id -> break id). */
+export function applyGiveawayOverrides(buckets: Bucket[], overrides: Record<string, number>): Bucket[] {
+    const target = (row: GiveawayRow, current: number) => {
+        const id = overrides[row.orderId]
+        return id !== undefined && buckets.some(b => b.break.id === id) ? id : current
+    }
+    const all = buckets.flatMap(b => b.rows.map(row => ({row, breakId: target(row, b.break.id)})))
+    return buckets.map(b => ({
+        break: b.break,
+        rows: all.filter(x => x.breakId === b.break.id).map(x => x.row).sort((a, c) => a.placedAt.getTime() - c.placedAt.getTime()),
+    }))
+}
+
 /** eventsByBreak must already be filtered to is_giveaway events. */
 export function computeGiveawayMismatches(buckets: Bucket[], eventsByBreak: Map<number, Event[]>): GiveawayMismatch[] {
     const results: GiveawayMismatch[] = []
@@ -130,7 +143,7 @@ export async function addMissingGiveaways(mismatches: GiveawayMismatch[], onProg
     const toFix = mismatches.filter(m => m.type === 'missing')
     for (let i = 0; i < toFix.length; i++) {
         const mm = toFix[i]
-        onProgress(`Adding ${i + 1} of ${toFix.length}: ${mm.buyer}…`)
+        onProgress(`Adding missing giveaways: ${toFix.length - i} of ${toFix.length} left (${mm.buyer})…`)
         await post(getEndpoints().event_add, {
             id: 0,
             index: -1,
@@ -150,7 +163,7 @@ export async function deleteExtraGiveaways(mismatches: GiveawayMismatch[], onPro
     const toDelete = mismatches.filter(m => m.type === 'extra' && m.eventId !== undefined)
     for (let i = 0; i < toDelete.length; i++) {
         const mm = toDelete[i]
-        onProgress(`Deleting ${i + 1} of ${toDelete.length}: ${mm.buyer}…`)
+        onProgress(`Deleting extra giveaways: ${toDelete.length - i} of ${toDelete.length} left (${mm.buyer})…`)
         await post(getEndpoints().event_delete, {id: mm.eventId})
     }
 }

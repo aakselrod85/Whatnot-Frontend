@@ -8,6 +8,10 @@ import {useRouter} from "next/navigation";
 import {sortBreaksById} from "@/app/common/breaks";
 import {useStream} from "@/app/hooks/useStream";
 import {AddBreakWizardComponent} from "@/app/stream/[id]/addBreakWizardComponent";
+import {WhatnotShowStepComponent} from "@/app/stream/[id]/whatnotShowStepComponent";
+import {StreamStatusBadge, RunStatusBadge} from "@/app/stream/[id]/statusBadges";
+import {ShowReconciliationListItem, ShowReconciliation} from "@/app/entity/entities";
+import {WhatnotShowPickerComponent} from "@/app/stream/[id]/whatnotShowPickerComponent";
 
 export default function Page({params} : {params: {id: string}}) {
     let streamId = parseInt(params.id)
@@ -24,6 +28,46 @@ export default function Page({params} : {params: {id: string}}) {
     const [presetSeriesIds, setPresetSeriesIds] = useState<number[]>([])
     const [applying, setApplying] = useState(false)
     const [shows, setShows] = useState<WhatnotShow[]>([])
+    const [showPickerOpen, setShowPickerOpen] = useState(false)
+    const [showsLoadedOnce, setShowsLoadedOnce] = useState(false)
+    const [showsLoading, setShowsLoading] = useState(false)
+    const [showsPartialFailure, setShowsPartialFailure] = useState(false)
+    const [breaksStatus, setBreaksStatus] = useState<'loading' | 'ok' | 'failed'>('loading')
+    const [skipped, setSkipped] = useState(false)
+    const [lastRun, setLastRun] = useState<ShowReconciliationListItem | null | undefined>(undefined)
+    const [reconciling, setReconciling] = useState(false)
+    const [reconcileError, setReconcileError] = useState<string | null>(null)
+
+    useEffect(() => {
+        post(getEndpoints().stream_reconciliation, {stream_id: streamId})
+            .then((r: {item?: ShowReconciliationListItem | null}) => setLastRun(r?.item ?? null))
+            .catch(() => setLastRun(null))
+    }, [streamId, stream?.whatnot_show_id])
+
+    async function reconcileNow() {
+        setReconciling(true)
+        setReconcileError(null)
+        try {
+            const r: ShowReconciliation & {error?: string} = await post(getEndpoints().stream_reconcile, {stream_id: streamId})
+            if (!r || !r.id) {
+                setReconcileError((r as {error?: string} | null)?.error ?? 'Reconciliation failed')
+                return
+            }
+            router.push(`/stream/${streamId}/reconciliation`)
+        } catch (e) {
+            setReconcileError(String(e))
+        } finally {
+            setReconciling(false)
+        }
+    }
+
+    function lastRunText(r: ShowReconciliationListItem): string {
+        const s = r.summary
+        const parts = [new Date(r.started_at).toLocaleString()]
+        if (r.status === 'applied') parts.push(`${s.fixed + s.price_fixed} teams fixed`, `${s.events_added ?? 0} new events added`, `${s.added} giveaways added`)
+        else if (r.status === 'needs_manual') parts.push(`${s.blocking} blocking issues`)
+        return parts.join(' · ')
+    }
     let router = useRouter()
 
     useEffect(() => {
@@ -31,8 +75,13 @@ export default function Page({params} : {params: {id: string}}) {
             id: streamId
         }
         post(getEndpoints().stream_breaks, body)
-            .then((breaks: WNBreak[]) => {
-                setBreaks(sortBreaksById(breaks))
+            .then((result: WNBreak[]) => {
+                if (Array.isArray(result)) {
+                    setBreaks(sortBreaksById(result))
+                    setBreaksStatus('ok')
+                } else {
+                    setBreaksStatus('failed')
+                }
             })
         get(getEndpoints().series_list).then((data: Series[]) => {
             setClosedSeries(data ?? [])
@@ -42,19 +91,45 @@ export default function Page({params} : {params: {id: string}}) {
         })
     }, []);
 
-    // The Whatnot API key lives on the channel (DB-only column), so shows can only be
-    // listed once the stream's channel id is known.
-    useEffect(() => {
+    async function loadShows() {
         if (!channelId) return
-        Promise.all(['live', 'ended'].map(status =>
-            post(getEndpoints().whatnot_shows, {channel_id: channelId, status}).then((r: {shows: WhatnotShow[]}) => r?.shows ?? []).catch(() => [] as WhatnotShow[])
-        )).then(([live, ended]) => setShows([...live, ...ended]))
-    }, [channelId]);
+        setShowsLoading(true)
+        try {
+            const results = await Promise.all(['live', 'scheduled', 'ended'].map(status =>
+                post(getEndpoints().whatnot_shows, {channel_id: channelId, status})
+                    .then((r: {shows: WhatnotShow[]}) => (Array.isArray(r?.shows) ? r.shows : null))
+                    .catch(() => null)
+            ))
+            const [live, scheduled, ended] = results
+            const scheduledSorted = [...(scheduled ?? [])]
+                .sort((a, b) => {
+                    if (!a.scheduled_start_at && !b.scheduled_start_at) return 0
+                    if (!a.scheduled_start_at) return 1
+                    if (!b.scheduled_start_at) return -1
+                    return new Date(a.scheduled_start_at).getTime() - new Date(b.scheduled_start_at).getTime()
+                })
+                .slice(0, 10)
+            setShows([...(live ?? []), ...scheduledSorted, ...(ended ?? [])])
+            setShowsPartialFailure(results.some(r => r === null))
+            setShowsLoadedOnce(true)
+        } finally {
+            setShowsLoading(false)
+        }
+    }
 
-    async function changeWhatnotShow(value: string) {
-        await post(getEndpoints().stream_set_whatnot_show, {stream_id: streamId, whatnot_show_id: value || null})
+    async function changeWhatnotShow(value: string): Promise<boolean> {
+        const resp = await post(getEndpoints().stream_set_whatnot_show, {
+            stream_id: streamId,
+            whatnot_show_id: value || null,
+            whatnot_show_name: shows.find(sh => sh.id === value)?.title ?? null,
+        })
+        if (!resp?.success) {
+            toast('Failed to update Whatnot show')
+            return false
+        }
         refreshStream()
         toast(value ? 'Whatnot show linked' : 'Whatnot show unlinked')
+        return true
     }
 
     async function addNewBreak(name: string, customSpots: string[] = []) {
@@ -215,6 +290,20 @@ export default function Page({params} : {params: {id: string}}) {
         toast(`Preset "${p.name}" applied to ${n} breaks`)
     }
 
+    const showSkip = devMode || (showsLoadedOnce && (shows.length === 0 || showsPartialFailure))
+    const needsStep = breaksStatus === 'ok' && breaks.length === 0 && !stream?.whatnot_show_id && !skipped
+    const pageLoading = breaksStatus === 'loading' || (needsStep && !stream)
+    const wantShows = showPickerOpen || (!!stream && needsStep)
+
+    // Shows are slow to list, so fetch them only when the new-stream step or the picker needs them.
+    // The Whatnot API key lives on the channel (DB-only column), so this also waits for the channel id.
+    // A failed or partial load is retried the next time the picker opens.
+    useEffect(() => {
+        if (!channelId || !wantShows) return
+        if (showsLoadedOnce && !showsPartialFailure) return
+        void loadShows()
+    }, [channelId, wantShows]);
+
     const presetRows = Math.max(breaks.length, presetSeriesIds.length)
 
     return (
@@ -234,6 +323,19 @@ export default function Page({params} : {params: {id: string}}) {
                     <label className="form-check-label" htmlFor="devModeSwitch">dev</label>
                 </div>
             </div>
+            {pageLoading ? (
+                <div className="text-center text-muted mt-5">Loading…</div>
+            ) : stream && needsStep ? (
+                <WhatnotShowStepComponent
+                    shows={shows}
+                    loading={showsLoading || !showsLoadedOnce}
+                    partialFailure={showsPartialFailure}
+                    showSkip={showSkip}
+                    onSelect={changeWhatnotShow}
+                    onRetry={() => void loadShows()}
+                    onSkip={() => setSkipped(true)}
+                />
+            ) : (<>
             {/* Two equal halves: the centre line of the viewport is the seam. Buttons hug it from the left,
                 the breaks list starts from it on the right. */}
             <div className="d-flex">
@@ -241,36 +343,43 @@ export default function Page({params} : {params: {id: string}}) {
                 <div className='pe-3 d-flex flex-column gap-2'>
                     <div>
                         <label className="form-label mb-1">Whatnot show</label>
-                        <select
-                            className="form-select form-select-sm"
-                            value={stream?.whatnot_show_id ?? ''}
-                            onChange={(e) => changeWhatnotShow(e.target.value)}
-                        >
-                            <option value="">— not linked —</option>
-                            {shows.map(sh => (
-                                <option key={sh.id} value={sh.id}>
-                                    {`${sh.status === 'live' ? '🔴 ' : ''}${sh.title} · ${sh.scheduled_start_at ? new Date(sh.scheduled_start_at).toLocaleString() : ''}`}
-                                </option>
-                            ))}
-                            {stream?.whatnot_show_id && !shows.some(sh => sh.id === stream.whatnot_show_id) && (
-                                <option value={stream.whatnot_show_id}>{stream.whatnot_show_id}</option>
-                            )}
-                        </select>
-                        <small className="text-muted">
+                        <small className="text-muted d-block">
                             {stream?.whatnot_show_id
-                                ? (shows.find(sh => sh.id === stream.whatnot_show_id)?.title ?? stream.whatnot_show_id)
+                                ? (stream.whatnot_show_name ?? shows.find(sh => sh.id === stream.whatnot_show_id)?.title ?? stream.whatnot_show_id)
                                 : 'No Whatnot show linked'}
+                        </small>
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-outline-light"
+                            disabled={!(channelId && stream)}
+                            onClick={() => setShowPickerOpen(true)}
+                        >
+                            {!(channelId && stream) ? 'Loading…' : (stream.whatnot_show_id ? 'Change' : 'Select show')}
+                        </button>
+                    </div>
+                    <div>
+                        <label className="form-label mb-1">Status</label>{' '}
+                        <StreamStatusBadge status={stream?.status}/>
+                        <small className="text-muted d-block">
+                            Last reconciliation:{' '}
+                            {lastRun === undefined ? '…' : lastRun === null ? 'never' : (
+                                <>
+                                    <a href={`/stream/${streamId}/reconciliation`}>{lastRunText(lastRun)}</a>{' '}
+                                    <RunStatusBadge status={lastRun.status}/>
+                                </>
+                            )}
                         </small>
                     </div>
                     <button
                         type="button"
                         className="btn btn-primary"
-                        disabled={!stream?.whatnot_show_id}
+                        disabled={!stream?.whatnot_show_id || reconciling}
                         title={stream?.whatnot_show_id ? '' : 'Link a Whatnot show first'}
-                        onClick={() => router.push(`/stream/${streamId}/whatnot-verify`)}
+                        onClick={reconcileNow}
                     >
-                        Start verification
+                        {reconciling ? 'Reconciling… (~1 min)' : 'Reconcile now'}
                     </button>
+                    {reconcileError && <div className="text-danger small">{reconcileError}</div>}
                     <button type="button" className="btn btn-primary" onClick={() => router.push(`/package/${streamId}`)}>
                         Package all
                     </button>
@@ -342,6 +451,18 @@ export default function Page({params} : {params: {id: string}}) {
                     <AddBreakWizardComponent onAdd={addNewBreak}/>
                 </div>
             </div>
+            </>)}
+            {showPickerOpen && (
+                <WhatnotShowPickerComponent
+                    shows={shows}
+                    loading={showsLoading || !showsLoadedOnce}
+                    partialFailure={showsPartialFailure}
+                    currentShowId={stream?.whatnot_show_id ?? null}
+                    onSelect={changeWhatnotShow}
+                    onRetry={() => void loadShows()}
+                    onClose={() => setShowPickerOpen(false)}
+                />
+            )}
             {presetOpen && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center z-3" style={{background: 'rgba(0,0,0,0.6)'}}>
                     <div className="bg-dark text-white border rounded p-3" style={{width: '640px', maxHeight: '90vh', overflowY: 'auto'}}>

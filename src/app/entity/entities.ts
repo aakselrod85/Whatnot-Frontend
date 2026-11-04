@@ -126,6 +126,8 @@ export interface SeriesTeamTotal {
     price_left: number
 }
 
+export type StreamStatus = 'planned' | 'live' | 'ended' | 'verified'
+
 export interface WNStream {
     id: number
     created_at: number
@@ -133,6 +135,8 @@ export interface WNStream {
     is_ended: boolean
     active_break_id: number | null
     whatnot_show_id: string | null
+    whatnot_show_name: string | null
+    status: StreamStatus
 }
 
 export interface StreamResponse extends WNStream {}
@@ -296,3 +300,42 @@ export interface WhatnotBreakOrders { name: string; orders: WhatnotBreakOrder[] 
 export interface WhatnotGiveawayOrder { order_id: string; title: string; username: string; created_at: string }
 export interface WhatnotUnparsedOrder { order_id: string; title: string; username: string; price: number; created_at: string }
 export interface WhatnotOrdersResponse { show: WhatnotShow; orders_scanned: number; breaks: WhatnotBreakOrders[]; giveaways: WhatnotGiveawayOrder[]; unparsed: WhatnotUnparsedOrder[] }
+
+export type ReconciliationStatus = 'running' | 'applied' | 'needs_manual' | 'failed'
+export interface ReconciliationToAdd { team: string; username: string; price: number }
+export interface ReconciliationExtraEvent { team: string; customer: string; event_id: number }
+export interface ReconciliationBreakReport {
+    wn_name: string; break_id: number; break_name: string; matched_by: 'name' | 'number' | 'none' | 'manual' | 'skipped'
+    matched: number; to_fix: number; to_fix_price: number
+    to_add?: ReconciliationToAdd[]; extra: ReconciliationExtraEvent[]
+}
+export interface ShowReconciliationReport {
+    show: {id: string; title: string}
+    orders_scanned: number
+    blocking: number
+    breaks: ReconciliationBreakReport[]
+    giveaways: {
+        to_add: number
+        unplaced: {order_id: string; title: string; username: string}[]
+        extra: {break_id: number; customer: string; event_id: number}[]
+    }
+    unparsed: {title: string; username: string}[]
+}
+export interface ReconciliationManualMap {
+    breaks?: Record<string, number> // Whatnot break name -> break id, or -1 to skip
+    giveaways?: Record<string, number> // order id -> break id
+}
+export interface ShowReconciliation {
+    id: number; stream_id: number; show_id: string; trigger: string; status: ReconciliationStatus
+    started_at: string; finished_at: string | null; error: string | null
+    orders: WhatnotOrdersResponse | null
+    report: ShowReconciliationReport | null
+    manual_map: ReconciliationManualMap | null
+}
+export interface ShowReconciliationSummary { fixed: number; price_fixed: number; added: number; events_added?: number; blocking: number }
+export interface ShowReconciliationListItem {
+    id: number; trigger: string; status: ReconciliationStatus
+    started_at: string; finished_at: string | null; error: string | null
+    summary: ShowReconciliationSummary
+    manual_map: ReconciliationManualMap | null
+}
