@@ -295,13 +295,14 @@ export interface LayoutImage {
 }
 
 export interface WhatnotShow { id: string; title: string; status: string; scheduled_start_at: string | null; ended_at: string | null }
+export interface WhatnotShowsResponse { shows: WhatnotShow[]; next_cursor?: string; has_more?: boolean }
 export interface WhatnotBreakOrder { order_id: string; team: string; username: string; price: number; created_at: string }
 export interface WhatnotBreakOrders { name: string; orders: WhatnotBreakOrder[] }
 export interface WhatnotGiveawayOrder { order_id: string; title: string; username: string; created_at: string }
 export interface WhatnotUnparsedOrder { order_id: string; title: string; username: string; price: number; created_at: string }
 export interface WhatnotOrdersResponse { show: WhatnotShow; orders_scanned: number; breaks: WhatnotBreakOrders[]; giveaways: WhatnotGiveawayOrder[]; unparsed: WhatnotUnparsedOrder[] }
 
-export type ReconciliationStatus = 'running' | 'applied' | 'needs_manual' | 'failed'
+export type ReconciliationStatus = 'running' | 'applied' | 'needs_manual' | 'failed' | 'dry_run'
 export interface ReconciliationToAdd { team: string; username: string; price: number }
 export interface ReconciliationExtraEvent { team: string; customer: string; event_id: number }
 export interface ReconciliationBreakReport {
@@ -316,6 +317,7 @@ export interface ShowReconciliationReport {
     breaks: ReconciliationBreakReport[]
     giveaways: {
         to_add: number
+        items?: {order_id: string; title: string; username: string; created_at: string; break_id: number; break_name: string; placed_by: 'auto' | 'manual' | 'none'; status: 'matched' | 'missing' | 'unplaced'}[] // absent on older runs
         unplaced: {order_id: string; title: string; username: string}[]
         extra: {break_id: number; customer: string; event_id: number}[]
     }

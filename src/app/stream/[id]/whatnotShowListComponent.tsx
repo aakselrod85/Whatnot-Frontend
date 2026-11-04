@@ -9,9 +9,13 @@ interface WhatnotShowListProps {
     currentShowId: string | null
     disabled: boolean
     onPick: (id: string) => void
+    hasOlder?: boolean
+    olderLoading?: boolean
+    olderFailed?: boolean
+    onLoadOlder?: () => Promise<number>
 }
 
-export const WhatnotShowListComponent: FC<WhatnotShowListProps> = ({shows, currentShowId, disabled, onPick}) => {
+export const WhatnotShowListComponent: FC<WhatnotShowListProps> = ({shows, currentShowId, disabled, onPick, hasOlder, olderLoading, olderFailed, onLoadOlder}) => {
     const [page, setPage] = useState(() => {
         const idx = currentShowId ? shows.findIndex(sh => sh.id === currentShowId) : -1
         return idx >= 0 ? Math.floor(idx / PAGE_SIZE) : 0
@@ -20,10 +24,21 @@ export const WhatnotShowListComponent: FC<WhatnotShowListProps> = ({shows, curre
     const totalPages = Math.max(1, Math.ceil(shows.length / PAGE_SIZE))
     const visible = shows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
+    const canLoadOlder = !!onLoadOlder && !!hasOlder
+
+    async function loadOlder() {
+        if (!onLoadOlder) return
+        const firstNewIndex = shows.length
+        const added = await onLoadOlder()
+        if (added > 0) setPage(Math.floor(firstNewIndex / PAGE_SIZE))
+    }
+
     return (
         <>
             {shows.length === 0 ? (
-                <div className="text-muted">No shows returned — check the channel&apos;s Whatnot API key.</div>
+                <div className="text-muted">
+                    {canLoadOlder ? 'No recent shows.' : <>No shows returned — check the channel&apos;s Whatnot API key.</>}
+                </div>
             ) : (
                 <div className="d-flex flex-column gap-1" style={totalPages > 1 ? {minHeight: '536px'} : undefined}>
                     {visible.map(sh => (
@@ -53,6 +68,14 @@ export const WhatnotShowListComponent: FC<WhatnotShowListProps> = ({shows, curre
                         Next
                     </button>
                     <small className="text-muted ms-auto">Page {page + 1} of {totalPages} · {shows.length} shows</small>
+                </div>
+            )}
+            {canLoadOlder && (
+                <div className="d-flex align-items-center gap-2 mt-2">
+                    <button type="button" className="btn btn-sm btn-outline-light" disabled={disabled || olderLoading} onClick={() => void loadOlder()}>
+                        {olderLoading ? 'Loading…' : 'Load older shows'}
+                    </button>
+                    {olderFailed && <small className="text-warning">Couldn&apos;t load older shows</small>}
                 </div>
             )}
         </>

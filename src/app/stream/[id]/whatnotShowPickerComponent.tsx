@@ -10,10 +10,14 @@ interface WhatnotShowPickerProps {
     currentShowId: string | null
     onSelect: (id: string) => Promise<boolean>
     onRetry: () => void
+    hasOlder: boolean
+    olderLoading: boolean
+    olderFailed: boolean
+    onLoadOlder: () => Promise<number>
     onClose: () => void
 }
 
-export const WhatnotShowPickerComponent: FC<WhatnotShowPickerProps> = ({shows, loading, partialFailure, currentShowId, onSelect, onRetry, onClose}) => {
+export const WhatnotShowPickerComponent: FC<WhatnotShowPickerProps> = ({shows, loading, partialFailure, currentShowId, onSelect, onRetry, hasOlder, olderLoading, olderFailed, onLoadOlder, onClose}) => {
     const [saving, setSaving] = useState(false)
 
     const currentMissing = !loading && !!currentShowId && !shows.some(sh => sh.id === currentShowId)
@@ -68,7 +72,16 @@ export const WhatnotShowPickerComponent: FC<WhatnotShowPickerProps> = ({shows, l
                                 <button type="button" className="btn btn-sm btn-outline-light" onClick={onRetry}>Retry</button>
                             </div>
                         )}
-                        <WhatnotShowListComponent shows={shows} currentShowId={currentShowId} disabled={saving} onPick={choose}/>
+                        <WhatnotShowListComponent
+                            shows={shows}
+                            currentShowId={currentShowId}
+                            disabled={saving}
+                            onPick={choose}
+                            hasOlder={hasOlder}
+                            olderLoading={olderLoading}
+                            olderFailed={olderFailed}
+                            onLoadOlder={onLoadOlder}
+                        />
                     </>
                 )}
             </div>

@@ -12,7 +12,7 @@ function ReconciliationPage({params}: {params: {id: string}}) {
     const streamId = parseInt(params.id)
     const router = useRouter()
     const [noRun, setNoRun] = useState(false)
-    const [rerunning, setRerunning] = useState(false)
+    const [rerunning, setRerunning] = useState<'apply' | 'report' | null>(null)
     const [run, setRun] = useState<ShowReconciliation | null>(null)
     const [streamStatus, setStreamStatus] = useState<string | undefined>(undefined)
     const [error, setError] = useState<string | null>(null)
@@ -38,18 +38,18 @@ function ReconciliationPage({params}: {params: {id: string}}) {
         return () => { cancelled = true }
     }, [streamId, reloadKey])
 
-    async function rerun() {
-        setRerunning(true)
+    async function rerun(dryRun: boolean) {
+        setRerunning(dryRun ? 'report' : 'apply')
         setError(null)
         try {
-            const r = await post(getEndpoints().stream_reconcile, {stream_id: streamId})
+            const r = await post(getEndpoints().stream_reconcile, {stream_id: streamId, dry_run: dryRun})
             if (!r?.id) setError(r?.error ?? 'Reconciliation failed')
             setExpanded(new Set())
             setReloadKey(k => k + 1)
         } catch (e) {
             setError(String(e))
         } finally {
-            setRerunning(false)
+            setRerunning(null)
         }
     }
 
@@ -78,7 +78,14 @@ function ReconciliationPage({params}: {params: {id: string}}) {
                 <h4>Reconciliation <StreamStatusBadge status={streamStatus}/></h4>
                 {error && <div className="alert alert-danger">{error}</div>}
 
-                {noRun && <div className="alert alert-info">No reconciliation has run yet for this stream.</div>}
+                {noRun && (
+                    <div className="alert alert-info">
+                        No reconciliation has run yet for this stream.{' '}
+                        <button className="btn btn-outline-primary btn-sm" disabled={!!rerunning} onClick={() => rerun(true)}>
+                            {rerunning === 'report' ? 'Building report… (~1 min)' : 'Run report'}
+                        </button>
+                    </div>
+                )}
 
                 {run && (
                     <>
@@ -90,6 +97,11 @@ function ReconciliationPage({params}: {params: {id: string}}) {
                         {run.status === 'applied' && (
                             <div className="alert alert-success">
                                 All {ordersMapped} orders mapped, {fixedTeams} teams fixed, {addedEvents} new events added, {addedGive} giveaways added.
+                            </div>
+                        )}
+                        {run.status === 'dry_run' && (
+                            <div className="alert alert-info">
+                                Report only, nothing was changed. If applied: all {ordersMapped} orders mapped, {fixedTeams} teams fixed, {addedEvents} new events added, {addedGive} giveaways added.
                             </div>
                         )}
                         {run.status === 'needs_manual' && report && (
@@ -113,10 +125,13 @@ function ReconciliationPage({params}: {params: {id: string}}) {
                         {run.status === 'running' && <div className="alert alert-info">Run in progress…</div>}
 
                         <div className="d-flex gap-2 mb-3">
-                            <button className="btn btn-primary" disabled={rerunning || run.status === 'running'} onClick={rerun}>
-                                {rerunning ? 'Re-running… (~1 min)' : 'Re-run reconciliation'}
+                            <button className="btn btn-primary" disabled={!!rerunning || run.status === 'running'} onClick={() => rerun(false)}>
+                                {rerunning === 'apply' ? 'Re-running… (~1 min)' : 'Re-run reconciliation'}
                             </button>
-                            <a className="btn btn-outline-primary" href={`https://www.whatnot.com/live/${run.show_id}`} target="_blank" rel="noopener noreferrer">
+                            <button className="btn btn-outline-primary" disabled={!!rerunning || run.status === 'running'} onClick={() => rerun(true)}>
+                                {rerunning === 'report' ? 'Building report… (~1 min)' : 'Re-run report'}
+                            </button>
+                            <a className="btn btn-outline-secondary" href={`https://www.whatnot.com/live/${run.show_id}`} target="_blank" rel="noopener noreferrer">
                                 Go to show
                             </a>
                             {streamStatus === 'ended' && (
@@ -129,7 +144,7 @@ function ReconciliationPage({params}: {params: {id: string}}) {
                                 <h6>Breaks</h6>
                                 <table className="table table-bordered table-sm">
                                     <thead>
-                                        <tr><th>Whatnot break</th><th>DB break</th><th>Matched by</th><th>Matched</th><th>Fixed</th><th>Price fixed</th><th>New events</th><th>Details</th></tr>
+                                        <tr><th>Whatnot break</th><th>DB break</th><th>Matched by</th><th>Matched</th><th>{run.status === 'applied' ? 'Fixed' : 'To fix'}</th><th>{run.status === 'applied' ? 'Price fixed' : 'Price to fix'}</th><th>New events</th><th>Details</th></tr>
                                     </thead>
                                     <tbody>
                                         {report.breaks.map((b, i) => {
@@ -183,6 +198,20 @@ function ReconciliationPage({params}: {params: {id: string}}) {
 
                                 <h6>Giveaways</h6>
                                 <div className="mb-2">{report.giveaways.to_add} {run.status === 'applied' ? 'added' : 'to add'} · {report.giveaways.unplaced.length} unplaced · {report.giveaways.extra.length} extra</div>
+                                {(report.giveaways.items?.length ?? 0) > 0 && (
+                                    <table className="table table-bordered table-sm">
+                                        <thead><tr><th>Order time</th><th>Title</th><th>Username</th><th>Break</th><th>Placed by</th><th>Status</th></tr></thead>
+                                        <tbody>
+                                            {report.giveaways.items?.map(g => (
+                                                <tr key={g.order_id}>
+                                                    <td>{new Date(g.created_at).toLocaleString()}</td>
+                                                    <td>{g.title}</td><td>{g.username}</td><td>{g.break_name}</td><td>{g.placed_by}</td>
+                                                    <td>{g.status === 'missing' ? (run.status === 'applied' ? 'added' : 'to add') : g.status}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
                                 {report.giveaways.unplaced.length > 0 && (
                                     <table className="table table-bordered table-sm">
                                         <thead><tr><th>Unplaced order</th><th>Title</th><th>Username</th></tr></thead>

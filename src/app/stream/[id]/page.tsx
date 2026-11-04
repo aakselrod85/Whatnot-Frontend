@@ -3,7 +3,7 @@
 import React, {useEffect, useState} from "react";
 import {Teams} from "@/app/common/teams";
 import {getEndpoints, get, post} from "@/app/lib/backend";
-import {AddBreakResponse, Event, GetChannelsChannel, GiveawayTypeNone, Series, WhatnotShow, SeriesPreset, WNBreak} from "@/app/entity/entities";
+import {AddBreakResponse, Event, GetChannelsChannel, GiveawayTypeNone, Series, WhatnotShow, WhatnotShowsResponse, SeriesPreset, WNBreak} from "@/app/entity/entities";
 import {useRouter} from "next/navigation";
 import {sortBreaksById} from "@/app/common/breaks";
 import {useStream} from "@/app/hooks/useStream";
@@ -32,10 +32,14 @@ export default function Page({params} : {params: {id: string}}) {
     const [showsLoadedOnce, setShowsLoadedOnce] = useState(false)
     const [showsLoading, setShowsLoading] = useState(false)
     const [showsPartialFailure, setShowsPartialFailure] = useState(false)
+    const [olderCursor, setOlderCursor] = useState('')
+    const [hasOlderShows, setHasOlderShows] = useState(false)
+    const [olderLoading, setOlderLoading] = useState(false)
+    const [olderFailed, setOlderFailed] = useState(false)
     const [breaksStatus, setBreaksStatus] = useState<'loading' | 'ok' | 'failed'>('loading')
     const [skipped, setSkipped] = useState(false)
     const [lastRun, setLastRun] = useState<ShowReconciliationListItem | null | undefined>(undefined)
-    const [reconciling, setReconciling] = useState(false)
+    const [reconciling, setReconciling] = useState<'apply' | 'report' | null>(null)
     const [reconcileError, setReconcileError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -44,11 +48,11 @@ export default function Page({params} : {params: {id: string}}) {
             .catch(() => setLastRun(null))
     }, [streamId, stream?.whatnot_show_id])
 
-    async function reconcileNow() {
-        setReconciling(true)
+    async function runReconciliation(dryRun: boolean) {
+        setReconciling(dryRun ? 'report' : 'apply')
         setReconcileError(null)
         try {
-            const r: ShowReconciliation & {error?: string} = await post(getEndpoints().stream_reconcile, {stream_id: streamId})
+            const r: ShowReconciliation & {error?: string} = await post(getEndpoints().stream_reconcile, {stream_id: streamId, dry_run: dryRun})
             if (!r || !r.id) {
                 setReconcileError((r as {error?: string} | null)?.error ?? 'Reconciliation failed')
                 return
@@ -57,7 +61,7 @@ export default function Page({params} : {params: {id: string}}) {
         } catch (e) {
             setReconcileError(String(e))
         } finally {
-            setReconciling(false)
+            setReconciling(null)
         }
     }
 
@@ -65,6 +69,7 @@ export default function Page({params} : {params: {id: string}}) {
         const s = r.summary
         const parts = [new Date(r.started_at).toLocaleString()]
         if (r.status === 'applied') parts.push(`${s.fixed + s.price_fixed} teams fixed`, `${s.events_added ?? 0} new events added`, `${s.added} giveaways added`)
+        else if (r.status === 'dry_run') parts.push(`${s.fixed + s.price_fixed} teams to fix`, `${s.events_added ?? 0} new events to add`, `${s.added} giveaways to add`)
         else if (r.status === 'needs_manual') parts.push(`${s.blocking} blocking issues`)
         return parts.join(' · ')
     }
@@ -92,16 +97,16 @@ export default function Page({params} : {params: {id: string}}) {
     }, []);
 
     async function loadShows() {
-        if (!channelId) return
+        if (!channelId || olderLoading) return
         setShowsLoading(true)
         try {
             const results = await Promise.all(['live', 'scheduled', 'ended'].map(status =>
                 post(getEndpoints().whatnot_shows, {channel_id: channelId, status})
-                    .then((r: {shows: WhatnotShow[]}) => (Array.isArray(r?.shows) ? r.shows : null))
+                    .then((r: WhatnotShowsResponse) => (Array.isArray(r?.shows) ? r : null))
                     .catch(() => null)
             ))
             const [live, scheduled, ended] = results
-            const scheduledSorted = [...(scheduled ?? [])]
+            const scheduledSorted = [...(scheduled?.shows ?? [])]
                 .sort((a, b) => {
                     if (!a.scheduled_start_at && !b.scheduled_start_at) return 0
                     if (!a.scheduled_start_at) return 1
@@ -109,11 +114,44 @@ export default function Page({params} : {params: {id: string}}) {
                     return new Date(a.scheduled_start_at).getTime() - new Date(b.scheduled_start_at).getTime()
                 })
                 .slice(0, 10)
-            setShows([...(live ?? []), ...scheduledSorted, ...(ended ?? [])])
+            setShows([...(live?.shows ?? []), ...scheduledSorted, ...(ended?.shows ?? [])])
+            setOlderCursor(ended?.next_cursor ?? '')
+            setHasOlderShows(!!ended?.has_more)
+            setOlderFailed(false)
             setShowsPartialFailure(results.some(r => r === null))
             setShowsLoadedOnce(true)
         } finally {
             setShowsLoading(false)
+        }
+    }
+
+    // Returns how many new shows were added. The first batch can repeat shows already listed, because it
+    // restarts from the page where the 2-day cutoff stopped.
+    async function loadOlderShows(): Promise<number> {
+        if (!channelId || olderLoading) return 0
+        setOlderLoading(true)
+        setOlderFailed(false)
+        try {
+            const r: WhatnotShowsResponse | null = await post(getEndpoints().whatnot_shows, {
+                channel_id: channelId,
+                status: 'ended',
+                older: true,
+                cursor: olderCursor,
+            })
+            if (!r || !Array.isArray(r.shows)) {
+                setOlderFailed(true)
+                return 0
+            }
+            const added = r.shows.filter(sh => !shows.some(existing => existing.id === sh.id))
+            setShows([...shows, ...added])
+            setOlderCursor(r.next_cursor ?? '')
+            setHasOlderShows(!!r.has_more)
+            return added.length
+        } catch {
+            setOlderFailed(true)
+            return 0
+        } finally {
+            setOlderLoading(false)
         }
     }
 
@@ -373,11 +411,20 @@ export default function Page({params} : {params: {id: string}}) {
                     <button
                         type="button"
                         className="btn btn-primary"
-                        disabled={!stream?.whatnot_show_id || reconciling}
+                        disabled={!stream?.whatnot_show_id || !!reconciling}
                         title={stream?.whatnot_show_id ? '' : 'Link a Whatnot show first'}
-                        onClick={reconcileNow}
+                        onClick={() => runReconciliation(false)}
                     >
-                        {reconciling ? 'Reconciling… (~1 min)' : 'Reconcile now'}
+                        {reconciling === 'apply' ? 'Reconciling… (~1 min)' : 'Reconcile now'}
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-outline-primary"
+                        disabled={!stream?.whatnot_show_id || !!reconciling}
+                        title={stream?.whatnot_show_id ? 'Report only, nothing is changed' : 'Link a Whatnot show first'}
+                        onClick={() => runReconciliation(true)}
+                    >
+                        {reconciling === 'report' ? 'Building report… (~1 min)' : 'Reconcile report'}
                     </button>
                     {reconcileError && <div className="text-danger small">{reconcileError}</div>}
                     <button type="button" className="btn btn-primary" onClick={() => router.push(`/package/${streamId}`)}>
@@ -461,6 +508,10 @@ export default function Page({params} : {params: {id: string}}) {
                     onSelect={changeWhatnotShow}
                     onRetry={() => void loadShows()}
                     onClose={() => setShowPickerOpen(false)}
+                    hasOlder={hasOlderShows}
+                    olderLoading={olderLoading}
+                    olderFailed={olderFailed}
+                    onLoadOlder={loadOlderShows}
                 />
             )}
             {presetOpen && (
