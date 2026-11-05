@@ -134,7 +134,7 @@ function ReconciliationPage({params}: {params: {id: string}}) {
                             <a className="btn btn-outline-secondary" href={`https://www.whatnot.com/live/${run.show_id}`} target="_blank" rel="noopener noreferrer">
                                 Go to show
                             </a>
-                            {streamStatus === 'ended' && (
+                            {(streamStatus === 'ended' || streamStatus === 'failed_to_verify') && (
                                 <button className="btn btn-success" onClick={markVerified}>Mark verified</button>
                             )}
                         </div>

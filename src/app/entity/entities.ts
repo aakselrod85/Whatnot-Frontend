@@ -126,7 +126,7 @@ export interface SeriesTeamTotal {
     price_left: number
 }
 
-export type StreamStatus = 'planned' | 'live' | 'ended' | 'verified'
+export type StreamStatus = 'planned' | 'live' | 'ended' | 'failed_to_verify' | 'verified'
 
 export interface WNStream {
     id: number

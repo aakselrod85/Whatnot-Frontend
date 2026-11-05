@@ -488,7 +488,7 @@ function VerifyPage({params}: {params: {id: string}}) {
                             {rerunning === 'report' ? 'Building report… (~1 min)' : 'Re-run report'}
                         </button>
                     )}
-                    {results && streamStatus === 'ended' && (
+                    {results && (streamStatus === 'ended' || streamStatus === 'failed_to_verify') && (
                         <button className="btn btn-success" disabled={!!progress} onClick={markVerified}>
                             Mark verified
                         </button>
