@@ -1,0 +1,170 @@
+/* The 'sports' skin of the `results` element (sportsStyle.ts, SportsResults.tsx). Every rule is
+   scoped under `.res-style-sports`, which is on `.res-root` only for that style, so the default
+   and rips looks are untouched. This skin has its own markup (`res-sp-*`), not the default cells.
+
+   No sizes and no image paths are written here: SportsResults.tsx computes every position from
+   sportsStyle.ts and hands it over as inline styles / custom properties (--res-sp-*-art for the
+   art, --res-sp-shadow for the shadow, --res-sp-line / --res-sp-stripe-h / --res-sp-text-h … for
+   lengths). This file only says HOW each piece is painted. */
+
+/* The RESULTS plate stands on the box's top edge and sticks out above it. `.res-root` clips the
+   other styles (ResultsElement.css) now that the registry entry is `unclipped`; this skin opts
+   out. Two classes so it wins over `.res-root` whatever order the stylesheets load in. */
+.res-root.res-style-sports {
+    overflow: visible;
+}
+
+/* Base.png as a 9-slice: the border IS the image (border-image + `fill`), so the gold edge and
+   the rounded corners keep their shape and only the green middle stretches. Widths and slices are
+   inline (SPORTS_BASE_SLICE). */
+.res-style-sports .res-sp-base {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border-style: solid;
+    border-color: transparent;
+}
+
+.res-style-sports .res-sp-label {
+    position: absolute;
+    /* Topmost layer of the element: above the field, cells and numbers. */
+    z-index: 10;
+    display: block;
+    max-width: none;
+    pointer-events: none;
+}
+
+.res-style-sports .res-sp-field {
+    position: absolute;
+}
+
+.res-style-sports .res-sp-grass {
+    position: absolute;
+    background: var(--res-sp-grass-art) 0 0 / 100% 100% no-repeat;
+}
+
+/* Every white line — field rectangle, row separators, gutter ticks — is LaneStraingt.png
+   stretched to the rectangle it is given. */
+.res-style-sports .res-sp-line {
+    position: absolute;
+    background: var(--res-sp-line-art) 0 0 / 100% 100% no-repeat;
+}
+
+/* A column divider spans one row's clear height; its stripes keep a fixed size, sit one stripe
+   height apart, and the stack is centred so the leftover is equal above and below. */
+.res-style-sports .res-sp-divider {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: var(--res-sp-stripe-h);
+}
+
+.res-style-sports .res-sp-stripe {
+    flex: none;
+    height: var(--res-sp-stripe-h);
+    background: var(--res-sp-stripe-art) 0 0 / 100% 100% no-repeat;
+}
+
+/* Cells: transparent over the grass. The row tracks come inline (one per field row, each that
+   row's clear height) and the row gap is one line thickness, so every grid row is exactly the
+   space between two white lines. ONE drop-shadow on the whole layer shadows
+   every logo and nickname by its own outline — same picture as a filter per cell, one pass. */
+.res-style-sports .res-sp-cells {
+    position: absolute;
+    display: grid;
+    grid-template-columns: repeat(var(--res-sp-tracks), minmax(0, 1fr));
+    row-gap: var(--res-sp-line);
+    column-gap: 0;
+    filter: var(--res-sp-shadow);
+}
+
+.res-style-sports .res-sp-cell {
+    /* `grid-column-end`, not the `grid-column` shorthand, so the inline `grid-column-start` that
+       centres a short last row still applies. */
+    grid-column-end: span 2;
+    min-width: 0;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--res-sp-logo-top);
+}
+
+/* Logo area: everything above the nickname strip, full cell width. */
+.res-style-sports .res-sp-logo {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    margin-bottom: var(--res-sp-logo-bottom);
+}
+
+/* Pinned to the CENTRE of the logo area; SportsLogo sets the size and pulls it back with negative
+   margins by however much puts the logo's drawing (not its padded file) on that centre. */
+.res-style-sports .res-sp-logo-img {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: block;
+    max-width: none;
+    pointer-events: none;
+}
+
+/* FitText (SportsResults.tsx): the inner span is never wrapped or clipped; when it is wider than
+   the outer box the component scales it down around its centre. */
+.res-style-sports .res-sp-fit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    color: #fff;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.res-style-sports .res-sp-fit-inner {
+    flex: none;
+    display: inline-block;
+    white-space: nowrap;
+    transform-origin: center;
+}
+
+/* Buyer nickname: the bottom strip of the cell (SPORTS_TEXT_SHARE). Side margins, not padding:
+   FitText fits the text to this box's own width. */
+.res-style-sports .res-sp-name {
+    flex: none;
+    height: var(--res-sp-text-h);
+    margin: 0 var(--res-sp-pad-x) var(--res-sp-text-bottom, 0px);
+    font-size: var(--res-sp-font);
+}
+
+/* A non-team spot's short code, standing where the logo would be: centred in the logo area and
+   given the same width budget as a logo (FitText shrinks it to that). No tile, no border. */
+.res-style-sports .res-sp-abbr {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: var(--res-sp-logo-w);
+    max-width: 100%;
+    transform: translateX(-50%);
+    font-size: var(--res-sp-abbr-font);
+}
+
+/* Yard numbers. Same single-filter trick as the cells; the ticks sit outside this layer and get
+   no shadow, like the other white lines. */
+.res-style-sports .res-sp-numbers {
+    /* Box-sized and positioned: a filtered element becomes the containing block of its absolute
+       children, so it must share the root's origin for the numbers' coordinates to hold. */
+    position: absolute;
+    inset: 0;
+    /* No shadow under the numbers (user request). To bring it back: filter: var(--res-sp-shadow); */
+}
+
+.res-style-sports .res-sp-number {
+    position: absolute;
+    display: block;
+    max-width: none;
+    pointer-events: none;
+}

@@ -47,7 +47,8 @@ export default function FrameSettings({ elementKey, element, currentPhase, onPat
     if (element.kind !== 'frame') return null
 
     const style: FrameStyle = element.style ?? 'default'
-    const isRips = style === 'rips'
+    // 'rips' and 'sports' are both art skins: cut-out + fixed 9-slice frame, no frame width setting.
+    const isRips = style !== 'default'
 
     const bordersMap = element.borders ?? {}
     const overrideSides = bordersMap[currentPhase]
@@ -101,6 +102,7 @@ export default function FrameSettings({ elementKey, element, currentPhase, onPat
                 >
                     <option value="default">Default</option>
                     <option value="rips">Rips</option>
+                    <option value="sports">Sports</option>
                 </select>
             </div>
             <div className="small text-muted mb-1">

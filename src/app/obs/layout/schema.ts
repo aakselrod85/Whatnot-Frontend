@@ -151,8 +151,9 @@ export type FrameVariant = (typeof FRAME_VARIANTS)[number]
 // singleton group or stage behaviour, and an absent field keeps every stored config on the
 // code-drawn look. 'default' is the code-drawn black fill + drifting gradient; 'rips' paints the
 // marble art in public/images/static/rips with a cut-out and a fixed 16px gold 9-slice frame
-// (see elements/frame/FrameElement.tsx).
-export const FRAME_STYLES = ['default', 'rips'] as const
+// (see elements/frame/FrameElement.tsx). 'sports' is the same recipe with the blue twill and the
+// gold/green frame from public/images/results/sports (elements/frame/sportsAssets.ts).
+export const FRAME_STYLES = ['default', 'rips', 'sports'] as const
 export type FrameStyle = (typeof FRAME_STYLES)[number]
 
 // obs-layout-plan.md §1.9's wrap-around stash-or-pass, plus `stashOrPassWrapTl` — the same
@@ -188,8 +189,9 @@ export type ResultsSort = (typeof RESULTS_SORTS)[number]
 // boards do it) because a style changes only how the grid is painted — data, settings and the
 // singleton group are identical — and an absent field keeps every pre-existing config on the
 // original look. 'rips' paints the grid over the art in public/images/results/rips (see
-// elements/results/ripsStyle.ts).
-export const RESULTS_STYLES = ['default', 'rips'] as const
+// elements/results/ripsStyle.ts). 'sports' is a football field built from the art in
+// public/images/results/sports (see elements/results/sportsStyle.ts).
+export const RESULTS_STYLES = ['default', 'rips', 'sports'] as const
 export type ResultsStyle = (typeof RESULTS_STYLES)[number]
 
 // Skin of the `resultsThin` element — same reasoning as `RESULTS_STYLES`. Its own constant rather

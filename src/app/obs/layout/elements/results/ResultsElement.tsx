@@ -34,6 +34,7 @@ import {orderResults} from './orderResults'
 import {ResultRow} from './ResultRow'
 import {NO_SERIES_TIER, tiersByEventId} from './tiers'
 import {RIPS_FRAME_SRC, RIPS_GRID_INSETS, RIPS_TIER_ART} from './ripsStyle'
+import {SportsResults} from './SportsResults'
 import './ResultsElement.css'
 import './ResultsRips.css'
 
@@ -138,6 +139,22 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
             <div className={rootClass}>
                 <div className="res-empty">Active stream is not set</div>
             </div>
+        )
+    }
+
+    // The 'sports' skin has its own markup and geometry (SportsResults.tsx) — it shares the
+    // ordering, the row count and the short-last-row centring computed above, and nothing below.
+    // No tiers and no high-bid/giveaway highlight in that skin, so neither is passed.
+    if (style === 'sports') {
+        return (
+            <SportsResults
+                box={box}
+                ordered={ordered}
+                columns={columns}
+                rows={visualRows}
+                lastRowStart={lastRowStart}
+                lastRowShortBy={lastRowOffset}
+            />
         )
     }
 

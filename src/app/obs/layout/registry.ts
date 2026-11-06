@@ -6,6 +6,7 @@ import type { ComponentType } from 'react'
 import { Placeholder } from './Placeholder'
 import { FrameElement } from './elements/frame/FrameElement'
 import { RIPS_FRAME_ASSETS, RIPS_FRAME_PRELOAD } from './elements/frame/ripsAssets'
+import { SPORTS_FRAME_PRELOAD } from './elements/frame/sportsAssets'
 import { StashOrPassWrap } from './elements/animation/StashOrPassWrap'
 import { StashOrPassTl } from './elements/animation/tl/StashOrPassTl'
 import { StashOrPassRing } from './elements/animation/ring/StashOrPassRing'
@@ -22,6 +23,7 @@ import { SportPricedBoard } from './elements/board-sport-priced/SportPricedBoard
 import { ResultsElement } from './elements/results/ResultsElement'
 import { ThinResults } from './elements/results-thin/ThinResults'
 import { RIPS_RESULTS_PRELOAD } from './elements/results/ripsStyle'
+import { SPORTS_RESULTS_PRELOAD } from './elements/results/sportsStyle'
 import { RIPS_RESULTS_THIN_PRELOAD } from './elements/results-thin/ripsStyle'
 import { CircleWidget } from './elements/circle/CircleWidget'
 import { CardsElement } from './elements/cards/CardsElement'
@@ -455,13 +457,17 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         singleton: true,
         singletonGroup: 'results',
         defaultBox: FULL_BOX,
-        // The 'rips' style's static art (ripsStyle.ts). Preloaded whatever style the element is
-        // on: a style switch is a config edit, and the layout page only preloads on load/stage
-        // change — cheap at three small PNGs. The default style has no art.
-        preload: RIPS_RESULTS_PRELOAD,
+        // The 'rips' and 'sports' styles' static art (ripsStyle.ts, sportsStyle.ts). Preloaded
+        // whatever style the element is on: a style switch is a config edit, and the layout page
+        // only preloads on load/stage change. The default style has no art.
+        preload: [...RIPS_RESULTS_PRELOAD, ...SPORTS_RESULTS_PRELOAD],
         component: ResultsElement,
         available: true,
         hasBox: true,
+        // The 'sports' style's RESULTS plate stands on the box's top edge and sticks out above it
+        // (sportsStyle.ts SPORTS_LABEL_OVERLAP). The element clips itself in the other styles
+        // (ResultsElement.css `.res-root`), so 'default' and 'rips' look exactly as before.
+        unclipped: true,
         // Matches board-flat (obs-layout-plan.md §2.1): a manually-triggered 'sold' scene event
         // forces an immediate events refetch so the results grid updates without waiting up to
         // 5s for the spine's normal poll (obs-layout-plan.md §2.3).
@@ -549,7 +555,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         defaultBox: FULL_BOX,
         // The 'rips' style's two PNGs (elements/frame/ripsAssets.ts), preloaded whatever style
         // the element is on — same reasoning as `results` above. The default style has no art.
-        preload: RIPS_FRAME_PRELOAD,
+        preload: [...RIPS_FRAME_PRELOAD, ...SPORTS_FRAME_PRELOAD],
         component: FrameElement,
         available: true,
         // Boxless (obs-layout-plan.md §1.9): it draws its border bands + edge ornament over its

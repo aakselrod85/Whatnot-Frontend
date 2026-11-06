@@ -4,7 +4,8 @@
 // style (skin). The tier ramp itself stays fixed — a style only changes how the grid and its tiers
 // are painted (schema.ts `RESULTS_STYLES`): 'default' is the overlay-1f-spec.md palette this
 // element has always had, 'rips' paints over the art in public/images/results/rips
-// (layout/elements/results/ripsStyle.ts).
+// (layout/elements/results/ripsStyle.ts), 'sports' is the football-field look built from
+// public/images/results/sports (layout/elements/results/sportsStyle.ts).
 //
 // Like the other settings components this mutates the element itself via `onPatchElement`
 // (ElementsPanel's `mutate` -> debounced `pushConfig`), not a separate backend endpoint.
@@ -39,6 +40,7 @@ export default function ResultsSettings({elementKey, element, onPatchElement}: P
                 >
                     <option value="default">Default</option>
                     <option value="rips">Rips</option>
+                    <option value="sports">Sports</option>
                 </select>
             </div>
             <div className="mb-2">
