@@ -10,6 +10,10 @@
     height: 100%;
     position: relative;
     box-sizing: border-box;
+    /* The registry entry is `unclipped` (the 'sports' style's plate sticks out above the box —
+       ResultsSports.css lifts this for that style only), so ElementFrame no longer clips this
+       element. Clipping here, at the same box, keeps every other style exactly as it was. */
+    overflow: hidden;
 }
 
 .res-empty {
