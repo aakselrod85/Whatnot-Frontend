@@ -528,7 +528,7 @@ function FrontStrip({cfg, w, s, z, timeScale}: FrontStripProps) {
             <div className={animated ? 'rps-front-track' : 'rps-front-track rps-static'} style={trackStyle}>
                 {Array.from({length: n}, (_, j) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={j} className="rps-img" src={asset.src} alt="" draggable={false} style={{left: (j - 1) * pitch, top: 0, width: tileW}}/>
+                    <img key={j} className="rps-img" src={asset.src} alt="" draggable={false} style={{left: (j - 1) * pitch, top: 0, width: tileW, transform: cfg.mirror ? 'scaleX(-1)' : undefined}}/>
                 ))}
             </div>
         </div>
