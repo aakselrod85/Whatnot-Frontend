@@ -38,7 +38,13 @@ import {
     SPORTS_LOGO_GAP_TOP,
     SPORTS_LOGO_MAX_W,
     SPORTS_LOGO_TRIM,
-    SPORTS_NUMBER_ART,
+    SPORTS_NUMBER_FILL,
+    SPORTS_NUMBER_FONT_DY_EM,
+    SPORTS_NUMBER_FONT_FAMILY,
+    SPORTS_NUMBER_FONT_SIZE_ART,
+    SPORTS_NUMBER_OUTLINE_ART,
+    SPORTS_NUMBER_OUTLINE_COLOR,
+    SPORTS_NUMBER_ZERO_GLYPH,
     SPORTS_NUMBER_CENTER,
     SPORTS_NUMBER_GUTTER_FILL,
     SPORTS_NUMBER_MAX_SLOT_FILL,
@@ -292,26 +298,35 @@ export function SportsResults({box, ordered, columns, rows, lastRowStart, lastRo
                     ))
                 )}
             {showNumbers && (
-                <div className="res-sp-numbers">
+                <div
+                    className="res-sp-numbers"
+                    style={
+                        {
+                            fontFamily: SPORTS_NUMBER_FONT_FAMILY,
+                            fontSize: SPORTS_NUMBER_FONT_SIZE_ART * numberScale,
+                            '--res-sp-num-dy': SPORTS_NUMBER_FONT_DY_EM,
+                            '--res-sp-num-fill': SPORTS_NUMBER_FILL,
+                            '--res-sp-num-outline': SPORTS_NUMBER_OUTLINE_COLOR,
+                            // Stroke is centred on the glyph edge, so double it: the inner half
+                            // hides under the fill layer, the outer half is the visible outline.
+                            '--res-sp-num-stroke': `${SPORTS_NUMBER_OUTLINE_ART * 2 * numberScale}px`,
+                        } as React.CSSProperties
+                    }
+                >
                     {sides.map((cx, side) =>
                         SPORTS_NUMBER_SEQUENCE.map((n, i) => {
-                            const art = SPORTS_NUMBER_ART[n]
+                            const label = String(n).replace(/0/g, SPORTS_NUMBER_ZERO_GLYPH)
                             return (
-                                // eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element
-                                <img
-                                    key={`n${side}-${i}`}
-                                    className="res-sp-number"
-                                    src={art.src}
-                                    alt=""
-                                    draggable={false}
-                                    style={{
-                                        width: art.w * numberScale,
-                                        height: art.h * numberScale,
-                                        // Centred on the white digits, not on the padded file.
-                                        left: cx - art.cx * numberScale,
-                                        top: firstY + i * numberStep - art.cy * numberScale,
-                                    }}
-                                />
+                            // line-height 1 puts the middle of the font's digits (nudged by SPORTS_NUMBER_FONT_DY_EM) on the
+                            // middle of this box, so centring the box centres the digits.
+                            <div
+                                key={`n${side}-${i}`}
+                                className="res-sp-number"
+                                style={{left: cx, top: firstY + i * numberStep}}
+                            >
+                                <span className="res-sp-num-outline">{label}</span>
+                                <span className="res-sp-num-fill">{label}</span>
+                            </div>
                             )
                         })
                     )}

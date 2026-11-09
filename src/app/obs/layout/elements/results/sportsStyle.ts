@@ -122,19 +122,31 @@ export const SPORTS_NUMBER_SEQUENCE = [0, 10, 20, 30, 40, 50, 40, 30, 20, 10, 0]
 
 export type SportsNumber = (typeof SPORTS_NUMBER_SEQUENCE)[number]
 
-/** One number PNG: its size and the centre of its white digits, all art px. The PNGs have uneven
- *  transparent padding (and a baked shadow underneath), so they are centred on the digits, not on
- *  the file. Re-measure only if a PNG is re-exported. */
-export type SportsNumberArt = { src: string; w: number; h: number; cx: number; cy: number }
+/** The yard numbers are text in the Aguante-Regular font (public/fonts/Aguante-Regular.otf), not
+ *  sprites. The font file is declared in ResultsSports.css under the family name 'Sports-Numbers';
+ *  to try another font change the file there and the font numbers below (they depend on the font). */
+export const SPORTS_NUMBER_FONT_FAMILY = "'Sports-Numbers', sans-serif"
 
-export const SPORTS_NUMBER_ART: Record<SportsNumber, SportsNumberArt> = {
-    0: { src: `${ART_DIR}/0.png`, w: 76, h: 111, cx: 38, cy: 52.5 },
-    10: { src: `${ART_DIR}/10.png`, w: 127, h: 116, cx: 63, cy: 54.5 },
-    20: { src: `${ART_DIR}/20.png`, w: 143, h: 136, cx: 73, cy: 55.5 },
-    30: { src: `${ART_DIR}/30.png`, w: 142, h: 124, cx: 70, cy: 53.5 },
-    40: { src: `${ART_DIR}/40.png`, w: 149, h: 117, cx: 74.5, cy: 53.5 },
-    50: { src: `${ART_DIR}/50.png`, w: 143, h: 123, cx: 70.5, cy: 55.5 },
-}
+/** Font size at the reference scale, art px (same units as the two size constants below). Aguante's
+ *  digits are 0.8 of the font size tall, and the old sprites' white digits were 89 art px tall,
+ *  so 89 / 0.8 = 111.25 gives numbers of exactly the old size. Raise = bigger numbers. */
+export const SPORTS_NUMBER_FONT_SIZE_ART = 111.25
+
+/** Vertical nudge of the digits, in font sizes (negative = up). 0 for Aguante, whose digits sit
+ *  exactly on the middle of their line box. */
+export const SPORTS_NUMBER_FONT_DY_EM = 0
+
+/** Every "0" in a number is drawn as this letter instead (Aguante's own zero has a slash through
+ *  it). Same height as the digits. Set to '0' to use the font's zero. */
+export const SPORTS_NUMBER_ZERO_GLYPH = 'o'
+
+/** Thickness of the black outline around each digit, art px, measured outward from the white
+ *  shape (the old sprites had about 5.5). Raise = fatter outline. */
+export const SPORTS_NUMBER_OUTLINE_ART = 5.5
+
+/** Fill and outline colours of the numbers. */
+export const SPORTS_NUMBER_FILL = '#ffffff'
+export const SPORTS_NUMBER_OUTLINE_COLOR = '#000000'
 
 /** Art px: width of the widest number's white digits ("40") and the height of any number with
  *  its black outline. What the two size rules above are measured against. */
@@ -209,6 +221,5 @@ export const SPORTS_RESULTS_PRELOAD: string[] = Array.from(
         SPORTS_LINE_SRC,
         SPORTS_STRIPE_SRC,
         SPORTS_GRASS_SRC,
-        ...SPORTS_NUMBER_SEQUENCE.map((n) => SPORTS_NUMBER_ART[n].src),
     ])
 )
