@@ -66,8 +66,8 @@ export const SPORTS_THIN_FONT = 0.36
  * cell padding (SPORTS_THIN_CELL_PAD) puts it, positive = lower, negative = higher. The logo and
  * the nickname move independently. 0.05 = 5% of the row height.
  */
-export const SPORTS_THIN_LOGO_OFFSET_Y = 0.06
-export const SPORTS_THIN_TEXT_OFFSET_Y = 0
+export const SPORTS_THIN_LOGO_OFFSET_Y = -0.02
+export const SPORTS_THIN_TEXT_OFFSET_Y = -0.02
 
 /**
  * Shadow under the logo and the nickname, straight down — same look as the big Results board's
