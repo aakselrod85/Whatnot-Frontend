@@ -152,6 +152,12 @@
     font-size: var(--res-sp-abbr-font);
 }
 
+@font-face {
+    font-family: 'Sports-Numbers';
+    src: url('/fonts/Aguante-Regular.otf') format('opentype');
+    font-display: block;
+}
+
 /* Yard numbers. Same single-filter trick as the cells; the ticks sit outside this layer and get
    no shadow, like the other white lines. */
 .res-style-sports .res-sp-numbers {
@@ -159,12 +165,30 @@
        children, so it must share the root's origin for the numbers' coordinates to hold. */
     position: absolute;
     inset: 0;
-    /* No shadow under the numbers (user request). To bring it back: filter: var(--res-sp-shadow); */
+    filter: var(--res-sp-shadow);
+    color: var(--res-sp-num-fill);
+    line-height: 1;
+    font-weight: 400;
 }
 
 .res-style-sports .res-sp-number {
     position: absolute;
-    display: block;
-    max-width: none;
+    transform: translate(-50%, -50%);
+    margin-top: calc(var(--res-sp-num-dy, 0) * 1em);
+    white-space: nowrap;
     pointer-events: none;
+}
+
+/* Two stacked copies of the number: the outline copy underneath, the white fill on top. */
+.res-style-sports .res-sp-num-outline {
+    color: var(--res-sp-num-outline);
+    -webkit-text-stroke: var(--res-sp-num-stroke) var(--res-sp-num-outline);
+    stroke-linejoin: round;
+}
+
+.res-style-sports .res-sp-num-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--res-sp-num-fill);
 }
