@@ -48,6 +48,7 @@ export type FrontCloud = {
     speed: number // px/s, scrolls left; 0 = static
     overlap: number // px each tile overlaps the previous one
     offset: number // px the strip starts already scrolled by
+    mirror: boolean // every tile flipped horizontally
 }
 
 // The layer a glow is painted directly IN FRONT of. Everything further forward covers it.
@@ -144,8 +145,8 @@ export const DEFAULT_RIPS_RECIPE: RipsSceneRecipe = {
     mountain: { enabled: true, width: 1080, x: 0, bottom: 0 },
     // The old scene element's default, its percentage band turned into px for a 640-tall box (plan §1.2).
     birds: { enabled: true, countMin: 2, countMax: 5, intervalSec: 25, yMin: 96, yMax: 288 },
-    frontBack: { enabled: true, width: 1080, y: 430, speed: 20, overlap: 36, offset: 540 },
-    frontFront: { enabled: true, width: 1080, y: 470, speed: 28, overlap: 36, offset: 0 },
+    frontBack: { enabled: true, width: 1080, y: 430, speed: 20, overlap: 36, offset: 540, mirror: false },
+    frontFront: { enabled: true, width: 1080, y: 470, speed: 28, overlap: 36, offset: 0, mirror: false },
     glows: [],
     // Off by default so streams whose recipe predates the podium do not grow one until it is tuned.
     // Sprite widths are the art's native widths (assets.ts), so scale 1 shows every image at its

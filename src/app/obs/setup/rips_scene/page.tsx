@@ -237,6 +237,10 @@ export default function Page() {
         return (
             <Section title={title}>
                 <Enabled value={c.enabled} onChange={(v) => setFront(key, {enabled: v})}/>
+                <label className="small d-flex align-items-center gap-1">
+                    <input type="checkbox" checked={c.mirror} onChange={(e) => setFront(key, {mirror: e.target.checked})}/>
+                    Mirror image
+                </label>
                 <Num label="Y" value={c.y} min={-400} max={960} step={1} onChange={(v) => setFront(key, {y: v})}/>
                 <Num label="Speed px/s" value={c.speed} min={0} max={300} step={1} onChange={(v) => setFront(key, {speed: v})}/>
                 <Num label="Width" value={c.width} min={200} max={4000} step={1} onChange={(v) => setFront(key, {width: v})}/>
