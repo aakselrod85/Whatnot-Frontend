@@ -80,7 +80,13 @@
 
 .rest-customer-name {
     overflow: hidden;
-    text-overflow: ellipsis;
+    /* A name that does not fit gets no ellipsis: it runs (ThinResultRow.tsx, nameScrollSync.ts). */
+    text-overflow: clip;
+    /* The clipping mask: THIS box is what cuts the text. Its left / right edges are moved out (or in)
+       from the text area per style (defaultStyle.ts / ripsStyle.ts / sportsStyle.ts); the mover's
+       left padding gives the same room back, so the name still STARTS where it always did. */
+    margin-left: calc(var(--rest-mask-l, 0px) * -1);
+    margin-right: calc(var(--rest-mask-r, 0px) * -1);
     white-space: nowrap;
     color: var(--rest-ivory);
 }
@@ -88,6 +94,18 @@
 /* Slot state, in palette. The tier frame carries the ranking, so these only need to separate an
    unsold slot from a taken one and flag the two special teams — a faint lift rather than the old
    set of unrelated hues. */
+/* The text holder that slides inside the mask (a second copy follows it while the name is cut off). */
+.rest-customer-name-inner {
+    display: inline-flex;
+    white-space: nowrap;
+    will-change: transform;
+    padding-left: max(0px, var(--rest-mask-l, 0px));
+}
+
+.rest-customer-name-text {
+    flex: none;
+}
+
 .rest-bg-empty .rest-customer-name {
     /* ivory70 is the documented text floor — dimmer than a real handle, still legible. */
     color: var(--rest-ivory70);

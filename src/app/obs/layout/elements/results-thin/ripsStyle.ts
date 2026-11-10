@@ -56,6 +56,15 @@ export const RIPS_THIN_CORNER_OVERHANG = { x: 8, y: 3 } as const
  *  (2.8%) wide at the sides, so ThinResultsRips.css pads the cell content past it. */
 export const RIPS_THIN_CELL_SRC = `${ART_DIR}/ResultsCell.png`
 
+/**
+ * The clipping mask of the running nickname (timings: scrollStyle.ts): the nickname is visible only
+ * inside it, anything outside is cut off. By default it is exactly the text area (between the icon
+ * and the plate's inner right edge). Canvas px; positive = that edge moves outward (text shows
+ * further out, over the plate's gold rim), negative = inward. The nickname's START position does
+ * not move when the left edge does, only the mask grows.
+ */
+export const RIPS_THIN_TEXT_MASK_EXTEND = { left: 0, right: 0 } as const
+
 // registry.ts's `preload` list for the `resultsThin` entry — static art only (ADDING_AN_ELEMENT.md
 // §2).
 export const RIPS_RESULTS_THIN_PRELOAD: string[] = [

@@ -43,6 +43,13 @@ export const SPORTS_THIN_COLUMN_GAP = -10
 
 /** Cell art (211x56): a slanted green plate with a gold rim; only the last pixel row is transparent. */
 export const SPORTS_THIN_CELL_SRC = `${ART_DIR}/ResultsMinicell.png`
+/** Overlay for a name that does not fit (211x56, same shape and size as the cell, so it uses the
+ *  same 9-slice cuts below): transparent on the left, fading into the plate on the right. Drawn
+ *  over the nickname, and only while the nickname is cut off. */
+export const SPORTS_THIN_CELL_LONG_SRC = `${ART_DIR}/ResultsMinicellForLongText.png`
+/** Mirror of the overlay above (same size, same cuts): the plate's edge on the LEFT, fading out
+ *  to the right. Laid over the nickname, under the logo, together with the one above. */
+export const SPORTS_THIN_CELL_LONG_LEFT_SRC = `${ART_DIR}/ResultsMinicellForLongTextleftSide.png`
 /** Art height of the cell PNG, px — the cell's 9-slice is scaled by (row height / this). */
 export const SPORTS_THIN_CELL_ART_H = 56
 
@@ -61,6 +68,20 @@ export const SPORTS_THIN_LOGO = 0.7
 /** Nickname letter size, share of the row height. */
 export const SPORTS_THIN_FONT = 0.36
 
+// Timings of the running nickname are shared by all styles: scrollStyle.ts.
+
+/**
+ * The clipping mask of the nickname: the text is visible only inside it, and what is outside is
+ * cut off. By default it is exactly the text area (between the logo and the cell's right edge), so
+ * the letters are cut sharply right where the two overlays start to fade them. Moving the mask's
+ * edges OUT lets the text show (and fade) under the overlays. Art px (scaled with the row, like
+ * the cell cuts): positive = that edge moves outward, negative = inward. The nickname's START
+ * position does not move when the left edge does (only the mask grows); the right edge is the
+ * one that can let text show outside the visible plate, so go gently with it. The "does the name
+ * fit" check still uses the plain text area, so changing these never switches overlays on or off.
+ */
+export const SPORTS_THIN_TEXT_MASK_EXTEND = { left: 5, right: 5 } as const
+
 /**
  * Vertical position of the content inside the cell, share of the row height: 0 = centred as the
  * cell padding (SPORTS_THIN_CELL_PAD) puts it, positive = lower, negative = higher. The logo and
@@ -77,4 +98,9 @@ export const SPORTS_THIN_TEXT_OFFSET_Y = -0.02
 export const SPORTS_THIN_SHADOW = { offsetY: 0.05, blur: 0.03, color: 'rgba(0, 0, 0, 1)' } as const
 
 // registry.ts's `preload` list for the `resultsThin` entry — static art only.
-export const SPORTS_RESULTS_THIN_PRELOAD: string[] = [SPORTS_THIN_BOARD_SRC, SPORTS_THIN_CELL_SRC]
+export const SPORTS_RESULTS_THIN_PRELOAD: string[] = [
+    SPORTS_THIN_BOARD_SRC,
+    SPORTS_THIN_CELL_SRC,
+    SPORTS_THIN_CELL_LONG_SRC,
+    SPORTS_THIN_CELL_LONG_LEFT_SRC,
+]
