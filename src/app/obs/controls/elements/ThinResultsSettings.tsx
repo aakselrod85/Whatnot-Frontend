@@ -45,6 +45,7 @@ export default function ThinResultsSettings({elementKey, element, onPatchElement
                 >
                     <option value="default">Default</option>
                     <option value="rips">Rips</option>
+                    <option value="sports">Sports</option>
                 </select>
             </div>
             <div className="mb-2">

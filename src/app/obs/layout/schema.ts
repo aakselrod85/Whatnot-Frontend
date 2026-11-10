@@ -197,8 +197,9 @@ export type ResultsStyle = (typeof RESULTS_STYLES)[number]
 // Skin of the `resultsThin` element — same reasoning as `RESULTS_STYLES`. Its own constant rather
 // than a reuse of that one so the two elements' style lists can diverge. 'rips' paints the board
 // and its cells over the art in public/images/results_mini/rips (see
-// elements/results-thin/ripsStyle.ts).
-export const RESULTS_THIN_STYLES = ['default', 'rips'] as const
+// elements/results-thin/ripsStyle.ts). 'sports' is a green football board with a winged ball
+// (public/images/results_mini/sports, elements/results-thin/sportsStyle.ts).
+export const RESULTS_THIN_STYLES = ['default', 'rips', 'sports'] as const
 export type ResultsThinStyle = (typeof RESULTS_THIN_STYLES)[number]
 
 // Per-element opt-out of a native reaction its registry entry declares in `reactsTo` (registry.ts)

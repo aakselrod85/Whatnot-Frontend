@@ -25,6 +25,7 @@ import { ThinResults } from './elements/results-thin/ThinResults'
 import { RIPS_RESULTS_PRELOAD } from './elements/results/ripsStyle'
 import { SPORTS_RESULTS_PRELOAD } from './elements/results/sportsStyle'
 import { RIPS_RESULTS_THIN_PRELOAD } from './elements/results-thin/ripsStyle'
+import { SPORTS_RESULTS_THIN_PRELOAD } from './elements/results-thin/sportsStyle'
 import { CircleWidget } from './elements/circle/CircleWidget'
 import { CardsElement } from './elements/cards/CardsElement'
 import { TextElement } from './elements/text/TextElement'
@@ -488,7 +489,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // rather than competing with it. The operator can add it to any phase either way.
         // The 'rips' style's static art (results-thin/ripsStyle.ts), preloaded whatever style the
         // element is on — same reasoning as the `results` entry above. The default style has no art.
-        preload: RIPS_RESULTS_THIN_PRELOAD,
+        preload: [...RIPS_RESULTS_THIN_PRELOAD, ...SPORTS_RESULTS_THIN_PRELOAD],
         component: ThinResults,
         available: true,
         hasBox: true,
