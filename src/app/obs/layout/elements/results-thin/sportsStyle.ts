@@ -39,22 +39,22 @@ export const SPORTS_THIN_ROW_GAP = 2
 
 /** Space between two columns of cells, canvas px. May be NEGATIVE: the cells are slanted, so
  *  they can overlap a little and sit closer than a plain gap of 0 allows. */
-export const SPORTS_THIN_COLUMN_GAP = -8
+export const SPORTS_THIN_COLUMN_GAP = -10
 
-/** Cell art (211x63): a slanted green plate with a gold rim. Its bottom 8 px are transparent. */
+/** Cell art (211x56): a slanted green plate with a gold rim; only the last pixel row is transparent. */
 export const SPORTS_THIN_CELL_SRC = `${ART_DIR}/ResultsMinicell.png`
 /** Art height of the cell PNG, px — the cell's 9-slice is scaled by (row height / this). */
-export const SPORTS_THIN_CELL_ART_H = 63
+export const SPORTS_THIN_CELL_ART_H = 56
 
 /** 9-slice cuts of the cell, art px from each edge. Left/right cover the slanted sides, top/bottom
- *  the gold rim (the bottom one also the transparent strip under it). */
-export const SPORTS_THIN_CELL_SLICE = { top: 7, right: 26, bottom: 17, left: 34 } as const
+ *  the gold rim. Re-measure if the PNG is replaced. */
+export const SPORTS_THIN_CELL_SLICE = { top: 7, right: 39, bottom: 9, left: 34 } as const
 
 /** Space between the cell art's outer edge and the logo (left) / the end of the name (right), art
  *  px (scaled like the slice). Bigger = more room between the gold and the content. Top/bottom
- *  centre the content on the visible plate (it sits ~1–54 of the 63 px art). The right side is
+ *  centre the content on the visible plate (it sits ~1–54 of the 56 px art). The right side is
  *  wider because the plate's right edge slants inwards towards the bottom. */
-export const SPORTS_THIN_CELL_PAD = { top: 8, right: 30, bottom: 16, left: 24 } as const
+export const SPORTS_THIN_CELL_PAD = { top: 8, right: 30, bottom: 9, left: 24 } as const
 
 /** Logo (or abbreviation tile) size, share of the row height. */
 export const SPORTS_THIN_LOGO = 0.7

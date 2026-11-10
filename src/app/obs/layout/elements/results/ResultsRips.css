@@ -4,7 +4,7 @@
    here: ResultsElement/ResultRow hand them in as custom properties (--res-frame-art,
    --res-cell-art, --res-name-art) so the per-tier table in ripsStyle.ts is the single source. */
 
-/* The frame art fills the whole box — same fill mode as board:rips_flat's ResultsMiniBoard.png. The
+/* The frame art fills the whole box — same fill mode as board:rips_flat's board.png. The
    default style's panel colour, border and rounding would peek out around the art's transparent
    corners, so they go. */
 .res-style-rips .res-dimmed-bg {

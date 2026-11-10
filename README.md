@@ -41,7 +41,7 @@ The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone 
 
 The board backdrop is the same for every set: `public/images/rips_board/BoardSeparate.png` (the blue board in its gold frame, no marble surround), stretched to the element's box. The team cells sit 15 px in from every edge of the 1473x354 art (`RIPS_BOARD_INSET` in `src/app/obs/layout/elements/board-rips-flat/boardArt.ts`), scaled with the box so they follow the frame at any size; re-check it if the art is replaced.
 
-`ResultsMiniBoard.png` and `board_tiles.png` (the old marble-surround backdrops) are no longer shown on the board; the tile generator below still reads `ResultsMiniBoard.png` for the marble texture, and "Change the board edge" only affects `board_tiles.png`.
+`board.png` and `board_tiles.png` (the old marble-surround backdrops) are no longer shown on the board; the tile generator below still reads `board.png` for the marble texture, and "Change the board edge" only affects `board_tiles.png`.
 
 `icons` brings back the previous `new_teams` octagon icons.
 
