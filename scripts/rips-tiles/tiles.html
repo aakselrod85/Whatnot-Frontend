@@ -71,7 +71,7 @@
   const MARBLES = {
     cream: { base0: '#f4eee4', base1: '#e1d2bb', v1: '#b07d47', v1a: .72, v2: '#8c8378', v2a: .32, flecks: null },
     lapis: { base0: '#0a1840', base1: '#1d3d8c', v1: '#4cb2ea', v1a: .38, v2: '#d6ecff', v2a: .22, flecks: '#ecc768' },
-    board: { base0: '#f6ece2', base1: '#e7d3c1', v1: '#c86f28', v1a: .78, v2: '#a8907c', v2a: .22, flecks: null },   // board.png's outer marble
+    board: { base0: '#f6ece2', base1: '#e7d3c1', v1: '#c86f28', v1a: .78, v2: '#a8907c', v2a: .22, flecks: null },   // ResultsMiniBoard.png's outer marble
     nero:  { base0: '#0d0d0f', base1: '#211f24', v1: '#ebe7df', v1a: .82, v2: '#cfa64e', v2a: .42, flecks: null },
   };
   function makeSlab(kind, size, seed) {
@@ -112,10 +112,10 @@
     DEEP_GOLD.forEach(([o, c]) => g.addColorStop(o, c));
     return g;
   }
-  // The board backdrop for the marble sets (rips_board/board_tiles.png): board.png with its inset frame
+  // The board backdrop for the marble sets (rips_board/board_tiles.png): ResultsMiniBoard.png with its inset frame
   // redrawn in the tiles' deepGold and with the tiles' cut corners. K = output px per board px.
   function drawBoardBackdrop(ctx, K) {
-    const F = { x0: 132, y0: 18, x1: 959, y1: 237 }, bw = 10, cut = 21;  // just over board.png's frame (133-957 x 20-234), so it is fully covered
+    const F = { x0: 132, y0: 18, x1: 959, y1: 237 }, bw = 10, cut = 21;  // just over ResultsMiniBoard.png's frame (133-957 x 20-234), so it is fully covered
     const poly = (m, c) => { const x0 = F.x0 + m, y0 = F.y0 + m, x1 = F.x1 - m, y1 = F.y1 - m, p = new Path2D();
       p.moveTo(x0 + c, y0); p.lineTo(x1 - c, y0); p.lineTo(x1, y0 + c); p.lineTo(x1, y1 - c); p.lineTo(x1 - c, y1); p.lineTo(x0 + c, y1); p.lineTo(x0, y1 - c); p.lineTo(x0, y0 + c); p.closePath(); return p; };
     ctx.save(); ctx.scale(K, K); ctx.imageSmoothingQuality = 'high';
@@ -263,7 +263,7 @@
         const pts = m => { const c = Math.max(0, cut - m * .586); return [[m + c, m], [S - m - c, m], [S - m, m + c], [S - m, S - m - c], [S - m - c, S - m], [m + c, S - m], [m, S - m - c], [m, m + c]]; };
         const oct = m => { const p = new Path2D(), q = pts(m); p.moveTo(...q[0]); for (const v of q.slice(1)) p.lineTo(...v); p.closePath(); return p; };
         // the stone: its own cut of marble, coarse veins (~2x magnification)
-        // the stone: a random cut of board.png's own outer marble (side panels), at the board's scale, randomly turned/flipped
+        // the stone: a random cut of ResultsMiniBoard.png's own outer marble (side panels), at the board's scale, randomly turned/flipped
         ctx.save(); ctx.clip(oct(0));
         const side = r() < .5 ? [2, 130] : [962, 1078], cs = 66;
         const sx = side[0] + r() * (side[1] - side[0] - cs), sy = 14 + r() * (238 - 14 - cs), rot = Math.floor(r() * 4), flip = r() < .5;
@@ -302,7 +302,7 @@
   }
   const load = name => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = IMG + 'teams/' + encodeURIComponent(name) + '.webp'; });
 
-  // board:rips_flat geometry (RipsFlatBoard.tsx): board.png 1080x250, blue inset, 11 columns, rows from
+  // board:rips_flat geometry (RipsFlatBoard.tsx): ResultsMiniBoard.png 1080x250, blue inset, 11 columns, rows from
   // splitRows (32 -> 11/11/10), integer cell px rounded down to a multiple of 3, short row starts at col 0.
   const INSET = { left: .136, right: .13, top: .108, bottom: .1 }, MAX_COLS = 11;
   function boardLayout(w, h, n) {

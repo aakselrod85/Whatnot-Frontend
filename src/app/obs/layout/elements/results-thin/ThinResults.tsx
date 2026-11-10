@@ -31,9 +31,19 @@ import {
     RIPS_THIN_CORNER_OVERHANG,
     RIPS_THIN_GRID_INSETS,
 } from './ripsStyle'
+import {
+    SPORTS_THIN_BOARD_ART,
+    SPORTS_THIN_BOARD_SLICE,
+    SPORTS_THIN_BOARD_SRC,
+    SPORTS_THIN_COLUMN_GAP,
+    SPORTS_THIN_GRID_INSETS,
+    SPORTS_THIN_ROW_GAP,
+    SPORTS_THIN_SHADOW,
+} from './sportsStyle'
 import type {ResultsSort, ResultsThinStyle} from '../../schema'
 import './ThinResults.css'
 import './ThinResultsRips.css'
+import './ThinResultsSports.css'
 
 // Fixed cosmetic spacing of the default style's panel (ThinResults.css `.rest-grid`): its border,
 // its inner padding and the vertical gap between rows. Declared HERE and handed to the CSS as
@@ -61,6 +71,10 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
     const sort = element.kind === 'resultsThin' ? (element.sort ?? DEFAULT_SORT) : DEFAULT_SORT
     const style = element.kind === 'resultsThin' ? (element.style ?? DEFAULT_STYLE) : DEFAULT_STYLE
     const isRips = style === 'rips'
+    const isSports = style === 'sports'
+    // Sports board: drawn as wide as the box at the art's own proportions (sportsStyle.ts), so
+    // every art-px number of that skin turns into screen px through this one factor.
+    const sportsScale = box.w / SPORTS_THIN_BOARD_ART.w
 
     const {ordered} = useMemo(
         // 'row': .rest-grid is a plain grid-auto-flow:row, so it must be handed the sorted order
@@ -88,11 +102,17 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
     //              the grid has no border or padding of its own in that style.
     // The row gaps come off that, and what is left is split evenly. Deliberately NO minimum: rows
     // get as small as they must for every one of them to fit.
-    const chromePx = isRips ? 0 : (GRID_BORDER + GRID_PADDING) * 2
+    //   - sports:  same idea, the board art's insets (SPORTS_THIN_GRID_INSETS) at the board's
+    //              width-driven scale.
+    const chromePx = isRips || isSports ? 0 : (GRID_BORDER + GRID_PADDING) * 2
     const fieldHeight = isRips
         ? box.h - (RIPS_THIN_GRID_INSETS.top + RIPS_THIN_GRID_INSETS.bottom) * RIPS_THIN_BOARD_SCALE
-        : box.h
-    const availableHeight = Math.max(0, fieldHeight - chromePx - GRID_ROW_GAP * Math.max(0, visualRows - 1))
+        : isSports
+          ? box.h - (SPORTS_THIN_GRID_INSETS.top + SPORTS_THIN_GRID_INSETS.bottom) * sportsScale
+          : box.h
+    // The sports skin has its own gap (sportsStyle.ts); the other styles share GRID_ROW_GAP.
+    const rowGap = isSports ? SPORTS_THIN_ROW_GAP : GRID_ROW_GAP
+    const availableHeight = Math.max(0, fieldHeight - chromePx - rowGap * Math.max(0, visualRows - 1))
     const rowHeightPx = visualRows > 0 ? availableHeight / visualRows : 0
 
     // Centre a short final row, exactly as the full board does (see ResultsElement.tsx for the
@@ -106,7 +126,11 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
 
     // The style is a modifier class on the root (`rest-root--rips`); every rips rule in
     // ThinResultsRips.css is scoped under it, so the default look is untouched.
-    const rootClass = isRips ? 'rest-root rest-root--rips' : 'rest-root'
+    const rootClass = isRips
+        ? 'rest-root rest-root--rips'
+        : isSports
+          ? 'rest-root rest-root--sports'
+          : 'rest-root'
 
     if (!stream) {
         return (
@@ -123,22 +147,41 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
     // the blue middle stretched to the box.
     const sc = RIPS_THIN_BOARD_SCALE
     const sl = RIPS_THIN_BOARD_SLICE
+    // Sports board: the same border-image trick, but cut only top and bottom (left/right slices
+    // are 0), so the full-width top band (ball + wings) and bottom band are scaled uniformly by the
+    // box width and only the green strip between them stretches with the box height.
+    const ssc = sportsScale
+    const ssl = SPORTS_THIN_BOARD_SLICE
     const boardArtStyle: React.CSSProperties | undefined = isRips
         ? {
               borderStyle: 'solid',
               borderWidth: `${sl.top * sc}px ${sl.right * sc}px ${sl.bottom * sc}px ${sl.left * sc}px`,
               borderImage: `url(${RIPS_THIN_BOARD_SRC}) ${sl.top} ${sl.right} ${sl.bottom} ${sl.left} fill stretch`,
           }
-        : undefined
+        : isSports
+          ? {
+                borderStyle: 'solid',
+                borderWidth: `${ssl.top * ssc}px 0 ${ssl.bottom * ssc}px 0`,
+                borderImage: `url(${SPORTS_THIN_BOARD_SRC}) ${ssl.top} 0 ${ssl.bottom} 0 fill stretch`,
+            }
+          : undefined
     const gi = RIPS_THIN_GRID_INSETS
+    const sgi = SPORTS_THIN_GRID_INSETS
     const gridInset = isRips
         ? {inset: `${gi.top * sc}px ${gi.right * sc}px ${gi.bottom * sc}px ${gi.left * sc}px`}
+        : isSports
+          ? {inset: `${sgi.top * ssc}px ${sgi.right * ssc}px ${sgi.bottom * ssc}px ${sgi.left * ssc}px`}
+          : undefined
+    // Sports shadow under logos and nicknames, sized off the row height (sportsStyle.ts).
+    const sh = SPORTS_THIN_SHADOW
+    const sportsShadow = isSports
+        ? {'--rest-sp-shadow': `drop-shadow(0 ${sh.offsetY * rowHeightPx}px ${sh.blur * rowHeightPx}px ${sh.color})`}
         : undefined
 
     return (
         <div className={rootClass}>
             <div className="rest-frame">
-                {isRips && <div className="rest-board-art" style={boardArtStyle}/>}
+                {(isRips || isSports) && <div className="rest-board-art" style={boardArtStyle}/>}
                 {/* Only mounted once there is a row to size — `repeat(0, ...)` is not valid CSS,
                     and the full board gates its grid the same way. */}
                 {visualRows > 0 && (
@@ -147,11 +190,13 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
                         style={
                             {
                                 ...gridInset,
+                                ...sportsShadow,
                                 '--rest-rows': visualRows,
                                 '--rest-row-h': `${rowHeightPx}px`,
                                 '--rest-border': `${GRID_BORDER}px`,
                                 '--rest-pad': `${GRID_PADDING}px`,
-                                '--rest-gap': `${GRID_ROW_GAP}px`,
+                                '--rest-gap': `${rowGap}px`,
+                                ...(isSports ? {'--rest-col-gap': `${SPORTS_THIN_COLUMN_GAP}px`} : undefined),
                                 '--rest-columns': columns,
                                 '--rest-tracks': columns * 2,
                             } as React.CSSProperties
@@ -167,7 +212,7 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
                                 tier={tiers.get(event.id) ?? NO_SERIES_TIER}
                                 highBidTeam={breakObject?.high_bid_team ?? ''}
                                 giveawayTeam={breakObject?.giveaway_team ?? ''}
-                                isRips={isRips}
+                                skin={style}
                             />
                         ))}
                     </div>

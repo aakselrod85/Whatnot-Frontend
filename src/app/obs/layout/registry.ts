@@ -25,6 +25,7 @@ import { ThinResults } from './elements/results-thin/ThinResults'
 import { RIPS_RESULTS_PRELOAD } from './elements/results/ripsStyle'
 import { SPORTS_RESULTS_PRELOAD } from './elements/results/sportsStyle'
 import { RIPS_RESULTS_THIN_PRELOAD } from './elements/results-thin/ripsStyle'
+import { SPORTS_RESULTS_THIN_PRELOAD } from './elements/results-thin/sportsStyle'
 import { CircleWidget } from './elements/circle/CircleWidget'
 import { CardsElement } from './elements/cards/CardsElement'
 import { TextElement } from './elements/text/TextElement'
@@ -171,7 +172,7 @@ const BOARD_BOX: Box = { x: 0, y: 300, w: 1080, h: 1300 }
 // point — the operator resizes it in the builder like any other box.
 const COBRA_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 340 }
 // rips_flat: full canvas width at the backdrop art's own aspect (1473x354, boardArt.ts), so the
-// gold frame is undistorted by default. Any other box stretches it like board:flat's board.png.
+// gold frame is undistorted by default. Any other box stretches it like board:flat's ResultsMiniBoard.png.
 const RIPS_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 260 }
 // classic is a 10-column grid of square team tiles plus an 8-cell centre block: 32 teams + 8
 // reserved cells = 40 cells / 10 cols = 4 rows of squares — at REF_W (ClassicBoard.tsx, 810) that's
@@ -231,7 +232,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // Just the static board background — the per-cell/per-tile skin art is combinatorial
         // (style x tier x piece x variant, resolved from manifest.json at runtime) and not worth
         // eagerly preloading here (obs-layout-plan.md §2.1).
-        preload: ['/images/board.png'],
+        preload: ['/images/ResultsMiniBoard.png'],
         component: FlatBoard,
         available: true,
         hasBox: true,
@@ -251,7 +252,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // Just the static board background + the mount_golden.png overlay — the per-team PNGs
         // (x2 for the sold " BW" variant) are combinatorial and not worth eagerly preloading here,
         // same call as board:flat's manifest-resolved skins (obs-layout-plan.md §2.10.7).
-        preload: ['/images/board.png', '/images/mount_golden.png'],
+        preload: ['/images/ResultsMiniBoard.png', '/images/mount_golden.png'],
         component: ClassicBoard,
         available: true,
         hasBox: true,
@@ -488,7 +489,7 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // rather than competing with it. The operator can add it to any phase either way.
         // The 'rips' style's static art (results-thin/ripsStyle.ts), preloaded whatever style the
         // element is on — same reasoning as the `results` entry above. The default style has no art.
-        preload: RIPS_RESULTS_THIN_PRELOAD,
+        preload: [...RIPS_RESULTS_THIN_PRELOAD, ...SPORTS_RESULTS_THIN_PRELOAD],
         component: ThinResults,
         available: true,
         hasBox: true,

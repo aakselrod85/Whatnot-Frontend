@@ -91,7 +91,7 @@ function useIntegerBoardLayout(cols: number, rows: number) {
     cellPx -= cellPx % 3 // sub-tile lines (3 per cell) land on integers too
     if (cellPx <= 0) cellPx = 3
 
-    // The grid (and its board.png backdrop) always fills the element's box on BOTH axes: the
+    // The grid (and its ResultsMiniBoard.png backdrop) always fills the element's box on BOTH axes: the
     // leftover space on each axis becomes extra padding around the centred cells, so anything
     // that wraps or anchors to this element (e.g. the stash-or-pass ring) hugs the visible board,
     // not an empty strip. Requested by the user after 2.1's first version left the grid at its

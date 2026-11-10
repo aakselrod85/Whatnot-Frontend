@@ -1,0 +1,88 @@
+/* The 'sports' skin of the `resultsThin` element (sportsStyle.ts). Every rule is scoped under
+   `.rest-root--sports`, which ThinResults.tsx puts on `.rest-root` only for that style, so the
+   default and rips looks are untouched. No image paths or art numbers here: the board's and the
+   cells' border-image, the grid inset and all sizes come inline / as custom properties from
+   ThinResults.tsx and ThinResultRow.tsx (--rest-sp-*). */
+
+.rest-root--sports .rest-frame {
+    position: relative;
+}
+
+/* Board art layer under the grid (top/bottom-only border-image, set inline). */
+.rest-root--sports .rest-board-art {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+/* The grid sits inside the board's green field (SPORTS_THIN_GRID_INSETS, applied as `inset`); the
+   default panel's colour, border, rounding and padding go — ThinResults.tsx knows they are gone
+   and takes nothing off the field height for them. */
+.rest-root--sports .rest-grid {
+    position: absolute;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+    /* Gap between columns (sportsStyle.ts SPORTS_THIN_COLUMN_GAP) may be NEGATIVE, which a grid
+       `column-gap` cannot do. So the grid has no gap; each cell instead keeps half the gap as a
+       side margin (below), which a negative value turns into overlap. The grid itself is widened
+       by that half-gap on both sides, so the outer cells still sit flush with the grid's edges. */
+    column-gap: 0;
+    margin-inline: calc(var(--rest-col-gap, 10px) / -2);
+    overflow: visible;
+}
+
+/* The cell is its own plate (9-slice border-image, border widths and padding inline). The tier
+   frame colour does not show in this skin. */
+.rest-root--sports .rest-row-item {
+    width: auto;
+    max-width: none;
+    margin-inline: calc(var(--rest-col-gap, 10px) / 2);
+    border-radius: 0;
+    background-color: transparent;
+}
+
+/* Logo / abbreviation tile: pulled back left over the wide slanted slice, sized off the row. */
+.rest-root--sports .rest-image,
+.rest-root--sports .rest-abbr {
+    width: var(--rest-sp-logo);
+    height: var(--rest-sp-logo);
+    margin-left: calc(var(--rest-sp-pull-l, 0px) * -1);
+    filter: var(--rest-sp-shadow);
+    /* Vertical nudge from sportsStyle.ts (SPORTS_THIN_LOGO_OFFSET_Y). */
+    transform: translateY(var(--rest-sp-logo-dy, 0px));
+}
+
+.rest-root--sports .rest-abbr {
+    font-size: calc(var(--rest-sp-logo) * 0.5);
+    color: #fff;
+}
+
+/* Nickname: white bold, as on the big Results board's sports skin, with the same kind of shadow. */
+.rest-root--sports .rest-customer-text {
+    font-size: var(--rest-sp-font);
+    margin-right: calc(var(--rest-sp-pull-r, 0px) * -1);
+    /* Vertical nudge from sportsStyle.ts (SPORTS_THIN_TEXT_OFFSET_Y). */
+    transform: translateY(var(--rest-sp-text-dy, 0px));
+}
+
+.rest-root--sports .rest-customer-name {
+    color: #fff;
+    font-weight: 700;
+    filter: var(--rest-sp-shadow);
+}
+
+/* Unsold slot: dimmed white instead of full white. */
+.rest-root--sports .rest-bg-empty .rest-customer-name {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* High bid / giveaway: a faint white lift behind the nickname. */
+.rest-root--sports .rest-bg-high-bid,
+.rest-root--sports .rest-bg-giveaway {
+    background-color: rgba(255, 255, 255, 0.1);
+}
