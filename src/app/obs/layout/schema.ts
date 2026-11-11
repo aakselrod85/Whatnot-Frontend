@@ -259,6 +259,9 @@ export type Element = (
           backStyle?: 'tiles' | 'flip_art'
           cellOrder?: 'tier' | 'alphabet'
           soldPlacement?: 'sides' | 'stay'
+          // board:classic only (ClassicBoardSettings): true/unset = special (non-team) spots get
+          // their own row under the team board; false = they join the team pool after the teams.
+          specialSpotsOwnRow?: boolean
           // board:sport_style only (every other variant ignores all three; hit-sequence-plan.md §2.1):
           // the ball slot — a `hole.cols x hole.rows` block of grid cells at the TOP CENTRE that no
           // team is dealt into; the ball art renders there and is published as anchor `ball`.

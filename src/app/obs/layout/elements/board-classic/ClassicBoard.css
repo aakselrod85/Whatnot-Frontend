@@ -51,9 +51,26 @@
 .classic-grid {
     width: var(--classic-grid-w);
     display: grid;
-    grid-template-columns: repeat(10, var(--classic-cell));
+    grid-template-columns: repeat(var(--classic-cols), var(--classic-cell));
     grid-auto-rows: var(--classic-cell);
     gap: var(--classic-gap);
+}
+
+/* Row 3 of the team board: its own centred flex row, so a partly filled last row sits in the
+   middle as a whole (ClassicBoard.tsx sideTeams/bottomTeams). */
+.classic-bottom-row {
+    width: var(--classic-grid-w);
+    display: flex;
+    justify-content: center;
+    gap: var(--classic-gap);
+    margin-top: var(--classic-gap);
+}
+
+.classic-bottom-row > .classic-tile,
+.classic-bottom-row > .classic-custom-tile {
+    flex: 0 0 var(--classic-cell);
+    width: var(--classic-cell);
+    height: var(--classic-cell);
 }
 
 .classic-tile {
@@ -65,8 +82,10 @@
 }
 
 /* ── Centre block (was `.grid-middle-item.logo`) ── */
+/* Column start/span come from ClassicBoard.tsx (centreCol/centreSpan) so the block stays centred
+   whatever the derived column count is. */
 .classic-centre {
-    grid-column: 4 / span 4;
+    grid-column: var(--classic-centre-col) / span var(--classic-centre-span);
     grid-row: 1 / span 2;
 }
 
@@ -191,11 +210,12 @@
 }
 
 /* Was `.custom-spot-tile`. `.classic-custom-row`'s own width is exactly
-   `10 * cell + 9 * gap` (--classic-grid-w), so this formula resolves to precisely `--classic-cell`
-   — kept as the old percentage formula rather than swapped for a flat `var(--classic-cell))` so it
-   stays correct even if the row is ever given a different width. */
+   `cols * cell + (cols - 1) * gap` (--classic-grid-w), so this formula resolves to precisely
+   `--classic-cell` — kept as the old percentage formula rather than swapped for a flat
+   `var(--classic-cell)` so it stays correct even if the row is ever given a different width. */
 .classic-custom-tile {
-    width: calc((100% - 9 * var(--classic-gap)) / 10);
+    width: calc((100% - (var(--classic-cols) - 1) * var(--classic-gap)) / var(--classic-cols));
+    box-sizing: border-box;
     aspect-ratio: 1 / 1;
     border-radius: calc(var(--classic-s) * 15px);
     background-color: rgba(0, 0, 0, 0.6);
@@ -227,4 +247,11 @@
 
 .classic-custom-tile.classic-taken .classic-custom-text {
     color: #adb5bd;
+}
+
+/* A special spot pooled with the teams (`specialSpotsOwnRow: false`) sits in a grid cell or the
+   centred bottom row, where the row-relative width formula above doesn't apply: fill the cell. */
+.classic-grid > .classic-custom-tile {
+    width: 100%;
+    height: 100%;
 }

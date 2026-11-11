@@ -22,6 +22,7 @@ import NameSettings from './NameSettings'
 import CountSettings from './CountSettings'
 import CardsSettings from './CardsSettings'
 import CobraBoardSettings from './CobraBoardSettings'
+import ClassicBoardSettings from './ClassicBoardSettings'
 import RipsFlatBoardSettings from './RipsFlatBoardSettings'
 import SportStyleBoardSettings from './SportStyleBoardSettings'
 import SportPricedBoardSettings from './SportPricedBoardSettings'
@@ -86,7 +87,7 @@ const wrapSettings: SettingsRenderer = ({elementKey, element, config, currentPha
 // fails to compile when a new registry id is added without deciding this either way.
 const SETTINGS_PANELS = {
     'board:flat': null,
-    'board:classic': null,
+    'board:classic': ({elementKey, element, onPatchElement}) => <ClassicBoardSettings elementKey={elementKey} element={element} onPatchElement={onPatchElement}/>,
     // Shares one settings panel with `board:cobra_flat` (cobra-flat-board-plan.md §6): the tier
     // thresholds are channel-wide, and are the only setting either board reads. The "Side Cards
     // Price" card the panel also carries is irrelevant to cobra_flat but harmless.

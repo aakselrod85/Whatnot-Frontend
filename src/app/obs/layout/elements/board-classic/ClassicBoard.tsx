@@ -25,8 +25,8 @@
 //     becomes `calc(var(--classic-s) * Npx)` in ClassicBoard.css, the way CobraBoard.tsx sets
 //     `--cbr-font`. `cell` and `gap` are computed here (not left to CSS) as whole pixels — same
 //     "integer px so cell edges land on device-pixel boundaries" reasoning as FlatBoard's
-//     `useIntegerBoardLayout` — and sized to fit BOTH axes: `rows = ceil((teamEvents.length + 8) /
-//     10)` (32 team cells + the 8-cell centre block, 10 columns) plus the custom-spot rows, so a
+//     `useIntegerBoardLayout` — and sized to fit BOTH axes: the team grid is always TEAM_ROWS (3) rows, with the column
+//     count derived from the team count (colsForTeams), plus the custom-spot rows, so a
 //     box of any aspect ratio letterboxes instead of overflowing.
 //   - A fresh mount snapshots whichever cells are already sold as "settled" (no burst video); only
 //     a cell that sells AFTER that snapshot plays `press_animation.webm` — otherwise mounting on an
@@ -60,12 +60,28 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 // header for the verify-on-test note.
 const REF_W = 810
 
-const COLS = 10
-// The centre block spans grid columns 4-7 (span 4) x rows 1-2 (span 2) = 8 cells always reserved,
-// regardless of how many teams are left to place around it.
-const CENTRE_CELLS = 8
+// The team grid is ALWAYS exactly this many rows (2026-11-10): the column count is derived from the
+// team count instead of being fixed at 10, because a 10-column grid put 33 teams (+ the centre
+// block) onto a 5th row with a single orphan tile. The centre block always spans rows 1-2.
+const TEAM_ROWS = 3
+// Never narrower than the historical 10-column board, so small breaks keep the old proportions.
+const MIN_COLS = 10
+const CENTRE_ROWS = 2
 
-export function ClassicBoard({box}: ElementProps) {
+// Centre block is 4 columns wide on an even column count and 5 on an odd one, so it can always sit
+// exactly in the middle of the row.
+function centreSpanFor(cols: number): number {
+    return cols % 2 === 0 ? 4 : 5
+}
+
+// Smallest column count (>= MIN_COLS) whose TEAM_ROWS rows fit every team plus the centre block.
+function colsForTeams(teamCount: number): number {
+    let cols = MIN_COLS
+    while (TEAM_ROWS * cols - CENTRE_ROWS * centreSpanFor(cols) < teamCount) cols++
+    return cols
+}
+
+export function ClassicBoard({box, element}: ElementProps) {
     const {events: rawEvents, breakObject, lastFetched} = useLayoutData()
 
     // ---- data (obs-layout-plan.md §2.10.1) ----------------------------------------------------
@@ -89,6 +105,16 @@ export function ClassicBoard({box}: ElementProps) {
         ),
         [filteredEvents]
     )
+
+    // `specialSpotsOwnRow` (2026-11-10, ClassicBoardSettings): true/unset = special (non-team) spots
+    // get their own row under the team board, as before; false = they join the team pool after the
+    // teams and take part in the 3-row column math like any team.
+    const specialOwnRow = element.kind === 'board' ? element.specialSpotsOwnRow !== false : true
+    const poolEvents = useMemo(
+        () => (specialOwnRow ? teamEvents : [...teamEvents, ...customEvents]),
+        [specialOwnRow, teamEvents, customEvents]
+    )
+    const ownRowEvents = specialOwnRow ? customEvents : []
 
     const highBid = useMemo(() => getEventWithHighestPrice(teamEvents)?.price ?? 0, [teamEvents])
     const highBidTeam = breakObject?.high_bid_team ?? ''
@@ -137,8 +163,18 @@ export function ClassicBoard({box}: ElementProps) {
     const gap = Math.max(1, Math.round(s * 10))
     const pad = s * 31.2
 
-    const teamRows = Math.max(1, Math.ceil((teamEvents.length + CENTRE_CELLS) / COLS))
-    const customRows = customEvents.length > 0 ? Math.ceil(customEvents.length / COLS) : 0
+    const COLS = colsForTeams(poolEvents.length)
+    const centreSpan = centreSpanFor(COLS)
+    // 1-based grid line of the centre block's first column.
+    const centreCol = (COLS - centreSpan) / 2 + 1
+    const teamRows = TEAM_ROWS
+    // Rows 1-2 are exactly filled by the cells either side of the centre block; whatever is left
+    // goes to row 3, rendered as its own flex row so it is centred as a whole (2026-11-10) instead
+    // of grid auto-placement packing it to the left.
+    const sideCells = CENTRE_ROWS * (COLS - centreSpan)
+    const sideTeams = poolEvents.slice(0, sideCells)
+    const bottomTeams = poolEvents.slice(sideCells)
+    const customRows = ownRowEvents.length > 0 ? Math.ceil(ownRowEvents.length / COLS) : 0
     const totalRows = teamRows + customRows
 
     const cellByWidth = Math.floor((box.w - 2 * pad - (COLS - 1) * gap) / COLS)
@@ -158,10 +194,13 @@ export function ClassicBoard({box}: ElementProps) {
     // custom-spot rows), and the old page's fixed 150px image only ever fit its block because
     // the OBS source was ~1920 wide — see the 2026-09-18 scaling report. Sizing from the block
     // itself makes the high-bid panel fit at any box shape and independent of REF_W.
-    const centreH = 2 * cell + gap
+    const centreH = CENTRE_ROWS * cell + gap
 
     const cssVars = {
         '--classic-s': s,
+        '--classic-cols': COLS,
+        '--classic-centre-col': centreCol,
+        '--classic-centre-span': centreSpan,
         '--classic-cell': `${cell}px`,
         '--classic-gap': `${gap}px`,
         '--classic-pad': `${pad.toFixed(2)}px`,
@@ -170,6 +209,18 @@ export function ClassicBoard({box}: ElementProps) {
         '--classic-board-h': `${boardH.toFixed(2)}px`,
         '--classic-centre-h': `${centreH}px`,
     } as React.CSSProperties
+
+    const renderPoolCell = (e: typeof poolEvents[number]) => {
+        const Cell = IsTeam(e.team) ? ClassicTile : ClassicCustomSpot
+        return (
+            <Cell
+                key={e.id}
+                event={e}
+                alreadySettled={!baselineReady || settled.has(e.id)}
+                onBurstComplete={handleBurstComplete}
+            />
+        )
+    }
 
     return (
         <div className="classic-root">
@@ -195,18 +246,16 @@ export function ClassicBoard({box}: ElementProps) {
                         )}
                         <img className="classic-overlay position-absolute" src="/images/mount_golden.png" alt=""/>
                     </div>
-                    {teamEvents.map(e => (
-                        <ClassicTile
-                            key={e.id}
-                            event={e}
-                            alreadySettled={!baselineReady || settled.has(e.id)}
-                            onBurstComplete={handleBurstComplete}
-                        />
-                    ))}
+                    {sideTeams.map(renderPoolCell)}
                 </div>
-                {customEvents.length > 0 && (
+                {bottomTeams.length > 0 && (
+                    <div className="classic-bottom-row">
+                        {bottomTeams.map(renderPoolCell)}
+                    </div>
+                )}
+                {ownRowEvents.length > 0 && (
                     <div className="classic-custom-row">
-                        {customEvents.map(e => (
+                        {ownRowEvents.map(e => (
                             <ClassicCustomSpot
                                 key={e.id}
                                 event={e}

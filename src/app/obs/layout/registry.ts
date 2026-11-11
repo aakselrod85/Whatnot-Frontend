@@ -174,9 +174,9 @@ const COBRA_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 340 }
 // rips_flat: full canvas width at the backdrop art's own aspect (1473x354, boardArt.ts), so the
 // gold frame is undistorted by default. Any other box stretches it like board:flat's board.png.
 const RIPS_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 260 }
-// classic is a 10-column grid of square team tiles plus an 8-cell centre block: 32 teams + 8
-// reserved cells = 40 cells / 10 cols = 4 rows of squares — at REF_W (ClassicBoard.tsx, 810) that's
-// roughly 2.1:1, landscape (obs-layout-plan.md §2.10.4). BOARD_BOX is 1080x1300 (0.83:1, portrait)
+// classic is a grid of square team tiles plus a 2-row centre block, always 3 rows tall with the
+// column count derived from the team count (ClassicBoard.tsx colsForTeams; 32 teams -> 14 cols) — a
+// wide landscape strip (obs-layout-plan.md §2.10.4). BOARD_BOX is 1080x1300 (0.83:1, portrait)
 // and would leave two-thirds of the box empty, same reasoning as COBRA_FLAT_BOX above.
 const CLASSIC_BOX: Box = { x: 0, y: 620, w: 1080, h: 560 }
 // sport-style-board-plan.md §2: 10 cols of a 1080-wide box gives 96px cells (edgeGap 60 each side);
