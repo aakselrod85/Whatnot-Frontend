@@ -28,9 +28,15 @@ export const RIPS_FRAME_SLICE = 64
 
 // How far the gold frame's outer edge reaches OUT past the cut-out, over the marble, in canvas px.
 // Hides the art's transparent/anti-aliased outer pixels so no sliver of content shows between the
-// marble and the gold. Note the left/right sides have 5 transparent px in the art, so at 3 a 2px
-// gap can remain there; raise this to 5 if it does.
+// marble and the gold. The left/right sides have 5 transparent px in the art, so at 3 a 2px gap
+// would remain there — `RIPS_FRAME_TUCK` below closes it.
 export const RIPS_FRAME_OVERLAP = 3
+
+// How far the marble reaches IN past the cut-out edge, under the gold, per side in canvas px.
+// Left/right only: the gold's opaque band there spans 2..22px inside the hole edge (5px
+// transparent strip minus the 3px overlap, then 20px of gold), so 10 puts the marble's edge
+// under the middle of the band. Top/bottom gold is flush with the art edge and needs none.
+export const RIPS_FRAME_TUCK = { top: 0, right: 5, bottom: 0, left: 5 } as const
 
 // registry.ts's `preload` list for `frame:static` — preloaded whatever style the element is on,
 // for the same reason as the results element's rips art (a style switch is a config edit, and the
