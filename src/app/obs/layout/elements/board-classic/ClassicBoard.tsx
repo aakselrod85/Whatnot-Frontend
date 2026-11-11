@@ -25,7 +25,7 @@
 //     becomes `calc(var(--classic-s) * Npx)` in ClassicBoard.css, the way CobraBoard.tsx sets
 //     `--cbr-font`. `cell` and `gap` are computed here (not left to CSS) as whole pixels — same
 //     "integer px so cell edges land on device-pixel boundaries" reasoning as FlatBoard's
-//     `useIntegerBoardLayout` — and sized to fit BOTH axes: the team grid is always TEAM_ROWS (3) rows, with the column
+//     `useIntegerBoardLayout` — and sized to fit BOTH axes: the team grid is always TEAM_ROWS (4) rows, with the column
 //     count derived from the team count (colsForTeams), plus the custom-spot rows, so a
 //     box of any aspect ratio letterboxes instead of overflowing.
 //   - A fresh mount snapshots whichever cells are already sold as "settled" (no burst video); only
@@ -45,6 +45,7 @@ import {IsTeam} from "@/app/common/teams"
 import {getEventWithHighestPrice} from "@/app/common/event_filter"
 import type {ElementProps} from "../../registry"
 import {useLayoutData} from "../../useLayoutData"
+import {usePublishAnchors, type Shape} from "../../anchors"
 import {ClassicTile} from "./ClassicTile"
 import {ClassicCustomSpot} from "./ClassicCustomSpot"
 import {ClassicHighBidAmount, ClassicHighBidTeam} from "./ClassicHighBid"
@@ -63,7 +64,8 @@ const REF_W = 810
 // The team grid is ALWAYS exactly this many rows (2026-11-10): the column count is derived from the
 // team count instead of being fixed at 10, because a 10-column grid put 33 teams (+ the centre
 // block) onto a 5th row with a single orphan tile. The centre block always spans rows 1-2.
-const TEAM_ROWS = 3
+// 3 rows on 2026-11-10, changed to 4 the same day on request.
+const TEAM_ROWS = 4
 // Never narrower than the historical 10-column board, so small breaks keep the old proportions.
 const MIN_COLS = 10
 const CENTRE_ROWS = 2
@@ -81,7 +83,7 @@ function colsForTeams(teamCount: number): number {
     return cols
 }
 
-export function ClassicBoard({box, element}: ElementProps) {
+export function ClassicBoard({box, element, elementKey}: ElementProps) {
     const {events: rawEvents, breakObject, lastFetched} = useLayoutData()
 
     // ---- data (obs-layout-plan.md §2.10.1) ----------------------------------------------------
@@ -108,7 +110,7 @@ export function ClassicBoard({box, element}: ElementProps) {
 
     // `specialSpotsOwnRow` (2026-11-10, ClassicBoardSettings): true/unset = special (non-team) spots
     // get their own row under the team board, as before; false = they join the team pool after the
-    // teams and take part in the 3-row column math like any team.
+    // teams and take part in the TEAM_ROWS column math like any team.
     const specialOwnRow = element.kind === 'board' ? element.specialSpotsOwnRow !== false : true
     const poolEvents = useMemo(
         () => (specialOwnRow ? teamEvents : [...teamEvents, ...customEvents]),
@@ -168,10 +170,11 @@ export function ClassicBoard({box, element}: ElementProps) {
     // 1-based grid line of the centre block's first column.
     const centreCol = (COLS - centreSpan) / 2 + 1
     const teamRows = TEAM_ROWS
-    // Rows 1-2 are exactly filled by the cells either side of the centre block; whatever is left
-    // goes to row 3, rendered as its own flex row so it is centred as a whole (2026-11-10) instead
-    // of grid auto-placement packing it to the left.
-    const sideCells = CENTRE_ROWS * (COLS - centreSpan)
+    // The grid holds every row but the last: rows 1-2 are the cells either side of the centre block,
+    // the rows between them and the last are full width. Whatever is left goes to the last row,
+    // rendered as its own flex row so it is centred as a whole (2026-11-10) instead of grid
+    // auto-placement packing it to the left.
+    const sideCells = CENTRE_ROWS * (COLS - centreSpan) + (TEAM_ROWS - 1 - CENTRE_ROWS) * COLS
     const sideTeams = poolEvents.slice(0, sideCells)
     const bottomTeams = poolEvents.slice(sideCells)
     const customRows = ownRowEvents.length > 0 ? Math.ceil(ownRowEvents.length / COLS) : 0
@@ -209,6 +212,17 @@ export function ClassicBoard({box, element}: ElementProps) {
         '--classic-board-h': `${boardH.toFixed(2)}px`,
         '--classic-centre-h': `${centreH}px`,
     } as React.CSSProperties
+
+    // Anchors (board-anchors-plan.md), canvas coordinates. `.classic-root` centres the fixed-size
+    // `.classic-board` in the box, so the painted background is letterboxed inside it:
+    //   board = the board.png background panel, grid = the team-cell area inside its padding.
+    const boardX = box.x + (box.w - boardW) / 2
+    const boardY = box.y + (box.h - boardH) / 2
+    const anchors = useMemo<Record<string, Shape>>(() => ({
+        board: {x: boardX, y: boardY, w: boardW, h: boardH, rx: 0, ry: 0},
+        grid: {x: boardX + pad, y: boardY + pad, w: gridW, h: teamGridH, rx: 0, ry: 0},
+    }), [boardX, boardY, boardW, boardH, pad, gridW, teamGridH])
+    usePublishAnchors(elementKey, anchors)
 
     const renderPoolCell = (e: typeof poolEvents[number]) => {
         const Cell = IsTeam(e.team) ? ClassicTile : ClassicCustomSpot

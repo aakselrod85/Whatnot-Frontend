@@ -27,7 +27,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ElementProps } from '../../../registry'
-import { useResolvedBox } from '../../../resolvedBoxes'
+import { useTargetShape } from '../../../anchors'
 import { useSceneEvent } from '../../../sceneEventBus'
 import { useEventActive } from '../../../eventActive'
 import { useLayoutData } from '../../../useLayoutData'
@@ -109,7 +109,10 @@ export function StashOrPassRing(props: ElementProps) {
         [config]
     )
     const targetKey = anim?.target ?? firstBoardKey
-    const box = useResolvedBox(targetKey ?? '')
+    // board-anchors-plan.md §3.7, replicated from quarters/: the target's published anchor when
+    // "Attach to" names one, else its plain box. A Shape is a superset of Box, so everything below
+    // that takes `box` is unchanged.
+    const box = useTargetShape(targetKey ?? '', anim?.targetAnchor)
 
     const pad = anim?.pad ?? DEFAULT_PAD
     const laneFontSize = anim?.laneFontSize ?? DEFAULT_LANE_FONT

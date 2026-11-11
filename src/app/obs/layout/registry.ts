@@ -174,8 +174,9 @@ const COBRA_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 340 }
 // rips_flat: full canvas width at the backdrop art's own aspect (1473x354, boardArt.ts), so the
 // gold frame is undistorted by default. Any other box stretches it like board:flat's board.png.
 const RIPS_FLAT_BOX: Box = { x: 0, y: 300, w: 1080, h: 260 }
-// classic is a grid of square team tiles plus a 2-row centre block, always 3 rows tall with the
-// column count derived from the team count (ClassicBoard.tsx colsForTeams; 32 teams -> 14 cols) — a
+// classic is a grid of square team tiles plus a 2-row centre block, always 4 rows tall with the
+// column count derived from the team count (ClassicBoard.tsx colsForTeams; 32 teams -> 10 cols,
+// 33 -> 11) — a
 // wide landscape strip (obs-layout-plan.md §2.10.4). BOARD_BOX is 1080x1300 (0.83:1, portrait)
 // and would leave two-thirds of the box empty, same reasoning as COBRA_FLAT_BOX above.
 const CLASSIC_BOX: Box = { x: 0, y: 620, w: 1080, h: 560 }
@@ -253,6 +254,9 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         // (x2 for the sold " BW" variant) are combinatorial and not worth eagerly preloading here,
         // same call as board:flat's manifest-resolved skins (obs-layout-plan.md §2.10.7).
         preload: ['/images/board.png', '/images/mount_golden.png'],
+        // Published by ClassicBoard.tsx: `board` = the letterboxed background panel, `grid` = the
+        // team cells (4 rows; the special-spots row, when on, is outside it).
+        anchors: ['board', 'grid'],
         component: ClassicBoard,
         available: true,
         hasBox: true,

@@ -71,7 +71,7 @@ export default function StashOrPassWrapSettings({
     // themselves resolve their target (`anim.target ?? first board key in config`, see e.g.
     // StashOrPassQuarters.tsx), so the select's options always match what would actually render.
     // Shown for every wrap build (not gated to sport style) since `targetAnchor` is on the shared
-    // schema and other builds may start reading it later — only `stashOrPassSportStyle` reads it so
+    // schema and other builds may start reading it later — only `stashOrPassSportStyle` and `stashOrPassWrapRing` read it so
     // far.
     const resolvedTargetKey = anim?.target ?? Object.entries(config.elements).find(([, el]) => el.kind === 'board')?.[0]
     const resolvedTargetEl = resolvedTargetKey ? config.elements[resolvedTargetKey] : undefined

@@ -40,7 +40,11 @@
     height: var(--classic-board-h);
     padding: var(--classic-pad);
     background-image: url('/images/board.png');
-    background-size: cover;
+    /* Stretched to the board exactly (2026-11-10), not `cover`: board.png (4394x1892, ~2.32:1) has
+       a white marble border on all four sides, and with a derived column count the board's aspect
+       varies, so `cover` cropped that border off the top/bottom (wider board) or the sides
+       (narrower). The marble texture tolerates the mild stretch. */
+    background-size: 100% 100%;
     background-repeat: no-repeat;
     display: flex;
     flex-direction: column;
@@ -56,7 +60,7 @@
     gap: var(--classic-gap);
 }
 
-/* Row 3 of the team board: its own centred flex row, so a partly filled last row sits in the
+/* Last row of the team board: its own centred flex row, so a partly filled last row sits in the
    middle as a whole (ClassicBoard.tsx sideTeams/bottomTeams). */
 .classic-bottom-row {
     width: var(--classic-grid-w);
@@ -95,7 +99,17 @@
    prefer. */
 .classic-overlay {
     z-index: 1 !important;
+    /* Fit INSIDE the centre block (2026-11-10). The art is 1647x879 (~1.87:1); with only `width:
+       100%` it grew taller than the 2-row block whenever the block was wider than that (a 5-column
+       centre on an odd column count) and covered the top of row 3. `contain` keeps its aspect and
+       centres it; a wider block gets side margins instead of overflow. Height is 110%, not 100%:
+       the bottom ~6% of the art is the transparent strip the gold ornament hangs in, so the framed
+       picture itself still ends about level with the block's bottom edge. Anchored to the top so
+       the extra goes downward into the row gap. */
     width: 100%;
+    height: 110%;
+    object-fit: contain;
+    object-position: center top;
     left: 0;
     top: 0;
 }
