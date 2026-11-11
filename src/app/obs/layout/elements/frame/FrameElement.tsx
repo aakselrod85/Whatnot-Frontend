@@ -34,7 +34,7 @@ import type { ElementProps } from '../../registry'
 import { resolveBorders, resolveFrameWidth } from '../../config'
 import type { FrameStyle, Sides } from '../../schema'
 import { CANVAS } from '../../schema'
-import { RIPS_FRAME_ASSETS, RIPS_FRAME_OVERLAP, RIPS_FRAME_SLICE } from './ripsAssets'
+import { RIPS_FRAME_ASSETS, RIPS_FRAME_OVERLAP, RIPS_FRAME_SLICE, RIPS_FRAME_TUCK } from './ripsAssets'
 import { SPORTS_FRAME_ASSETS, SPORTS_FRAME_GOLD_OFFSET, SPORTS_FRAME_OVERLAP, SPORTS_FRAME_SLICE } from './sportsAssets'
 import './FrameElement.css'
 
@@ -54,7 +54,11 @@ const INNER_RULE_PX = 2
 //                 drop shadow, if any — zero for rips). The frame box is pushed OUT by this much
 //                 so a shadow falls on the background, not on the content;
 //   - `overlap` — how far the frame's opaque edge laps over the background past the hole.
-type ArtSkin = { back: string; gold: string; slice: number; offset: Sides; overlap: number }
+//   - `tuck`    — per side, how far the BACKGROUND reaches in past the hole edge, under the frame.
+//                 For art with a transparent strip outside the opaque band (rips left/right) the
+//                 overlap alone leaves a sliver of content showing; tucking the background under
+//                 the band closes it without moving the frame.
+type ArtSkin = { back: string; gold: string; slice: number; offset: Sides; overlap: number; tuck: Sides }
 
 const ZERO_SIDES: Sides = { top: 0, right: 0, bottom: 0, left: 0 }
 
@@ -65,6 +69,7 @@ const ART_SKINS: Record<Exclude<FrameStyle, 'default'>, ArtSkin> = {
         slice: RIPS_FRAME_SLICE,
         offset: ZERO_SIDES,
         overlap: RIPS_FRAME_OVERLAP,
+        tuck: RIPS_FRAME_TUCK,
     },
     sports: {
         back: SPORTS_FRAME_ASSETS.back.src,
@@ -72,6 +77,7 @@ const ART_SKINS: Record<Exclude<FrameStyle, 'default'>, ArtSkin> = {
         slice: SPORTS_FRAME_SLICE,
         offset: SPORTS_FRAME_GOLD_OFFSET,
         overlap: SPORTS_FRAME_OVERLAP,
+        tuck: ZERO_SIDES,
     },
 }
 
@@ -124,10 +130,10 @@ function ArtFrame({ borders, skin }: { borders: Sides; skin: ArtSkin }) {
                 className="frm-rips-marble"
                 style={{
                     backgroundImage: `url(${skin.back})`,
-                    paddingTop: hole.top,
-                    paddingRight: hole.right,
-                    paddingBottom: hole.bottom,
-                    paddingLeft: hole.left,
+                    paddingTop: hole.top + skin.tuck.top,
+                    paddingRight: hole.right + skin.tuck.right,
+                    paddingBottom: hole.bottom + skin.tuck.bottom,
+                    paddingLeft: hole.left + skin.tuck.left,
                 }}
             />
             {/* The frame: a 9-slice border on the hole grown by offset + overlap. Slice and width
