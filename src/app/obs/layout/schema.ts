@@ -324,6 +324,9 @@ export type Element = (
           columns?: number
           sort?: ResultsSort
           style?: ResultsStyle
+          /** 'sports' style only: gold nickname + GoldLine for buyers with many slots in the break
+           *  (threshold: sportsStyle.ts SPORTS_BIG_BUYER_MIN). Off when absent. */
+          highlightBigBuyers?: boolean
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions
@@ -341,6 +344,9 @@ export type Element = (
           columns?: number
           sort?: ResultsSort
           style?: ResultsThinStyle
+          /** 'sports' style only: gold cell + gold nickname for buyers with many slots in the break
+           *  (threshold: results-thin/sportsStyle.ts SPORTS_THIN_BIG_BUYER_MIN). Off when absent. */
+          highlightBigBuyers?: boolean
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions
