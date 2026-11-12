@@ -374,6 +374,9 @@ function validateResultsThinFields(key: string, rawEl: Record<string, unknown>):
     ) {
         errors.push(`element "${key}": style must be one of ${VALID_RESULTS_THIN_STYLES.join(', ')}`)
     }
+    if (rawEl.highlightBigBuyers !== undefined && typeof rawEl.highlightBigBuyers !== 'boolean') {
+        errors.push(`element "${key}": highlightBigBuyers must be a boolean`)
+    }
     return errors
 }
 
@@ -612,6 +615,9 @@ function validateResultsKind({ key, rawEl, stages }: KindValidatorCtx): { errors
         (typeof rawEl.style !== 'string' || !(VALID_RESULTS_STYLES as readonly string[]).includes(rawEl.style))
     ) {
         errors.push(`element "${key}": style must be one of ${VALID_RESULTS_STYLES.join(', ')}`)
+    }
+    if (rawEl.highlightBigBuyers !== undefined && typeof rawEl.highlightBigBuyers !== 'boolean') {
+        errors.push(`element "${key}": highlightBigBuyers must be a boolean`)
     }
     return { errors, regId }
 }

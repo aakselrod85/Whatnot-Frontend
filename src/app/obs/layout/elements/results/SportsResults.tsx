@@ -9,7 +9,7 @@
 // markup: there is no frame, no title band and no cell plate to restyle, and nearly every part is
 // positioned from numbers that depend on the box AND the row count (row pitch, stripe count,
 // number spacing), which CSS alone cannot derive. Every number comes from sportsStyle.ts; nothing
-// is measured from the DOM except the nickname width (FitText below).
+// is measured from the DOM except text widths (ScrollName / FitText below).
 //
 // Geometry is in element px, origin at the box's top-left. The plate draws ABOVE y = 0, which is
 // why the `results` registry entry is `unclipped` and `.res-root` clips the other styles itself.
@@ -25,7 +25,19 @@ import {
     SPORTS_BASE_ART_WIDTH,
     SPORTS_BASE_SLICE,
     SPORTS_BASE_SRC,
+    SPORTS_BIG_BUYER_MIN,
+    SPORTS_BIG_COLOR,
+    SPORTS_BIG_FONT_SCALE,
+    SPORTS_BIG_GLOW,
+    SPORTS_BIG_GRADIENT,
+    SPORTS_BIG_LINE,
+    SPORTS_BIG_OUTLINE,
+    SPORTS_BIG_OUTLINE_GRADIENT,
+    SPORTS_BIG_LOGO_SHRINK,
+    SPORTS_BIG_TEXT_WIDTH,
+    SPORTS_BIG_TEXT_RAISE,
     SPORTS_FIELD_INSET,
+    SPORTS_GOLD_LINE_SRC,
     SPORTS_GRASS_SRC,
     SPORTS_LABEL_ART,
     SPORTS_LABEL_OVERLAP,
@@ -51,6 +63,11 @@ import {
     SPORTS_NUMBER_OUTLINE_H_ART,
     SPORTS_NUMBER_SEQUENCE,
     SPORTS_NUMBER_WIDEST_ART,
+    SPORTS_SCROLL_FADE,
+    SPORTS_SCROLL_GAP_PX,
+    SPORTS_SCROLL_PAUSE_MS,
+    SPORTS_SCROLL_SPEED,
+    SPORTS_SCROLL_START_PAUSE_MS,
     SPORTS_SHADOW,
     SPORTS_SHORT_ROW_OUTER_DIVIDERS,
     SPORTS_SINGLE_ROW_NUMBER_INSET,
@@ -61,11 +78,22 @@ import {
     SPORTS_TEXT_FONT,
     SPORTS_TEXT_MAX_FONT,
     SPORTS_TEXT_PAD_X,
+    SPORTS_TEXT_STRIPE_GAP,
     SPORTS_TEXT_SHARE,
     SPORTS_TICK_THICKNESS,
     SPORTS_TICK_W,
 } from './sportsStyle'
+import {createNameScrollSync} from '../results-thin/nameScrollSync'
+import {buyerKey} from './bigBuyers'
 import './ResultsSports.css'
+
+// This board's own clock for running nicknames (see sportsStyle.ts SPORTS_SCROLL_*): every
+// running name of the sports Results moves in step with the others, not with resultsThin's.
+const registerSportsNameScroll = createNameScrollSync({
+    speed: SPORTS_SCROLL_SPEED,
+    pauseMs: SPORTS_SCROLL_PAUSE_MS,
+    startPauseMs: SPORTS_SCROLL_START_PAUSE_MS,
+})
 
 type Props = {
     box: Box
@@ -78,9 +106,18 @@ type Props = {
      *  full one (0 = full row). Same values the other styles centre their last row with. */
     lastRowStart: number
     lastRowShortBy: number
+    /** Buyers (buyerKey) whose nicknames are painted gold — see bigBuyers.ts. Absent = nobody. */
+    bigBuyers?: Set<string>
 }
 
-export function SportsResults({box, ordered, columns, rows, lastRowStart, lastRowShortBy}: Props) {
+// A top-to-bottom gradient from 2+ colour stops, otherwise the plain colour — as a CSS background
+// either way, so the text layers can paint it through `background-clip: text`.
+function gradientOrColor(stops: string[], color: string): string {
+    return stops.length >= 2 ? `linear-gradient(to bottom, ${stops.join(', ')})` : `linear-gradient(${color}, ${color})`
+}
+
+
+export function SportsResults({box, ordered, columns, rows, lastRowStart, lastRowShortBy, bigBuyers}: Props) {
     const W = box.w
     const H = box.h
 
@@ -177,6 +214,14 @@ export function SportsResults({box, ordered, columns, rows, lastRowStart, lastRo
     const logoH = Math.max(0, rowH - textH - textBottom - logoTop - logoBottom)
     const logoW = cellW * SPORTS_LOGO_MAX_W
 
+    // Big buyer's text area: SPORTS_BIG_TEXT_WIDTH times the normal one, centred, but never
+    // closer to the column stripes than SPORTS_TEXT_STRIPE_GAP.
+    const normalTextW = Math.max(0, cellW - 2 * W * SPORTS_TEXT_PAD_X)
+    const bigPadX = Math.max(
+        (cellW - normalTextW * SPORTS_BIG_TEXT_WIDTH) / 2,
+        stripeW / 2 + W * SPORTS_TEXT_STRIPE_GAP
+    )
+
     // Art paths and the shadow reach the CSS as custom properties, so sportsStyle.ts stays the
     // only place that names a file or a number (same convention as the rips skin).
     const rootStyle = {
@@ -186,6 +231,21 @@ export function SportsResults({box, ordered, columns, rows, lastRowStart, lastRo
         '--res-sp-shadow': `drop-shadow(0 ${W * SPORTS_SHADOW.offsetY}px ${W * SPORTS_SHADOW.blur}px ${SPORTS_SHADOW.color})`,
         '--res-sp-line': `${line}px`,
         '--res-sp-stripe-h': `${stripeH}px`,
+        // Letter paint: the gradient (top to bottom) when one is set, otherwise the plain colour.
+        '--res-sp-big-fill': gradientOrColor(SPORTS_BIG_GRADIENT, SPORTS_BIG_COLOR),
+        '--res-sp-big-font-scale': SPORTS_BIG_FONT_SCALE,
+        '--res-sp-big-pad-x': `${bigPadX}px`,
+        '--res-sp-fade': `${W * SPORTS_SCROLL_FADE}px`,
+        // Stroke is centred on the letter edge, so double it: the inner half hides under the fill
+        // layer and the outer half is the visible outline (same trick as the yard numbers).
+        '--res-sp-big-outline-w': `${SPORTS_BIG_OUTLINE.width * 2}em`,
+        '--res-sp-big-outline-fill': gradientOrColor(SPORTS_BIG_OUTLINE_GRADIENT, SPORTS_BIG_OUTLINE.color),
+        '--res-sp-big-glow-color': SPORTS_BIG_GLOW.color,
+        '--res-sp-big-glow-blur': `${SPORTS_BIG_GLOW.blur}em`,
+        '--res-sp-big-glow-spread': `${SPORTS_BIG_GLOW.spread * 2}em`,
+        '--res-sp-gold-line-art': `url(${SPORTS_GOLD_LINE_SRC})`,
+        '--res-sp-gold-line-h': `${SPORTS_BIG_LINE.height * 100}%`,
+        '--res-sp-gold-line-y': `${SPORTS_BIG_LINE.y * 100}%`,
     } as React.CSSProperties
 
     const rowIndexes = Array.from({length: rows}, (_, r) => r)
@@ -246,11 +306,14 @@ export function SportsResults({box, ordered, columns, rows, lastRowStart, lastRo
                                 '--res-sp-text-h': `${textH}px`,
                                 '--res-sp-font': `${Math.min(textH * SPORTS_TEXT_FONT, W * SPORTS_TEXT_MAX_FONT)}px`,
                                 '--res-sp-text-bottom': `${textBottom}px`,
+                                '--res-sp-big-raise': `${rowH * SPORTS_BIG_TEXT_RAISE}px`,
                                 '--res-sp-logo-top': `${logoTop}px`,
                                 '--res-sp-logo-bottom': `${logoBottom}px`,
                                 '--res-sp-pad-x': `${W * SPORTS_TEXT_PAD_X}px`,
                                 '--res-sp-logo-w': `${logoW}px`,
                                 '--res-sp-abbr-font': `${logoH * SPORTS_ABBR_FONT}px`,
+                                '--res-sp-big-logo-shrink': SPORTS_BIG_LOGO_SHRINK,
+                                '--res-sp-big-logo-cut': `${logoH * SPORTS_BIG_LOGO_SHRINK}px`,
                             } as React.CSSProperties
                         }
                     >
@@ -260,6 +323,7 @@ export function SportsResults({box, ordered, columns, rows, lastRowStart, lastRo
                                 event={event}
                                 logoW={logoW}
                                 logoH={logoH}
+                                big={!!bigBuyers?.has(buyerKey(event.customer))}
                                 gridColumnStart={lastRowShortBy > 0 && i === lastRowStart ? lastRowShortBy + 1 : undefined}
                             />
                         ))}
@@ -343,27 +407,43 @@ function SportsCell({
     event,
     logoW,
     logoH,
+    big,
     gridColumnStart,
 }: {
     event: Event
     /** The most room a logo may take, px (SPORTS_LOGO_MAX_W and what the gaps + nickname leave). */
     logoW: number
     logoH: number
+    /** Big buyer: gold, glowing nickname with GoldLine under it (ResultsSports.css). */
+    big: boolean
     gridColumnStart?: number
 }) {
     const sold = event.customer !== ''
+    // Big buyer: logo and its area SPORTS_BIG_LOGO_SHRINK smaller (the area via CSS).
+    const logoScale = big ? 1 - SPORTS_BIG_LOGO_SHRINK : 1
     return (
-        <div className="res-sp-cell" style={gridColumnStart ? {gridColumnStart} : undefined}>
+        <div className={big ? 'res-sp-cell res-sp-cell-big' : 'res-sp-cell'} style={gridColumnStart ? {gridColumnStart} : undefined}>
             {sold && (
                 <>
                     <div className="res-sp-logo">
                         {IsTeam(event.team) ? (
-                            <SportsLogo src={getTeamImageSrc(event.team)} alt={event.team} maxW={logoW} maxH={logoH} />
+                            <SportsLogo
+                                src={getTeamImageSrc(event.team)}
+                                alt={event.team}
+                                maxW={logoW * logoScale}
+                                maxH={logoH * logoScale}
+                            />
                         ) : (
                             <FitText className="res-sp-abbr" text={getSpotAbbreviation(event.team)} />
                         )}
                     </div>
-                    <FitText className="res-sp-name" text={event.customer} />
+                    <ScrollName
+                        className={big ? 'res-sp-name res-sp-name-big' : 'res-sp-name'}
+                        text={event.customer}
+                        glowLayers={big ? Math.max(0, Math.round(SPORTS_BIG_GLOW.layers)) : undefined}
+                    />
+                    {/* Last in the cell, so it is painted over the nickname, its glow and outline. */}
+                    {big && <div className="res-sp-gold-line" />}
                 </>
             )}
         </div>
@@ -490,11 +570,11 @@ function useLogoTrim(src: string): LogoTrim | null | undefined {
 }
 
 // A single line of text that shrinks (uniformly, like a smaller font) until it fits its
-// container's width — no ellipsis, no wrap. The scale is a CSS transform on the inner span, which
-// does not change the span's layout width, so measuring and scaling cannot feed back into each
-// other. Layout widths are also unaffected by the canvas's own `transform: scale()`, so this is
-// correct at any OBS source size. The ResizeObserver re-fits when the cell is resized (box, row or
-// column count changed) and when the text's own width changes (new name, web font arriving).
+// container's width — no ellipsis, no wrap. Used for a non-team spot's short code. The scale is a
+// CSS transform on the inner span, which does not change the span's layout width, so measuring and
+// scaling cannot feed back into each other. Layout widths are also unaffected by the canvas's own
+// `transform: scale()`, so this is correct at any OBS source size. The ResizeObserver re-fits when
+// the cell is resized and when the text's own width changes (new text, web font arriving).
 function FitText({text, className}: {text: string; className: string}) {
     const outerRef = useRef<HTMLDivElement>(null)
     const innerRef = useRef<HTMLSpanElement>(null)
@@ -521,6 +601,89 @@ function FitText({text, className}: {text: string; className: string}) {
                 {text}
             </span>
         </div>
+    )
+}
+
+// The buyer's nickname, always at full letter size. If it fits its text area it stands centred;
+// if not, it is cut at the area's edges with a soft fade (a CSS mask, only while cut) and runs left
+// like a ticker, a second copy following it — the same behaviour as resultsThin
+// (results-thin/ThinResultRow.tsx). The running itself is done by this board's clock
+// (registerSportsNameScroll), which keeps all running names in step.
+//
+//   .res-sp-name        the text area (strip at the bottom of the cell); stays put
+//   .res-sp-clip        the mask; as wide as the area, taller than it so a glow above and below
+//                       the letters is not cut
+//   .res-sp-mover       slides; holds the name and, while cut, its second copy
+//   .res-sp-name-text   one copy (the first one is measured)
+function ScrollName({text, className, glowLayers}: {text: string; className: string; glowLayers?: number}) {
+    const clipRef = useRef<HTMLDivElement>(null)
+    const moverRef = useRef<HTMLDivElement>(null)
+    const textRef = useRef<HTMLSpanElement>(null)
+    const [isCut, setIsCut] = useState(false)
+
+    useLayoutEffect(() => {
+        const clip = clipRef.current
+        const mover = moverRef.current
+        const textEl = textRef.current
+        if (!clip || !mover || !textEl) return
+        const key = {}
+        let unregister: (() => void) | undefined
+        const measure = () => {
+            const cut = textEl.offsetWidth > clip.clientWidth
+            setIsCut(cut)
+            if (cut) {
+                unregister = registerSportsNameScroll(key, mover, textEl.offsetWidth + SPORTS_SCROLL_GAP_PX)
+            } else {
+                unregister?.()
+                unregister = undefined
+            }
+        }
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(clip)
+        observer.observe(textEl)
+        return () => {
+            observer.disconnect()
+            unregister?.()
+        }
+    }, [text])
+
+    return (
+        <div className={`res-sp-fit ${className}`}>
+            <div ref={clipRef} className={isCut ? 'res-sp-clip res-sp-clip-cut' : 'res-sp-clip'}>
+                <div ref={moverRef} className="res-sp-mover">
+                    <span ref={textRef} className="res-sp-name-text">
+                        <NameText text={text} glowLayers={glowLayers} />
+                    </span>
+                    {/* Second copy, only while the name is cut off: what runs in behind the first. */}
+                    {isCut && (
+                        <span className="res-sp-name-text" style={{marginLeft: SPORTS_SCROLL_GAP_PX}} aria-hidden>
+                            <NameText text={text} glowLayers={glowLayers} />
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// One copy of a nickname. With `glowLayers` (big buyers) it is drawn in layers — that many blurred
+// glow copies, then an outline copy, all stacked exactly under the letters. Only the letters take
+// up room.
+function NameText({text, glowLayers}: {text: string; glowLayers?: number}) {
+    if (glowLayers === undefined) return <>{text}</>
+    return (
+        <>
+            {Array.from({length: glowLayers}, (_, i) => (
+                <span key={i} className="res-sp-layer res-sp-layer-glow" aria-hidden>
+                    {text}
+                </span>
+            ))}
+            <span className="res-sp-layer res-sp-layer-outline" aria-hidden>
+                {text}
+            </span>
+            <span className="res-sp-layer-fill">{text}</span>
+        </>
     )
 }
 

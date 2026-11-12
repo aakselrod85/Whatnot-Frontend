@@ -77,6 +77,12 @@
     grid-template-columns: repeat(var(--res-sp-tracks), minmax(0, 1fr));
     row-gap: var(--res-sp-line);
     column-gap: 0;
+}
+
+/* Shadow under logos and normal nicknames — per part rather than on the whole cell layer, so a
+   big buyer's gold nickname and line can stay shadow-free. */
+.res-style-sports .res-sp-logo,
+.res-style-sports .res-sp-name:not(.res-sp-name-big) {
     filter: var(--res-sp-shadow);
 }
 
@@ -90,6 +96,7 @@
     display: flex;
     flex-direction: column;
     padding-top: var(--res-sp-logo-top);
+    position: relative; /* for the gold line */
 }
 
 /* Logo area: everything above the nickname strip, full cell width. */
@@ -131,7 +138,7 @@
 }
 
 /* Buyer nickname: the bottom strip of the cell (SPORTS_TEXT_SHARE). Side margins, not padding:
-   FitText fits the text to this box's own width. */
+   this box's own width is the text area the name is cut at (ScrollName in SportsResults.tsx). */
 .res-style-sports .res-sp-name {
     flex: none;
     height: var(--res-sp-text-h);
@@ -139,8 +146,121 @@
     font-size: var(--res-sp-font);
 }
 
+/* Running nickname (ScrollName). The clip box is as wide as the text area and taller than it
+   (padding, pulled back by the negative margin) so a glow above and below the letters is not cut.
+   Only while the name does not fit is it masked — soft fade at both ends — and left-aligned, the
+   mover then slides it (nameScrollSync.ts). The mover's left padding keeps the resting name's
+   first letter out of the fade. */
+.res-style-sports .res-sp-clip {
+    flex: 1 1 auto;
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.6em 0;
+    margin: -0.6em 0;
+}
+
+.res-style-sports .res-sp-clip-cut {
+    justify-content: flex-start;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--res-sp-fade), #000 calc(100% - var(--res-sp-fade)), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--res-sp-fade), #000 calc(100% - var(--res-sp-fade)), transparent 100%);
+}
+
+.res-style-sports .res-sp-mover {
+    flex: none;
+    display: inline-flex;
+    white-space: nowrap;
+}
+
+.res-style-sports .res-sp-clip-cut .res-sp-mover {
+    padding-left: var(--res-sp-fade);
+    will-change: transform;
+}
+
+.res-style-sports .res-sp-name-text {
+    flex: none;
+    position: relative;
+    isolation: isolate; /* keeps a big name's layers (below) under its own letters */
+}
+
+/* Big buyer (sportsStyle.ts SPORTS_BIG_*): gold, outlined, glowing, no dark shadow, lifted a
+   little to clear the gold line, with a wider text area (SPORTS_BIG_TEXT_WIDTH). `top` moves only
+   the nickname. */
+.res-style-sports .res-sp-name-big {
+    position: relative;
+    top: calc(-1 * var(--res-sp-big-raise));
+    margin-left: var(--res-sp-big-pad-x);
+    margin-right: var(--res-sp-big-pad-x);
+    font-size: calc(var(--res-sp-font) * var(--res-sp-big-font-scale));
+}
+
+/* Layers of a big nickname (NameText `glowLayers`): copies of the text stacked exactly over the
+   letters, painted under them in DOM order — glow copies, then the outline, then the letters
+   (`-fill`, painted with a gradient clipped to the letter shapes). The gold line is a sibling
+   painted after all of this, so it sits on top. */
+.res-style-sports .res-sp-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.res-style-sports .res-sp-layer-glow {
+    color: var(--res-sp-big-glow-color);
+    -webkit-text-stroke: var(--res-sp-big-glow-spread) var(--res-sp-big-glow-color);
+    filter: blur(var(--res-sp-big-glow-blur));
+}
+
+.res-style-sports .res-sp-layer-fill {
+    background: var(--res-sp-big-fill);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.res-style-sports .res-sp-layer-outline {
+    /* Gradient outline: a transparent stroke still widens the shape `background-clip: text` cuts
+       the background to, so the background shows through letters + stroke; the fill layer on top
+       covers the letters, leaving the gradient only on the outline. The padding (pulled back by
+       the negative offset) grows the background past the box so the stroke at the edges is not
+       cut off. */
+    left: calc(-1 * var(--res-sp-big-outline-w));
+    top: calc(-1 * var(--res-sp-big-outline-w));
+    padding: var(--res-sp-big-outline-w);
+    background: var(--res-sp-big-outline-fill);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: var(--res-sp-big-outline-w) transparent;
+}
+
+/* GoldLine.png: full cell width, height and position as shares of the cell height. */
+.res-style-sports .res-sp-gold-line {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: var(--res-sp-gold-line-y);
+    height: var(--res-sp-gold-line-h);
+    transform: translateY(-50%);
+    background: var(--res-sp-gold-line-art) center / 100% 100% no-repeat;
+    pointer-events: none;
+}
+
 /* A non-team spot's short code, standing where the logo would be: centred in the logo area and
    given the same width budget as a logo (FitText shrinks it to that). No tile, no border. */
+/* Big buyer's cell: logo area SPORTS_BIG_LOGO_SHRINK shorter (the logo itself is sized in
+   SportsCell); the freed height is extra space between the logo and the nickname. */
+.res-style-sports .res-sp-cell-big .res-sp-logo {
+    margin-bottom: calc(var(--res-sp-logo-bottom) + var(--res-sp-big-logo-cut));
+}
+
+.res-style-sports .res-sp-cell-big .res-sp-abbr {
+    font-size: calc(var(--res-sp-abbr-font) * (1 - var(--res-sp-big-logo-shrink)));
+}
+
 .res-style-sports .res-sp-abbr {
     position: absolute;
     top: 0;

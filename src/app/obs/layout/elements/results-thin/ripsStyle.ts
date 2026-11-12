@@ -65,6 +65,10 @@ export const RIPS_THIN_CELL_SRC = `${ART_DIR}/ResultsCell.png`
  */
 export const RIPS_THIN_TEXT_MASK_EXTEND = { left: 0, right: 0 } as const
 
+/** Width of the soft fade at the left and right edge of the mask above, while the nickname does
+ *  not fit and runs. Canvas px. 0 = hard cut. */
+export const RIPS_THIN_TEXT_FADE = 8
+
 // registry.ts's `preload` list for the `resultsThin` entry — static art only (ADDING_AN_ELEMENT.md
 // §2).
 export const RIPS_RESULTS_THIN_PRELOAD: string[] = [

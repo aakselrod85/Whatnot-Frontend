@@ -102,6 +102,18 @@
     padding-left: max(0px, var(--rest-mask-l, 0px));
 }
 
+/* While the name does not fit and runs: soft fade at both ends of the mask (width per style,
+   --rest-fade). The mover's left padding then also keeps the resting name's first letter out of
+   the fade (only as much as the mask's own left extension does not already cover). */
+.rest-customer-name.rest-name-cut {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--rest-fade, 0px), #000 calc(100% - var(--rest-fade, 0px)), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--rest-fade, 0px), #000 calc(100% - var(--rest-fade, 0px)), transparent 100%);
+}
+
+.rest-name-cut .rest-customer-name-inner {
+    padding-left: max(0px, var(--rest-mask-l, 0px), var(--rest-fade, 0px));
+}
+
 .rest-customer-name-text {
     flex: none;
 }

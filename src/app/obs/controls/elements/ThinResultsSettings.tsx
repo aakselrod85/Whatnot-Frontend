@@ -64,6 +64,20 @@ export default function ThinResultsSettings({elementKey, element, onPatchElement
                 />
             </div>
             <SortButtons value={sort} onChange={(next) => onPatchElement(elementKey, {sort: next})}/>
+            {style === 'sports' && (
+                <div className="form-check mb-2 align-self-end">
+                    <input
+                        id={`${elementKey}-big-buyers`}
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={element.highlightBigBuyers ?? false}
+                        onChange={(e) => onPatchElement(elementKey, {highlightBigBuyers: e.target.checked})}
+                    />
+                    <label className="form-check-label small" htmlFor={`${elementKey}-big-buyers`}>
+                        show buyers with big amount of orders
+                    </label>
+                </div>
+            )}
         </div>
     )
 }

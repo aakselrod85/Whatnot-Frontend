@@ -5,3 +5,7 @@
 // px; positive = that edge moves outward (text shows further out), negative = inward. The
 // nickname's START position does not move when the left edge does, only the mask grows.
 export const DEFAULT_THIN_TEXT_MASK_EXTEND = { left: 0, right: 0 } as const
+
+// Width of the soft fade at the left and right edge of the mask above, while the nickname does
+// not fit and runs. Canvas px. 0 = hard cut.
+export const DEFAULT_THIN_TEXT_FADE = 8
