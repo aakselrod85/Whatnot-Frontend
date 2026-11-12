@@ -31,6 +31,7 @@ import {
     DEFAULT_RIPS_CELL_ORDER,
     DEFAULT_RIPS_SOLD_PLACEMENT,
     placeRipsCells,
+    ripsTierOf,
     RIPS_CELL_ORDERS,
     RIPS_SOLD_PLACEMENTS,
     type RipsCell,
@@ -38,6 +39,7 @@ import {
     type RipsSoldPlacement,
 } from './ripsOrder'
 import {useFlipArt} from './useFlipArt'
+import {RipsGoldOverlay} from './RipsGoldOverlay'
 import {
     DEFAULT_RIPS_BACK_STYLE,
     DEFAULT_RIPS_TILE_SET,
@@ -229,6 +231,13 @@ export function RipsFlatBoard({box, element}: ElementProps) {
         [placed]
     )
 
+    const goldCells = useMemo(() => items.flatMap((it) => {
+        const event = eventById.get(it.eventId)
+        return event && ripsTierOf(event.team) === 1
+            ? [{id: event.id, row: it.row, col: it.col, sold: event.customer !== ''}]
+            : []
+    }), [items, eventById])
+
     // Sold cells whose effect has finished — the only ones that join the 'tiles' groups or the
     // 'flip_art' shapes; a cell still flipping / bursting stays a piece of its own.
     const settledPositions = useMemo(
@@ -327,6 +336,7 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                                     style={{gridRow: it.row + 1, gridColumn: it.col + 1}}
                                     tileSet={tileSet}
                                     marbleOrigin={marbleOrigin}
+                                    cellPx={metrics.cellPx}
                                     backStyle={backStyle}
                                     // The sheet's top-left relative to THIS cell: the cover offset
                                     // minus whole cells.
@@ -337,6 +347,9 @@ export function RipsFlatBoard({box, element}: ElementProps) {
                             )
                         })}
                     </div>
+                    {tileSet === 'marble_auto' && goldCells.length > 0 && (
+                        <RipsGoldOverlay cells={goldCells} cellPx={metrics.cellPx} cols={MAX_COLS} rows={rowCount} left={metrics.padLeft} top={metrics.padTop} />
+                    )}
                     {/* 'flip_art': the settled cells' backs as free-form shapes (touching cells
                         merged, cut to the outline) in one SVG; the grey skin's decorations have
                         no place over the painting. */}

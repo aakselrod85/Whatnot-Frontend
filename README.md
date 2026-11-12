@@ -37,7 +37,7 @@ The `board:rips_flat` board (Greek scene) shows each team as an octagonal stone 
 |---|---|---|
 | `veined` (default) | `public/images/rips_tiles/veined/` | The board's marble across the whole stone, veins included |
 | `clean` | `public/images/rips_tiles/clean/` | Veins softened away inside the gold octagon, so nothing runs behind the logo |
-| `marble_auto` | `public/images/rips_tiles/CellFrame.png` (gold frame), `public/images/rips_tiles/webp-rips/` (logos), `public/images/static/rips/BackFlat.png` (marble) | Not a pre-drawn stone: composed live from the frame element's marble, the gold frame and the logo. The marble is the whole 1080x1920 canvas sheet, so each cell shows the piece that lies under it — veins run on across neighbouring cells and shift when the board is moved. No generator step; replace the three assets to restyle it (re-measure the clip octagon in `RipsFlatCell.css` if the frame changes). |
+| `marble_auto` | `public/images/rips_tiles/doric/` and existing sports team logos | Doric frames with 3/2/1 grooves: polished red-veined marble and moving gold highlights, satin silver marble, dim matte bronze limestone. All frames share calibrated outer bounds. |
 
 The board backdrop is the same for every set: `public/images/rips_board/BoardSeparate.png` (the blue board in its gold frame, no marble surround), stretched to the element's box. The team cells sit 15 px in from every edge of the 1473x354 art (`RIPS_BOARD_INSET` in `src/app/obs/layout/elements/board-rips-flat/boardArt.ts`), scaled with the box so they follow the frame at any size; re-check it if the art is replaced.
 
@@ -49,7 +49,13 @@ The board backdrop is the same for every set: `public/images/rips_board/BoardSep
 
 In `/obs/controls/<id>`, open the Rips board element's settings and choose **Tiles**: *Marble, veined*, *Marble, clean centre*, *Classic icons* or *Marble auto*. It is saved with the layout and the stream updates on its own. A board that never had it set shows `DEFAULT_RIPS_TILE_SET` (in `src/app/obs/layout/elements/board-rips-flat/RipsFlatCell.tsx`).
 
-*Marble auto* shows each team's tier (1 = best, 2, 3; the lists are `TIER_OF` in `src/app/obs/layout/elements/board-rips-flat/ripsOrder.ts`, every team not listed is tier 3) by its frame: `public/images/rips_tiles/CellFrameTier1.png` / `CellFrameTier2.png` for tiers 1 and 2, `CellFrame.png` for tier 3. The marble background is the same for every tier. Replace those files to restyle a tier.
+*Marble auto* uses the existing fixed team tiers from `board-rips-flat/ripsOrder.ts` (1 = gold, 2 = silver, unlisted = bronze). Saved `marble_auto` layouts receive this appearance automatically; the `veined` default and the other sets are unchanged. No layout migration or backend change is required.
+
+Assets live in `public/images/rips_tiles/doric/`: `gold-frame.png`, `silver-frame.png`, `bronze-frame.png`, `marble.png`, and `limestone.png`. These are the approved original-width Doric frames and materials. `doricMaterials.ts` calibrates the source padding onto one outer octagon for both CSS and WebGL. The marble uses a repeating sheet at approximately one-cell scale, still sampled from canvas coordinates, so broad reddish veins remain visible at stream size. Gold adds a subtle champagne hue; silver is quieter, bronze darker. Team art and the crisp black outline are shared with sports (`TeamIconSrc`, `sportsLogoFilter`); custom spots without an asset show their label.
+
+Gold reflections use one WebGL context per board, drawing directly at animation-frame cadence with one mipmapped texture upload. There are no per-frame canvas copies, DOM measurements, or React updates. The overlay only draws resting unsold gold cells: sale flips keep their static frame and existing burst, refunds wait for the 0.8s return transition, and current slot coordinates follow re-deals and resizing. The static frame remains underneath as fallback for loading, unavailable/lost WebGL, and reduced motion. The GPU loop stops for hidden/offscreen boards and when all gold cells are sold; it cleans up on unmount and recovers after context restoration.
+
+Review the real component at `/obs/setup/rips_tiles` (all 33 logos, local sale/refund controls, both backs, partial rows, sizing, remount and GPU context-loss checks; nothing is saved). Run `node scripts/rips-tiles/check-doric.cjs` for regression checks, plus TypeScript and ESLint. Actual OBS/Whatnot capture and compression still need checking on the streaming machine.
 
 **Pick the back**
 
