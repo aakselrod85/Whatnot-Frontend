@@ -1,6 +1,6 @@
 'use client'
 
-import React, {FC, useState} from "react";
+import React, {FC, useRef, useState} from "react";
 import {Photo} from "@/app/entity/entities";
 import {getEndpoints, post} from "@/app/lib/backend";
 import {Teams} from "@/app/common/teams";
@@ -15,6 +15,7 @@ interface PhotoGridComponentProps {
     onRestore?: (id: number) => void
     onTeamChange: (id: number, team: string) => void
     onPriceChange: (id: number, price: number) => void
+    onNameChange: (id: number, name: string) => void
     onRotationChange: (id: number, rotation: number) => void
 }
 
@@ -23,12 +24,14 @@ type SortDir   = 'asc'   | 'desc'
 
 const ROTATIONS = [0, 90, 180, 270] as const
 
-export const PhotoGridComponent: FC<PhotoGridComponentProps> = ({photos, deletedPhotos = [], isLoading, devMode = false, onDelete, onRestore, onTeamChange, onPriceChange, onRotationChange}) => {
+export const PhotoGridComponent: FC<PhotoGridComponentProps> = ({photos, deletedPhotos = [], isLoading, devMode = false, onDelete, onRestore, onTeamChange, onPriceChange, onNameChange, onRotationChange}) => {
     const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set())
     const [sortField, setSortField] = useState<SortField>('price')
     const [sortDir,   setSortDir]   = useState<SortDir>('desc')
     const [rotatingPhoto, setRotatingPhoto] = useState<Photo | null>(null)
     const [rotating, setRotating] = useState(false)
+    const [editingNameId, setEditingNameId] = useState<number | null>(null)
+    const skipBlurSave = useRef(false)
 
     function toggleSort(field: SortField) {
         if (field === sortField) {
@@ -68,6 +71,13 @@ export const PhotoGridComponent: FC<PhotoGridComponentProps> = ({photos, deleted
         post(getEndpoints().photo_update, {id: photo.id, name: photo.name, team: photo.team, price}).then(() => onPriceChange(photo.id, price))
     }
 
+    function setName(photo: Photo, raw: string) {
+        const name = raw.trim()
+        setEditingNameId(null)
+        if (!name || name === photo.name) return
+        post(getEndpoints().photo_update, {id: photo.id, name, team: photo.team, price: photo.price}).then(() => onNameChange(photo.id, name))
+    }
+
     async function applyRotation(deg: number) {
         if (!rotatingPhoto) return
         if (deg === (rotatingPhoto.rotation ?? 0)) {
@@ -94,7 +104,32 @@ export const PhotoGridComponent: FC<PhotoGridComponentProps> = ({photos, deleted
         const nameSize = nameFontSize(nameLines, 100, 36)
         return (
             <div key={photo.id} className="col-6 col-sm-4 col-md-3" style={{containerType: 'inline-size'}}>
-                <div style={{
+                {editingNameId === photo.id && !deleted ? (
+                    <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        style={{marginBottom: '2px'}}
+                        autoFocus
+                        defaultValue={photo.name}
+                        onFocus={() => { skipBlurSave.current = false }}
+                        onBlur={(e) => {
+                            if (skipBlurSave.current) { skipBlurSave.current = false; return }
+                            setName(photo, e.target.value)
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                            else if (e.key === 'Escape') {
+                                skipBlurSave.current = true
+                                setEditingNameId(null)
+                            }
+                        }}
+                    />
+                ) : (
+                <div
+                    title={deleted ? undefined : 'Click to rename'}
+                    onClick={deleted ? undefined : () => setEditingNameId(photo.id)}
+                    style={{
+                    cursor: deleted ? undefined : 'text',
                     fontSize: `${nameSize}cqw`,
                     lineHeight: 1.2,
                     textAlign: 'center',
@@ -108,6 +143,7 @@ export const PhotoGridComponent: FC<PhotoGridComponentProps> = ({photos, deleted
                 }}>
                     {nameLines.map((line, i) => <div key={i}>{line}</div>)}
                 </div>
+                )}
                 <div className="position-relative">
                     <div
                         className="rounded"
