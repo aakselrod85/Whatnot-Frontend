@@ -35,6 +35,8 @@ import {ResultRow} from './ResultRow'
 import {NO_SERIES_TIER, tiersByEventId} from './tiers'
 import {RIPS_FRAME_SRC, RIPS_GRID_INSETS, RIPS_TIER_ART} from './ripsStyle'
 import {SportsResults} from './SportsResults'
+import {bigBuyers} from './bigBuyers'
+import {SPORTS_BIG_BUYER_MIN} from './sportsStyle'
 import './ResultsElement.css'
 import './ResultsRips.css'
 
@@ -69,6 +71,7 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
     const sort = element.kind === 'results' ? (element.sort ?? DEFAULT_SORT) : DEFAULT_SORT
     const style = element.kind === 'results' ? (element.style ?? DEFAULT_STYLE) : DEFAULT_STYLE
     const isRips = style === 'rips'
+    const highlightBigBuyers = element.kind === 'results' && style === 'sports' && !!element.highlightBigBuyers
 
     const {ordered} = useMemo(
         // 'row': .res-grid is a plain grid-auto-flow:row, so it must be handed the sorted order as
@@ -86,6 +89,12 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
     // gets no ranking at all: every slot sits on NO_SERIES_TIER.
     const hasSeries = !!breakObject?.series_id
     const tiers = useMemo(() => tiersByEventId(rawEvents, hasSeries), [rawEvents, hasSeries])
+
+    // 'sports' only: buyers to paint gold. Counted over the FULL event list of the break.
+    const big = useMemo(
+        () => (highlightBigBuyers ? bigBuyers(rawEvents, SPORTS_BIG_BUYER_MIN) : undefined),
+        [rawEvents, highlightBigBuyers]
+    )
 
     // How many rows the grid ACTUALLY renders. Deliberately derived from the rendered list rather
     // than taken from orderResults()'s `rows`: that value is the sum of the team block's and the
@@ -154,6 +163,7 @@ export function ResultsElement({elementKey, element, box}: ElementProps) {
                 rows={visualRows}
                 lastRowStart={lastRowStart}
                 lastRowShortBy={lastRowOffset}
+                bigBuyers={big}
             />
         )
     }

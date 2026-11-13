@@ -171,7 +171,8 @@ export const SPORTS_TEXT_MAX_FONT = 0.045
 
 /** Empty margin on the left and right of the nickname, fraction of the element width (same unit
  *  as the stripe width, so the text keeps clear of the stripes whatever the column count: half a
- *  stripe is 0.0192). A nickname longer than what is left shrinks to fit. */
+ *  stripe is 0.02). A nickname longer than what is left is cut at these edges and runs (see
+ *  SPORTS_SCROLL_* below). */
 export const SPORTS_TEXT_PAD_X = 0.03
 
 /** Gap between the nickname and the row's bottom line, share of the cell height. 0 = the nickname
@@ -200,6 +201,103 @@ export const SPORTS_LOGO_TRIM = true
 export const SPORTS_ABBR_FONT = 0.6
 
 // ---------------------------------------------------------------------------------------------
+// Running nicknames. Every nickname has the same letter size; one that does not fit its text
+// area is cut there (with soft edges) and runs left like a ticker, a second copy following it —
+// same behaviour as resultsThin. All running names of the board move in step: they set off
+// together, each slides by its own length, the short ones wait for the longest one, then PAUSE,
+// then the next round. Values copied from resultsThin (results-thin/scrollStyle.ts) and kept
+// separate, so the two can be tuned apart.
+// ---------------------------------------------------------------------------------------------
+
+/** Speed, px per second (element px). */
+export const SPORTS_SCROLL_SPEED = 15
+
+/** Empty space, px, between the END of one copy of the name and the START of the next. */
+export const SPORTS_SCROLL_GAP_PX = 15
+
+/** How long everything stands still before the very first round, ms (comes back whenever a name
+ *  appears, changes or the board is resized). */
+export const SPORTS_SCROLL_START_PAUSE_MS = 2000
+
+/** The wait between rounds, ms, counted from the moment the LONGEST name has arrived. */
+export const SPORTS_SCROLL_PAUSE_MS = 2000
+
+/** Width of the soft fade at the left and right edge of a running nickname, fraction of the
+ *  element width (0.01 = ~11 px on a 1080-wide board). 0 = hard cut. */
+export const SPORTS_SCROLL_FADE = 0.01
+
+// ---------------------------------------------------------------------------------------------
+// Big buyers — checkbox "show buyers with big amount of orders" in the Results settings.
+// A buyer who bought at least SPORTS_BIG_BUYER_MIN slots in this break (giveaways and unsold
+// spots do not count) gets a gold, glowing, thicker nickname with GoldLine.png under it, in every
+// one of their cells. Sizes marked "em" are shares of the nickname's own letter size, so they
+// follow the nickname when it grows or shrinks.
+// ---------------------------------------------------------------------------------------------
+
+export const SPORTS_GOLD_LINE_SRC = `${ART_DIR}/GoldLine.png`
+
+/** How many bought slots in one break make a buyer "big". */
+export const SPORTS_BIG_BUYER_MIN = 5
+
+/** Plain letter colour of a big buyer's nickname (when SPORTS_BIG_GRADIENT is empty): rgb(red, green, blue), each 0-255. */
+export const SPORTS_BIG_COLOR = 'rgb(244, 236, 121)'
+
+/** Letter GRADIENT, top to bottom: a list of colours, rgb(red, green, blue). Two or more colours =
+ *  gradient, used instead of SPORTS_BIG_COLOR. Empty list [] = plain SPORTS_BIG_COLOR.
+ *  A colour may carry its own position: 'rgb(255, 255, 255) 30%' = this colour at 30% height. */
+export const SPORTS_BIG_GRADIENT: string[] = ['rgb(255, 252, 214)', 'rgb(255, 251, 0) 45%', 'rgb(240, 194, 1)']
+
+/** How much bigger the letters are than a normal nickname (1.2 = 20% bigger). A long nickname
+ *  still shrinks to fit its cell, so this mostly shows on short ones. */
+export const SPORTS_BIG_FONT_SCALE = 1.1
+
+/** How much WIDER a big buyer's text area is than a normal one (1.1 = 10% wider). It never gets
+ *  closer to the column stripes than SPORTS_TEXT_STRIPE_GAP. */
+export const SPORTS_BIG_TEXT_WIDTH = 1.1
+
+/** Smallest gap between a nickname's edge and the column stripe next to it, fraction of the
+ *  element width (0.002 = ~2 px). Only limits the wider big-buyer text area. */
+export const SPORTS_TEXT_STRIPE_GAP = 0.002
+
+/** How much SMALLER the logo and its area are in a big buyer's cell (0.1 = 10% smaller). The
+ *  freed height becomes space between the logo and the nickname. */
+export const SPORTS_BIG_LOGO_SHRINK = 0.2
+
+/** Outline AROUND the letters (drawn outside them, so the letters themselves are not eaten).
+ *  - `width` — outline thickness, em. 0 = no outline; 0.05 = clearly visible; above ~0.12 the
+ *              holes in "a", "e", "o" start to fill up.
+ *  - `color` — rgb(red, green, blue). Same as SPORTS_BIG_COLOR = the letters just get fatter. */
+export const SPORTS_BIG_OUTLINE = { width: 0.04, color: 'rgb(113, 067, 0)' } as const
+
+/** Outline GRADIENT, top to bottom — same rules as SPORTS_BIG_GRADIENT. Two or more colours =
+ *  used instead of SPORTS_BIG_OUTLINE's `color`; empty list [] = plain colour. */
+export const SPORTS_BIG_OUTLINE_GRADIENT: string[] = ['rgb(170, 110, 10)', 'rgb(70, 47, 0)']
+
+/** Glow behind the letters — a blurred, fattened copy of the nickname laid under it.
+ *  - `color`  — rgba(red, green, blue, strength); strength 0 = no glow, 1 = full.
+ *  - `blur`   — how soft the glow is and how far it spreads past the letters, em.
+ *  - `spread` — how much the copy is fattened before blurring, em. Bigger = denser, brighter
+ *               glow without making it spread further.
+ *  - `layers` — how many such copies are stacked; each one makes the glow more saturated
+ *               (1 = soft, 2-3 = rich, as in the reference).
+ *  Glow reaches roughly blur + spread past the letters; with the nickname ~30 px tall,
+ *  0.25 + 0.1 em is ~10 px. */
+export const SPORTS_BIG_GLOW = { color: 'rgba(144, 100, 29, 0.85)', blur: 0.25, spread: 0.1, layers: 2 } as const
+
+/** How far a big buyer's nickname is lifted, share of the cell height — makes room for the gold
+ *  line under it. Only the nickname moves; the logo keeps its size and place. */
+export const SPORTS_BIG_TEXT_RAISE = 0.1
+
+/** GoldLine.png under the nickname. It always runs the full width of the cell (the picture's own
+ *  ends fade out, so it reads shorter). Measured on the reference img.png: there the bright core
+ *  of the line is ~11% of the cell height and its middle ~7% above the cell's bottom line; the
+ *  picture's core is half its height, hence 0.22.
+ *  - `height` — thickness of the picture, share of the cell height.
+ *  - `y`      — where the MIDDLE of the line sits, share of the cell height from the cell's top
+ *               (1 = on the bottom white line; smaller = higher). */
+export const SPORTS_BIG_LINE = { height: 0.22, y: 0.93 } as const
+
+// ---------------------------------------------------------------------------------------------
 // Shadow under nicknames, logos and numbers: straight down (no sideways shift), soft.
 // ---------------------------------------------------------------------------------------------
 
@@ -221,5 +319,6 @@ export const SPORTS_RESULTS_PRELOAD: string[] = Array.from(
         SPORTS_LINE_SRC,
         SPORTS_STRIPE_SRC,
         SPORTS_GRASS_SRC,
+        SPORTS_GOLD_LINE_SRC,
     ])
 )

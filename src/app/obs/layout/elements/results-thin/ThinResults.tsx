@@ -44,6 +44,8 @@ import type {ResultsSort, ResultsThinStyle} from '../../schema'
 import './ThinResults.css'
 import './ThinResultsRips.css'
 import './ThinResultsSports.css'
+import {bigBuyers, buyerKey} from '../results/bigBuyers'
+import {SPORTS_THIN_BIG_BUYER_MIN} from './sportsStyle'
 
 // Fixed cosmetic spacing of the default style's panel (ThinResults.css `.rest-grid`): its border,
 // its inner padding and the vertical gap between rows. Declared HERE and handed to the CSS as
@@ -72,6 +74,7 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
     const style = element.kind === 'resultsThin' ? (element.style ?? DEFAULT_STYLE) : DEFAULT_STYLE
     const isRips = style === 'rips'
     const isSports = style === 'sports'
+    const highlightBigBuyers = element.kind === 'resultsThin' && isSports && !!element.highlightBigBuyers
     // Sports board: drawn as wide as the box at the art's own proportions (sportsStyle.ts), so
     // every art-px number of that skin turns into screen px through this one factor.
     const sportsScale = box.w / SPORTS_THIN_BOARD_ART.w
@@ -88,6 +91,12 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
     // what tier a slot is — including the "nothing to rank by" case, which flattens everything.
     const hasSeries = !!breakObject?.series_id
     const tiers = useMemo(() => tiersByEventId(rawEvents, hasSeries), [rawEvents, hasSeries])
+
+    // 'sports' only: buyers whose cells turn gold. Counted over the FULL event list of the break.
+    const big = useMemo(
+        () => (highlightBigBuyers ? bigBuyers(rawEvents, SPORTS_THIN_BIG_BUYER_MIN) : undefined),
+        [rawEvents, highlightBigBuyers]
+    )
 
     // How many rows the grid actually renders — derived from the rendered list, not from
     // orderResults()'s `rows`, for the reason ResultsElement.tsx gives (the two interleaved blocks
@@ -213,6 +222,7 @@ export function ThinResults({elementKey, element, box}: ElementProps) {
                                 highBidTeam={breakObject?.high_bid_team ?? ''}
                                 giveawayTeam={breakObject?.giveaway_team ?? ''}
                                 skin={style}
+                                big={!!big?.has(buyerKey(event.customer))}
                             />
                         ))}
                     </div>

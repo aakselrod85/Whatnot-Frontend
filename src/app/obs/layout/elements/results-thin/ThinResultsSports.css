@@ -40,9 +40,8 @@
    frame colour does not show in this skin. */
 .rest-root--sports .rest-row-item {
     position: relative;
-    /* Own stacking context: the overlays' and the logo's z-index then count only INSIDE this cell.
-       Without it, with cells overlapping (negative column gap) one cell's overlay was painted over
-       its neighbour's body and logo, which is what broke the geometry. */
+    /* Own stacking context: the logo's z-index then counts only INSIDE this cell (cells overlap
+       with a negative column gap). */
     isolation: isolate;
     width: auto;
     max-width: none;
@@ -57,7 +56,7 @@
     width: var(--rest-sp-logo);
     height: var(--rest-sp-logo);
     margin-left: calc(var(--rest-sp-pull-l, 0px) * -1);
-    /* Above the long-name overlays (z-index 2): the logo is the top layer of the cell. */
+    /* The logo is the top layer of the cell. */
     position: relative;
     z-index: 3;
     filter: var(--rest-sp-shadow);
@@ -82,8 +81,8 @@
     color: #fff;
     font-weight: 700;
     filter: var(--rest-sp-shadow);
-    /* A name that does not fit is simply clipped (no "…"): it scrolls, and the two overlays soften
-       both ends. */
+    /* A name that does not fit is not cut with an ellipsis: it scrolls, and the mask softens both
+       ends (ThinResultRow.css .rest-name-cut). */
     text-overflow: clip;
 }
 
@@ -98,11 +97,45 @@
     background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Long-name overlay (ThinResultRow.tsx): only mounted while the nickname is cut off. Offsets and
-   9-slice come inline; it sits above the text and never takes clicks. */
-.rest-root--sports .rest-sp-long {
+/* Big buyer (sportsStyle.ts SPORTS_THIN_BIG_*; the gold cell art itself is set inline by
+   ThinResultRow.tsx). Gold letters, no dark shadow. The name box clips (overflow / running-name
+   mask), so it is made taller — padding pulled back by a negative margin — to leave room for the
+   glow above and below the letters. */
+.rest-root--sports .rest-big .rest-customer-text {
+    font-size: calc(var(--rest-sp-font) * var(--rest-big-font-scale, 1));
+}
+
+.rest-root--sports .rest-big .rest-customer-name {
+    color: var(--rest-big-color);
+    filter: none;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+    margin-top: -0.5em;
+    margin-bottom: -0.5em;
+}
+
+/* Layers of a big nickname (ThinResultRow.tsx NameText): copies of the text stacked exactly over
+   the letters, painted under them — glow copies, then the outline, then the letters. */
+.rest-root--sports .rest-big .rest-customer-name-text {
+    position: relative;
+    isolation: isolate;
+}
+
+.rest-root--sports .rest-layer {
     position: absolute;
-    box-sizing: border-box;
+    left: 0;
+    top: 0;
+    z-index: -1;
     pointer-events: none;
-    z-index: 2;
+}
+
+.rest-root--sports .rest-layer-glow {
+    color: var(--rest-big-glow-color);
+    -webkit-text-stroke: var(--rest-big-glow-spread) var(--rest-big-glow-color);
+    filter: blur(var(--rest-big-glow-blur));
+}
+
+.rest-root--sports .rest-layer-outline {
+    color: var(--rest-big-outline-color);
+    -webkit-text-stroke: var(--rest-big-outline-w) var(--rest-big-outline-color);
 }

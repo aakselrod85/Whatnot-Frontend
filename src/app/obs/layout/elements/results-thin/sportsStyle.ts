@@ -43,13 +43,6 @@ export const SPORTS_THIN_COLUMN_GAP = -10
 
 /** Cell art (211x56): a slanted green plate with a gold rim; only the last pixel row is transparent. */
 export const SPORTS_THIN_CELL_SRC = `${ART_DIR}/ResultsMinicell.png`
-/** Overlay for a name that does not fit (211x56, same shape and size as the cell, so it uses the
- *  same 9-slice cuts below): transparent on the left, fading into the plate on the right. Drawn
- *  over the nickname, and only while the nickname is cut off. */
-export const SPORTS_THIN_CELL_LONG_SRC = `${ART_DIR}/ResultsMinicellForLongText.png`
-/** Mirror of the overlay above (same size, same cuts): the plate's edge on the LEFT, fading out
- *  to the right. Laid over the nickname, under the logo, together with the one above. */
-export const SPORTS_THIN_CELL_LONG_LEFT_SRC = `${ART_DIR}/ResultsMinicellForLongTextleftSide.png`
 /** Art height of the cell PNG, px — the cell's 9-slice is scaled by (row height / this). */
 export const SPORTS_THIN_CELL_ART_H = 56
 
@@ -72,15 +65,17 @@ export const SPORTS_THIN_FONT = 0.36
 
 /**
  * The clipping mask of the nickname: the text is visible only inside it, and what is outside is
- * cut off. By default it is exactly the text area (between the logo and the cell's right edge), so
- * the letters are cut sharply right where the two overlays start to fade them. Moving the mask's
- * edges OUT lets the text show (and fade) under the overlays. Art px (scaled with the row, like
- * the cell cuts): positive = that edge moves outward, negative = inward. The nickname's START
- * position does not move when the left edge does (only the mask grows); the right edge is the
- * one that can let text show outside the visible plate, so go gently with it. The "does the name
- * fit" check still uses the plain text area, so changing these never switches overlays on or off.
+ * cut off. By default it is exactly the text area (between the logo and the cell's right edge).
+ * Art px (scaled with the row, like the cell cuts): positive = that edge moves outward, negative =
+ * inward. The nickname's START position does not move when the left edge does (only the mask
+ * grows); the right edge is the one that can let text show outside the visible plate, so go
+ * gently with it. The "does the name fit" check still uses the plain text area.
  */
-export const SPORTS_THIN_TEXT_MASK_EXTEND = { left: 5, right: 5 } as const
+export const SPORTS_THIN_TEXT_MASK_EXTEND = { left: 8, right: 4 } as const
+
+/** Width of the soft fade at the left and right edge of the mask above, while the nickname does
+ *  not fit and runs. Art px (scaled with the row). 0 = hard cut. */
+export const SPORTS_THIN_TEXT_FADE = 8
 
 /**
  * Vertical position of the content inside the cell, share of the row height: 0 = centred as the
@@ -97,10 +92,41 @@ export const SPORTS_THIN_TEXT_OFFSET_Y = -0.02
  */
 export const SPORTS_THIN_SHADOW = { offsetY: 0.05, blur: 0.03, color: 'rgba(0, 0, 0, 1)' } as const
 
+// ---------------------------------------------------------------------------------------------
+// Big buyers — checkbox "show buyers with big amount of orders" in the Results Thin settings.
+// A buyer who bought at least SPORTS_THIN_BIG_BUYER_MIN slots in this break (giveaways and unsold
+// spots do not count) gets the gold cell and a gold, outlined, glowing nickname without the dark
+// shadow, in every one of their cells. Sizes marked "em" are shares of the nickname's own letter
+// size. Separate from the big Results board's values (results/sportsStyle.ts) on purpose.
+// ---------------------------------------------------------------------------------------------
+
+/** Gold cell art — same size and cuts as SPORTS_THIN_CELL_SRC (SPORTS_THIN_CELL_SLICE / _PAD). */
+export const SPORTS_THIN_CELL_GOLD_SRC = `${ART_DIR}/ResultsMinicellGold.png`
+
+/** How many bought slots in one break make a buyer "big". */
+export const SPORTS_THIN_BIG_BUYER_MIN = 5
+
+/** Letter colour of a big buyer's nickname: rgb(red, green, blue), each 0-255. */
+export const SPORTS_THIN_BIG_COLOR = 'rgb(255, 255, 255)'
+
+/** Letter size of a big buyer's nickname compared to a normal one (1 = same, 1.1 = 10% bigger). */
+export const SPORTS_THIN_BIG_FONT_SCALE = 1.2
+
+/** Outline AROUND the letters (outside them, the letters are not eaten).
+ *  - `width` — thickness, em. 0 = no outline; 0.05 = clearly visible.
+ *  - `color` — rgb(red, green, blue). */
+export const SPORTS_THIN_BIG_OUTLINE = { width: 0.08, color: 'rgb(171, 74, 4)' } as const
+
+/** Glow behind the letters — a blurred, fattened copy of the nickname laid under it.
+ *  - `color`  — rgba(red, green, blue, strength); strength 0 = no glow, 1 = full.
+ *  - `blur`   — how soft the glow is and how far it spreads past the letters, em.
+ *  - `spread` — how much the copy is fattened before blurring, em (denser, brighter glow).
+ *  - `layers` — how many such copies are stacked; more = more saturated. */
+export const SPORTS_THIN_BIG_GLOW = { color: 'rgba(144, 100, 29, 0.85)', blur: 0.25, spread: 0.1, layers: 2 } as const
+
 // registry.ts's `preload` list for the `resultsThin` entry — static art only.
 export const SPORTS_RESULTS_THIN_PRELOAD: string[] = [
     SPORTS_THIN_BOARD_SRC,
     SPORTS_THIN_CELL_SRC,
-    SPORTS_THIN_CELL_LONG_SRC,
-    SPORTS_THIN_CELL_LONG_LEFT_SRC,
+    SPORTS_THIN_CELL_GOLD_SRC,
 ]
