@@ -13,6 +13,7 @@
 // survives the stream's 4:2:0 chroma subsampling where a logo that only differs from its tile in hue
 // blurs into it. Whole px only: a fractional outline antialiases back into a soft edge.
 
+import {sportsLogoFilter} from './logoFilter'
 import {rgbToCss, shade, toGrey, type RGB} from './patchColors'
 import type {TierMaterial} from './priceMaterials'
 
@@ -49,14 +50,9 @@ export function tileMetrics(w: number, h: number) {
     return {radius, edgeInset, edgeWidth, logo, section, priceRoom}
 }
 
-function outlineFilter(px: number, color: string): string {
-    return [`${px}px 0`, `-${px}px 0`, `0 ${px}px`, `0 -${px}px`].map((o) => `drop-shadow(${o} 0 ${color})`).join(' ')
-}
-
 export default function PricePatchCell({w, h, background, logoSrc, label, price, priceFontPx, material, sold, shine = false, shineDelayS = 0}: Props) {
     const {radius, edgeInset, edgeWidth, logo, section} = tileMetrics(w, h)
     const innerR = Math.max(2, radius - edgeInset)
-    const outlinePx = Math.max(1, Math.round(h * 0.035))
     const edgeRect = (stroke: string, dy = 0, extra = 0) => (
         <rect
             x={edgeInset}
@@ -106,7 +102,7 @@ export default function PricePatchCell({w, h, background, logoSrc, label, price,
 
     const bodyBg = `${material.sheen}, linear-gradient(135deg, ${material.base.map((c, i) => `${c} ${Math.round((i / (material.base.length - 1)) * 100)}%`).join(', ')})`
     const inkShadow = material.inkHighlight ? `0 1px 0 ${material.inkHighlight}` : '0 1px 0 rgba(0,0,0,0.6), 0 2px 3px rgba(0,0,0,0.45)'
-    const logoFilter = `${outlineFilter(outlinePx, 'rgba(0,0,0,0.9)')} drop-shadow(0 ${Math.round(h * 0.03)}px ${Math.round(h * 0.03)}px rgba(0,0,0,0.5))`
+    const logoFilter = sportsLogoFilter(h)
     const edgeShadow = rgbToCss(shade(material.edge, 0.45), 0.6)
     const edgeColor = rgbToCss(material.edge, 0.95)
 

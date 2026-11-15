@@ -1,0 +1,48 @@
+.rfb-doric { isolation: isolate; pointer-events: none; }
+.rfb-doric-stone {
+    position: absolute;
+    inset: 3%;
+    overflow: hidden;
+    clip-path: polygon(19% 0,81% 0,100% 19%,100% 81%,81% 100%,19% 100%,0 81%,0 19%);
+    background-color: #e9e2d5;
+    background-image: url('/images/rips_tiles/doric/marble.png');
+}
+.rfb-doric-1 .rfb-doric-stone { filter: brightness(1.065) saturate(.9); box-shadow: inset 0 0 7px #9e7c43; }
+.rfb-doric-2 .rfb-doric-stone { filter: saturate(.55) brightness(.97); box-shadow: inset 0 0 5px #7f8187; }
+.rfb-doric-3 .rfb-doric-stone {
+    background-image: url('/images/rips_tiles/doric/limestone.png');
+    filter: brightness(.81) saturate(.6);
+    box-shadow: inset 0 0 6px #706350;
+}
+.rfb-doric-1 .rfb-doric-stone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 23% 14%,#fff3bd70 0%,#f5c85c29 36%,transparent 66%),linear-gradient(135deg,#ffd77815,transparent 58%,#e4ac3829);
+    mix-blend-mode: soft-light;
+}
+.rfb-doric-gloss {
+    position: absolute;
+    inset: -60%;
+    background: linear-gradient(115deg,transparent 30%,#fff7e5b3 45%,#fffffff5 50%,#fff9ec80 55%,transparent 69%);
+    mix-blend-mode: soft-light;
+    transform: translate3d(-12%,0,0);
+    opacity: .13;
+}
+.rfb-doric-1 .rfb-doric-gloss { animation: rfb-doric-polish 5s linear infinite; opacity: .85; }
+.rfb-doric-3 .rfb-doric-gloss { display: none; }
+.rfb-doric-sold .rfb-doric-gloss { animation-play-state: paused; }
+@keyframes rfb-doric-polish {
+    from { transform: translate3d(-48%,0,0); }
+    to { transform: translate3d(48%,0,0); }
+}
+.rfb-doric-logo,.rfb-doric-label { position: absolute; inset: 16%; width: 68%; height: 68%; object-fit: contain; z-index: 2; }
+.rfb-doric-label { display: flex; align-items: center; justify-content: center; text-align: center; overflow-wrap: anywhere; font-weight: 800; color: #25221f; }
+.rfb-doric-frame { position: absolute; inset: 0; overflow: hidden; z-index: 3; }
+.rfb-doric-frame img { position: absolute; max-width: none; object-fit: fill; }
+.rfb-doric-3 .rfb-doric-frame { filter: brightness(.86) saturate(.88); }
+/* One GPU layer in board coordinates, below flipping cells and sold-art/accent overlays. */
+.rfb-doric-gold { position: absolute; pointer-events: none; z-index: 4; }
+@media (prefers-reduced-motion: reduce) {
+    .rfb-doric-1 .rfb-doric-gloss { animation: none; transform: translate3d(-12%,0,0); }
+}

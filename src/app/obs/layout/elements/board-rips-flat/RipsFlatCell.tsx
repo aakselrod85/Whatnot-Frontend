@@ -1,24 +1,13 @@
 import {FC, useCallback, useEffect, useRef, useState} from 'react'
 import {Event} from '@/app/entity/entities'
-import {CANVAS} from '../../schema'
 import {Exposure} from '../board-flat/tiles/types'
 import {Manifest} from '../board-flat/tiles/manifest'
 import {CellSkin} from '../board-flat/CellSkin'
-import {RIPS_FRAME_ASSETS} from '../frame/ripsAssets'
-import {ripsTierOf, type RipsTier} from './ripsOrder'
+import {RipsDoricFront} from './RipsDoricFront'
 import './RipsFlatCell.css'
 
-// Front-face art (README "Rips board marble tiles"). 'veined' / 'clean' are the marble stones in
-// public/images/rips_tiles/ (scripts/rips-tiles/): they fill the whole cell so neighbouring stones
-// touch and the board shows through their cut corners. 'icons' is the earlier new_teams octagon at
-// 92% of the cell. 'marble_auto' is not a baked stone but three layers composed at render time
-// (bottom to top, all edge to edge like the stones): the frame element's marble (BackFlat.png)
-// clipped to an octagon, the team logo from rips_tiles/webp-rips/, and the gold CellFrame.png on top.
-// The marble is the whole 1080x1920 canvas sheet (`CANVAS`) positioned so each cell shows the
-// piece that lies under it on the canvas — veins run on across neighbours and shift with the
-// board when the operator moves it; `marbleOrigin` (canvas px of the cell's top-left, from
-// RipsFlatBoard) is what places it. Chosen per board element in /obs/controls (the element's
-// `tileSet`).
+// marble_auto uses the approved Doric tier frames, red-veined marble and sports logos.
+// Other sets and the saved tileSet values keep their existing behavior.
 export const RIPS_TILE_SETS = ['veined', 'clean', 'icons', 'marble_auto'] as const
 export type RipsTileSet = typeof RIPS_TILE_SETS[number]
 export const DEFAULT_RIPS_TILE_SET: RipsTileSet = 'veined'
@@ -26,22 +15,7 @@ export const DEFAULT_RIPS_TILE_SET: RipsTileSet = 'veined'
 const tileSrc = (set: RipsTileSet, team: string) =>
     set === 'icons' ? `/images/new_teams/${team}.png` : `/images/rips_tiles/${set}/${team}.png`
 
-// 'marble_auto' parts. The logos are webp with their padding baked in (so the <img> is the full
-// cell, no inset) — except Miscellaneous, which only exists as a PNG.
-export const MARBLE_AUTO_FRAME_SRC = '/images/rips_tiles/CellFrame.png'
-const marbleAutoLogoSrc = (team: string) =>
-    `/images/rips_tiles/webp-rips/${team}.${team === 'Miscellaneous' ? 'png' : 'webp'}`
-
-// 'marble_auto' frame per team tier (ripsOrder.ts, 1 = best): tier 3 has CellFrame above, tiers 1
-// and 2 their own frame. The marble under it is the same for every tier.
-const MARBLE_AUTO_TIER_FRAME: Record<RipsTier, string> = {
-    1: '/images/rips_tiles/CellFrameTier1.png',
-    2: '/images/rips_tiles/CellFrameTier2.png',
-    3: MARBLE_AUTO_FRAME_SRC,
-}
-export const MARBLE_AUTO_TIER_SRCS = [MARBLE_AUTO_TIER_FRAME[1], MARBLE_AUTO_TIER_FRAME[2]]
-
-// Canvas px of a cell's top-left corner (see `marbleOrigin` above).
+// Canvas coordinates anchor the per-tier material texture.
 export type MarbleOrigin = {x: number; y: number}
 
 // Back-face style (README "Rips board marble tiles", "Back"), independent of `tileSet` — any front
@@ -116,12 +90,13 @@ interface Props {
     tileSet?: RipsTileSet
     // 'marble_auto' only (ignored by the other sets); missing = marble sheet at the cell's origin.
     marbleOrigin?: MarbleOrigin
+    cellPx?: number
     backStyle?: RipsBackStyle
     // 'flip_art' only (ignored by 'tiles'): this cell's piece of the painting for its solo back.
     flipArt?: FlipArtPlacement
 }
 
-export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tier, alreadySettled, onSettled, style, tileSet = DEFAULT_RIPS_TILE_SET, marbleOrigin, backStyle = DEFAULT_RIPS_BACK_STYLE, flipArt}) => {
+export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tier, alreadySettled, onSettled, style, tileSet = DEFAULT_RIPS_TILE_SET, marbleOrigin, cellPx = 66, backStyle = DEFAULT_RIPS_BACK_STYLE, flipArt}) => {
     const flipped = event.customer !== ''
     const skipAnimation = flipped && !!alreadySettled
     const [animating, setAnimating] = useState(false)
@@ -166,28 +141,13 @@ export const RipsFlatCell: FC<Props> = ({event, manifest, exposure, styleId, tie
     }, [showVideo, armWatchdog])
 
     const contentClass = flipped ? (skipAnimation ? 'rfb-cell-final' : 'rfb-cell-flipped') : ''
-    const tierFrame = MARBLE_AUTO_TIER_FRAME[ripsTierOf(event.team)]
 
     return (
         <div className={`rfb-cell ${animating ? 'rfb-cell-flipping' : ''} ${showVideo ? 'rfb-cell-active' : ''}`} style={style}>
-            <div className={`rfb-cell-content ${contentClass}`} onAnimationEnd={() => setAnimating(false)}>
+            <div className={`rfb-cell-content ${contentClass}`} onAnimationEnd={(e) => { if (e.target === e.currentTarget) setAnimating(false) }}>
                 <div className="rfb-face rfb-front">
                     {tileSet === 'marble_auto' ? (
-                        <div className="rfb-tile rfb-tile-stone">
-                            <div
-                                className="rfb-marble"
-                                style={{
-                                    backgroundImage: `url(${RIPS_FRAME_ASSETS.back.src})`,
-                                    backgroundSize: `${CANVAS.w}px ${CANVAS.h}px`,
-                                    backgroundPosition: `${-(marbleOrigin?.x ?? 0)}px ${-(marbleOrigin?.y ?? 0)}px`,
-                                }}
-                            />
-                            {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element */}
-                            <img className="rfb-icon rfb-marble-logo" src={marbleAutoLogoSrc(event.team)} alt={event.team} />
-                            {/* Frame above the logo. */}
-                            {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element */}
-                            <img className="rfb-marble-frame" src={tierFrame} alt="" />
-                        </div>
+                        <RipsDoricFront team={event.team} cellPx={cellPx} origin={marbleOrigin} sold={flipped} />
                     ) : (
                         <div className={tileSet === 'icons' ? 'rfb-tile' : 'rfb-tile rfb-tile-stone'}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- plain <img>, same as every other layout element */}

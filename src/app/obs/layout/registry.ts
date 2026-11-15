@@ -5,7 +5,7 @@
 import type { ComponentType } from 'react'
 import { Placeholder } from './Placeholder'
 import { FrameElement } from './elements/frame/FrameElement'
-import { RIPS_FRAME_ASSETS, RIPS_FRAME_PRELOAD } from './elements/frame/ripsAssets'
+import { RIPS_FRAME_PRELOAD } from './elements/frame/ripsAssets'
 import { SPORTS_FRAME_PRELOAD } from './elements/frame/sportsAssets'
 import { StashOrPassWrap } from './elements/animation/StashOrPassWrap'
 import { StashOrPassTl } from './elements/animation/tl/StashOrPassTl'
@@ -17,7 +17,7 @@ import { CobraBoard } from './elements/board-cobra/CobraBoard'
 import { CobraFlatBoard } from './elements/board-cobra-flat/CobraFlatBoard'
 import { RipsFlatBoard } from './elements/board-rips-flat/RipsFlatBoard'
 import { RIPS_BOARD_ART } from './elements/board-rips-flat/boardArt'
-import { MARBLE_AUTO_FRAME_SRC, MARBLE_AUTO_TIER_SRCS } from './elements/board-rips-flat/RipsFlatCell'
+import { DORIC_PRELOAD } from './elements/board-rips-flat/doricMaterials'
 import { SportStyleBoard } from './elements/board-sport-style/SportStyleBoard'
 import { SportPricedBoard } from './elements/board-sport-priced/SportPricedBoard'
 import { ResultsElement } from './elements/results/ResultsElement'
@@ -316,10 +316,8 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         singleton: false,
         singletonGroup: 'board:rips_flat',
         defaultBox: RIPS_FLAT_BOX,
-        // Static art only; team icons and tiled skins resolve at render time. The 'marble_auto'
-        // set's frames (tier 0-2) and marble sheet (the latter is also in RIPS_FRAME_PRELOAD — cheap twice),
-        // and the 'flip_art' back's frame (its painting is a random pick, loaded by useFlipArt.ts).
-        preload: [RIPS_BOARD_ART.src, MARBLE_AUTO_FRAME_SRC, ...MARBLE_AUTO_TIER_SRCS, RIPS_FRAME_ASSETS.back.src],
+        // Team icons resolve at render time; flip-art paintings load through useFlipArt.
+        preload: [RIPS_BOARD_ART.src, ...DORIC_PRELOAD],
         // The press burst on a sale is 650% of a cell — taller than this short board.
         unclipped: true,
         component: RipsFlatBoard,
