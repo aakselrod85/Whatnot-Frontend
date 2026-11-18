@@ -61,7 +61,7 @@ export function buildCells(toppsDynasty: boolean): BreakdownCell[] {
             return a.nfl.localeCompare(b.nfl, 'en')
         })
         .map((t) => {
-            if (t.nfl === MISC) return { key: MISC, logo: TeamIconSrc(MISC), lines: ['Managers', 'regardless', 'of team'], noSeparators: true }
+            if (t.nfl === MISC) return { key: MISC, logo: TeamIconSrc(MISC), lines: ['Team USA cards', 'Gold/Tennis', 'UFC/WWE', 'F1/etc], noSeparators: true }
             const lines = LEAGUE_ORDER.map((l) => t[l]).filter((v): v is string => !!v && v.trim() !== '')
             if (toppsDynasty && t.soccer && t.soccer.trim() !== '') lines.push(t.soccer)
             return { key: t.nfl, logo: TeamIconSrc(t.nfl), lines: lines.map(shortName) }
