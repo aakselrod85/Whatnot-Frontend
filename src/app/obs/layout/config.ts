@@ -1141,6 +1141,19 @@ function validateDimmerKind({ key, rawEl, stages }: KindValidatorCtx): { errors:
     }
 }
 
+// `teamBreakdown` (schema.ts): `columns` an integer >= 1, `toppsDynasty` a boolean; both optional.
+function validateTeamBreakdownKind({ key, rawEl, stages }: KindValidatorCtx): { errors: string[]; regId?: RegistryId } {
+    const regId: RegistryId = 'teamBreakdown'
+    const errors = validatePlacements(key, rawEl.placements, regId, stages)
+    if (rawEl.columns !== undefined && (!isFiniteNumber(rawEl.columns) || !Number.isInteger(rawEl.columns) || rawEl.columns < 1)) {
+        errors.push(`element "${key}": columns must be an integer >= 1`)
+    }
+    if (rawEl.toppsDynasty !== undefined && typeof rawEl.toppsDynasty !== 'boolean') {
+        errors.push(`element "${key}": toppsDynasty must be a boolean`)
+    }
+    return { errors, regId }
+}
+
 // The enforcement this whole section exists for: a kind added to ElementKind (schema.ts) with no
 // entry below fails `tsc` right here — see the section's header comment.
 const KIND_VALIDATORS = {
@@ -1163,6 +1176,7 @@ const KIND_VALIDATORS = {
     obsToggle: validateObsToggleKind,
     hitSequence: validateHitSequenceKind,
     dimmer: validateDimmerKind,
+    teamBreakdown: validateTeamBreakdownKind,
 } satisfies Record<ElementKind, KindValidator>
 
 // `config.stages`: non-empty, every entry `{id: non-empty string, label: non-empty string}`,

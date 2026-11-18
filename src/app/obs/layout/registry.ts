@@ -44,6 +44,7 @@ import { ObsToggleElement } from './elements/obs-toggle/ObsToggleElement'
 import { mountObsToggle } from './elements/obs-toggle/mount'
 import { HitSequenceElement } from './elements/hit-sequence/HitSequenceElement'
 import { DimmerElement } from './elements/dimmer/DimmerElement'
+import { TeamBreakdownElement, TEAM_BREAKDOWN_PRELOAD } from './elements/team-breakdown/TeamBreakdownElement'
 import type { AnimationId, BoardVariant, Box, Element, ElementKind, FrameVariant, Phase, TickerSlot, WidgetId } from './schema'
 import { ANIMATION_IDS, DEFAULT_DIMMER_COLOR, DEFAULT_FRAME_BORDERS, DEFAULT_FRAME_WIDTH, DEFAULT_TICKER_SLOTS, WIDGET_IDS } from './schema'
 import type { SceneEventName } from './sceneEvents'
@@ -90,6 +91,7 @@ export type RegistryId =
     | 'obsToggle'
     | 'hitSequence'
     | 'dimmer'
+    | 'teamBreakdown'
 
 // Shared prop contract every registry component (placeholder now, real components in Phase 2)
 // implements.
@@ -816,6 +818,21 @@ export const REGISTRY: Record<RegistryId, RegistryEntry> = {
         hasBox: false,
         reactsTo: [],
     },
+    // Team Breakdown table. One per config — a second copy would show the same static table.
+    teamBreakdown: {
+        id: 'teamBreakdown',
+        kind: 'teamBreakdown',
+        label: 'Team Breakdown',
+        singleton: true,
+        singletonGroup: 'teamBreakdown',
+        // Full canvas width at base.png's own proportions (864x1484), centred vertically.
+        defaultBox: { x: 0, y: 32, w: 1080, h: 1855 },
+        preload: TEAM_BREAKDOWN_PRELOAD,
+        component: TeamBreakdownElement,
+        available: true,
+        hasBox: true,
+        reactsTo: [],
+    },
 }
 
 /** Narrows a registry id's suffix to a real AnimationId, refusing anything ANIMATION_IDS lacks. */
@@ -943,6 +960,9 @@ export function makeElement(registryId: RegistryId): Element {
             // -20 is under even a frame that was itself sent below the content. The operator moves
             // it up with the ordinary Layer input if they want it over something.
             return { kind: 'dimmer', color: DEFAULT_DIMMER_COLOR, placements, z: -20 }
+        case 'teamBreakdown':
+            // columns/toppsDynasty left unset — tuning.ts's DEFAULT_* apply.
+            return { kind: 'teamBreakdown', placements }
         default: {
             const _exhaustive: never = entry.kind
             throw new Error(`makeElement: unhandled kind ${JSON.stringify(_exhaustive)}`)

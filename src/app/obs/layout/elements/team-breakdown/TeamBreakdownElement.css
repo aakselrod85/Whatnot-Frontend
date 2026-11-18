@@ -1,0 +1,77 @@
+/* `teamBreakdown` (TeamBreakdownElement.tsx). Classes prefixed `tbd-` only; sizes come inline
+ * from the element's box, never vw/vh/rem. */
+
+@font-face {
+    font-family: 'Tbd Barlow Condensed';
+    src: url('/fonts/barlow-condensed-600.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+.tbd-root {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.tbd-base {
+    position: absolute;
+}
+
+.tbd-base-art {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border-style: solid;
+    border-color: transparent;
+    border-image-repeat: stretch;
+}
+
+.tbd-grid {
+    position: absolute;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+}
+
+.tbd-cell {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.tbd-cell-bg {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border-style: solid;
+    border-color: transparent;
+    border-image-repeat: stretch;
+}
+
+.tbd-logo {
+    position: absolute;
+    max-width: none;
+}
+
+.tbd-text {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.tbd-line-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.tbd-sep {
+    display: block;
+}

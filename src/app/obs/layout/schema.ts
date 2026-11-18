@@ -50,6 +50,7 @@ export type ElementKind =
     | 'obsToggle'
     | 'hitSequence'
     | 'dimmer'
+    | 'teamBreakdown'
 
 // ---- hitSequence (hit-sequence-plan.md §3.1) ---------------------------------------------------
 export type HitStepBase = {
@@ -610,6 +611,17 @@ export type Element = (
     | {
           kind: 'dimmer'
           color?: string
+          placements: Partial<Record<PlacementKey, Box>>
+          z?: number
+          reactions?: Reactions
+      }
+    // Team Breakdown table (elements/team-breakdown/): which other-league teams go with each NFL
+    // slot, read from the element's own teams.json. `columns` = cells per row (absent = 5);
+    // `toppsDynasty` adds each team's soccer club as the last line (absent = true).
+    | {
+          kind: 'teamBreakdown'
+          columns?: number
+          toppsDynasty?: boolean
           placements: Partial<Record<PlacementKey, Box>>
           z?: number
           reactions?: Reactions

@@ -72,4 +72,6 @@ export const NEEDS_BY_ID = {
     hitSequence: ['needsCobra', 'needsSeries'],
     // A static tint — reads nothing but its own `color` from the config, same as `text`/`frame`.
     dimmer: [],
+    // Static table from its own teams.json — reads no spine data.
+    teamBreakdown: [],
 } as const satisfies Record<RegistryId, readonly NeedFlag[]>

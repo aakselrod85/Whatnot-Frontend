@@ -49,6 +49,8 @@ export function registryIdOf(element: Element): RegistryId {
             return 'hitSequence'
         case 'dimmer':
             return 'dimmer'
+        case 'teamBreakdown':
+            return 'teamBreakdown'
         default: {
             const _exhaustive: never = element
             throw new Error(`registryIdOf: unhandled element ${JSON.stringify(_exhaustive)}`)
