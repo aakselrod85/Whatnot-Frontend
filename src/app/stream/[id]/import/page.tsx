@@ -5,7 +5,7 @@ import {useRouter} from "next/navigation";
 import {IsTeam, Teams} from "@/app/common/teams";
 import {sortBreaksById} from "@/app/common/breaks";
 import {getEndpoints, post} from "@/app/lib/backend";
-import {AddBreakResponse, Event, GetChannelsChannel, GiveawayTypeNone, WNBreak} from "@/app/entity/entities";
+import {Event, GetChannelsChannel, GiveawayTypeNone, WNBreak} from "@/app/entity/entities";
 
 const COL_ORDER_ID = 0
 const COL_TITLE = 1
@@ -99,40 +99,6 @@ interface BreakPlan {
     targetBreakId: number
     targetBreakName: string
     events: PlannedEvent[]
-}
-
-function planNewBreak(v: BreakValidation): PlannedEvent[] {
-    const teamRows = v.rows.filter(r => IsTeam(r.team))
-    const customSpotRows = v.rows.filter(r => !IsTeam(r.team))
-
-    const events: PlannedEvent[] = Teams.map((teamName, j) => {
-        const teamRow = teamRows.find(r => r.team === teamName)
-        return {
-            action: 'create' as PlannedAction,
-            team: teamName,
-            index: j,
-            customer: teamRow?.username ?? '',
-            price: teamRow?.price ?? 0,
-            prevCustomer: '',
-            prevPrice: 0,
-            existing: null,
-        }
-    })
-
-    customSpotRows.forEach((row, j) => {
-        events.push({
-            action: 'create',
-            team: row.team,
-            index: Teams.length + j,
-            customer: row.username,
-            price: row.price,
-            prevCustomer: '',
-            prevPrice: 0,
-            existing: null,
-        })
-    })
-
-    return events
 }
 
 function planExistingBreak(v: BreakValidation, existingEvents: Event[]): PlannedEvent[] {
@@ -247,16 +213,6 @@ export default function Page({params}: {params: {id: string}}) {
         for (let i = 0; i < validations.length; i++) {
             const v = validations[i]
 
-            if (v.targetBreakId === 0) {
-                plans.push({
-                    breakName: v.breakName,
-                    targetBreakId: 0,
-                    targetBreakName: '',
-                    events: planNewBreak(v),
-                })
-                continue
-            }
-
             setProgress(`Reading existing break ${i + 1} of ${validations.length}: ${v.breakName}…`)
             const resp: {events: Event[]} = await post(getEndpoints().break_events, {break_id: v.targetBreakId})
             const existingEvents = (resp.events ?? []).filter(e => !e.is_giveaway)
@@ -279,27 +235,8 @@ export default function Page({params}: {params: {id: string}}) {
         for (let i = 0; i < plan.length; i++) {
             const p = plan[i]
 
-            let breakId = p.targetBreakId
-            if (breakId === 0) {
-                setProgress(`Creating break ${i + 1} of ${plan.length}: ${p.breakName}…`)
-
-                const breakBody: WNBreak = {
-                    id: 0,
-                    day_id: streamId,
-                    name: p.breakName,
-                    start_date: date,
-                    end_date: date,
-                    is_deleted: false,
-                    high_bid_floor: 0,
-                    high_bid_team: '',
-                    giveaway_team: '',
-                }
-
-                const response: AddBreakResponse = await post(getEndpoints().break_add, breakBody)
-                breakId = response.id
-            } else {
-                setProgress(`Importing into existing break ${i + 1} of ${plan.length}: ${p.breakName}…`)
-            }
+            const breakId = p.targetBreakId
+            setProgress(`Importing into existing break ${i + 1} of ${plan.length}: ${p.breakName}…`)
 
             for (const e of p.events) {
                 if (e.action === 'unchanged') continue
@@ -413,7 +350,7 @@ export default function Page({params}: {params: {id: string}}) {
                                                 value={v.targetBreakId}
                                                 onChange={e => setTargetBreak(v.breakName, parseInt(e.target.value))}
                                             >
-                                                <option value={0}>— Create new break —</option>
+                                                <option value={0}>— Select existing break —</option>
                                                 {breaks.map(b => (
                                                     <option key={b.id} value={b.id}>{b.name}</option>
                                                 ))}
@@ -470,10 +407,7 @@ export default function Page({params}: {params: {id: string}}) {
                                     return (
                                         <div key={p.breakName} className="mb-4">
                                             <div className="fw-bold">
-                                                {p.targetBreakId === 0
-                                                    ? <>Create new break &quot;{p.breakName}&quot;</>
-                                                    : <>Import &quot;{p.breakName}&quot; into existing break &quot;{p.targetBreakName}&quot;</>
-                                                }
+                                                <>Import &quot;{p.breakName}&quot; into existing break &quot;{p.targetBreakName}&quot;</>
                                             </div>
                                             <div className="small text-muted mb-2">
                                                 {creates.length} added, {updates.length} updated, {unchanged.length} unchanged
@@ -532,7 +466,7 @@ export default function Page({params}: {params: {id: string}}) {
                             {!plan ? (
                                 <button
                                     className="btn btn-primary"
-                                    disabled={!allValid || !!progress}
+                                    disabled={!allValid || !!progress || validations.some(v => v.targetBreakId === 0)}
                                     onClick={handlePrepare}
                                 >
                                     Prepare import
