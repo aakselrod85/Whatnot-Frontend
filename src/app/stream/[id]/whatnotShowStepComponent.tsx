@@ -7,13 +7,12 @@ interface WhatnotShowStepProps {
     shows: WhatnotShow[]
     loading: boolean
     partialFailure: boolean
-    showSkip: boolean
     onSelect: (id: string) => Promise<boolean>
     onRetry: () => void
     onSkip: () => void
 }
 
-export const WhatnotShowStepComponent: FC<WhatnotShowStepProps> = ({shows, loading, partialFailure, showSkip, onSelect, onRetry, onSkip}) => {
+export const WhatnotShowStepComponent: FC<WhatnotShowStepProps> = ({shows, loading, partialFailure, onSelect, onRetry, onSkip}) => {
     const [saving, setSaving] = useState(false)
 
     async function pick(id: string) {
@@ -30,11 +29,9 @@ export const WhatnotShowStepComponent: FC<WhatnotShowStepProps> = ({shows, loadi
         <div className="bg-dark text-white border rounded p-3 mx-auto mt-5" style={{width: '640px', maxWidth: '100%'}}>
             <div className="d-flex align-items-center gap-2 mb-2">
                 <h5 className="mb-0 me-auto">Select Whatnot show</h5>
-                {showSkip && (
-                    <button type="button" className="btn btn-sm btn-outline-light" onClick={onSkip}>
-                        Skip
-                    </button>
-                )}
+                <button type="button" className="btn btn-sm btn-outline-light" onClick={onSkip}>
+                    Skip
+                </button>
             </div>
             <p className="mb-3">Link this stream to its Whatnot show to continue.</p>
             {loading ? (

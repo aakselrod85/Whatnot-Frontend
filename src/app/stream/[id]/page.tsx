@@ -36,7 +36,6 @@ export default function Page({params} : {params: {id: string}}) {
     const [hasOlderShows, setHasOlderShows] = useState(false)
     const [olderLoading, setOlderLoading] = useState(false)
     const [olderFailed, setOlderFailed] = useState(false)
-    const [breaksStatus, setBreaksStatus] = useState<'loading' | 'ok' | 'failed'>('loading')
     const [skipped, setSkipped] = useState(false)
     const [lastRun, setLastRun] = useState<ShowReconciliationListItem | null | undefined>(undefined)
     const [reconciling, setReconciling] = useState<'apply' | 'report' | null>(null)
@@ -81,12 +80,7 @@ export default function Page({params} : {params: {id: string}}) {
         }
         post(getEndpoints().stream_breaks, body)
             .then((result: WNBreak[]) => {
-                if (Array.isArray(result)) {
-                    setBreaks(sortBreaksById(result))
-                    setBreaksStatus('ok')
-                } else {
-                    setBreaksStatus('failed')
-                }
+                if (Array.isArray(result)) setBreaks(sortBreaksById(result))
             })
         get(getEndpoints().series_list).then((data: Series[]) => {
             setClosedSeries(data ?? [])
@@ -274,10 +268,9 @@ export default function Page({params} : {params: {id: string}}) {
         toast(`Preset "${p.name}" applied to ${n} breaks`)
     }
 
-    const showSkip = devMode || (showsLoadedOnce && (shows.length === 0 || showsPartialFailure))
-    const needsStep = breaksStatus === 'ok' && breaks.length === 0 && !stream?.whatnot_show_id && !skipped
-    const pageLoading = breaksStatus === 'loading' || (needsStep && !stream)
-    const wantShows = showPickerOpen || (!!stream && needsStep)
+    const needsStep = !!stream && !stream.whatnot_show_id && !skipped
+    const pageLoading = !stream
+    const wantShows = showPickerOpen || needsStep
 
     // Shows are slow to list, so fetch them only when the new-stream step or the picker needs them.
     // The Whatnot API key lives on the channel (DB-only column), so this also waits for the channel id.
@@ -309,12 +302,11 @@ export default function Page({params} : {params: {id: string}}) {
             </div>
             {pageLoading ? (
                 <div className="text-center text-muted mt-5">Loading…</div>
-            ) : stream && needsStep ? (
+            ) : needsStep ? (
                 <WhatnotShowStepComponent
                     shows={shows}
                     loading={showsLoading || !showsLoadedOnce}
                     partialFailure={showsPartialFailure}
-                    showSkip={showSkip}
                     onSelect={changeWhatnotShow}
                     onRetry={() => void loadShows()}
                     onSkip={() => setSkipped(true)}
