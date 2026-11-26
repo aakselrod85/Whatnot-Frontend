@@ -3,7 +3,7 @@
 import React, {Suspense, useEffect, useState} from "react";
 import {useRouter, useSearchParams} from "next/navigation";
 import {getEndpoints, post} from "@/app/lib/backend";
-import {AddBreakResponse, Event, GiveawayTypeNone, ReconciliationManualMap, WNBreak, WhatnotBreakOrders, WhatnotOrdersResponse, ShowReconciliation} from "@/app/entity/entities";
+import {Event, GiveawayTypeNone, ReconciliationManualMap, WNBreak, WhatnotBreakOrders, WhatnotOrdersResponse, ShowReconciliation} from "@/app/entity/entities";
 import {Teams} from "@/app/common/teams";
 import {sortBreaksById} from "@/app/common/breaks";
 import {
@@ -12,7 +12,6 @@ import {
 } from "../giveawayAssignment";
 
 const SKIP = -1
-const NEW_BREAK = -2
 const NOT_CHOSEN = 0
 const TIMEZONE_KEY = 'giveaway_tz'
 const EMPTY_CUSTOMERS = ['', '?']
@@ -151,25 +150,6 @@ function VerifyPage({params}: {params: {id: string}}) {
         return resp?.events ?? []
     }
 
-    async function createBreak(wb: WhatnotBreakOrders): Promise<WNBreak> {
-        const date = (new Date()).toISOString()
-        const body: WNBreak = {
-            high_bid_floor: 0, id: 0, day_id: streamId, name: wb.name,
-            start_date: date, end_date: date, is_deleted: false, high_bid_team: '', giveaway_team: ''
-        }
-        const response: AddBreakResponse = await post(getEndpoints().break_add, body)
-        const custom = Array.from(new Set(wb.orders.map(o => o.team))).filter(t => !Teams.includes(t))
-        const spots = [...Teams, ...custom]
-        for (let j = 0; j < spots.length; j++) {
-            const ev: Event = {
-                id: 0, index: j, giveaway_type: GiveawayTypeNone, break_id: response.id, customer: '',
-                price: 0, team: spots[j], is_giveaway: false, note: '', quantity: 0
-            }
-            await post(getEndpoints().event_add, ev)
-        }
-        return {...body, id: response.id}
-    }
-
     async function runVerify() {
         if (!orders || !breaks) return
         const curBreaks: WNBreak[] = breaks
@@ -177,15 +157,6 @@ function VerifyPage({params}: {params: {id: string}}) {
         setFixDone(false)
         let breaks_: WNBreak[] = curBreaks
         let ids = [...matchIds]
-        for (let i = 0; i < wnBreaks.length; i++) {
-            if (ids[i] !== NEW_BREAK) continue
-            setProgress(`Creating break ${wnBreaks[i].name}…`)
-            const nb = await createBreak(wnBreaks[i])
-            breaks_ = sortBreaksById([...breaks_, nb])
-            ids[i] = nb.id
-            setBreaks(breaks_)
-            setMatchIds([...ids])
-        }
         const allBreaks = breaks_
         const matchIds_ = ids
         const eventsByBreak = new Map<number, Event[]>()
@@ -359,7 +330,6 @@ function VerifyPage({params}: {params: {id: string}}) {
                                             >
                                                 <option value={NOT_CHOSEN}>— select —</option>
                                                 <option value={SKIP}>— skip —</option>
-                                                <option value={NEW_BREAK}>Add as new break</option>
                                                 {(breaks ?? []).filter(b => b.id === matchIds[i] || !matchIds.includes(b.id)).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                             </select>
                                         </td>

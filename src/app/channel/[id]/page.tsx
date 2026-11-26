@@ -1,5 +1,6 @@
 'use client'
 
+import {MobAioLink} from "@/app/component/mobAioLink";
 import {StreamStatusBadge} from "@/app/stream/[id]/statusBadges";
 import {getEndpoints, post} from "@/app/lib/backend";
 import React, {useEffect, useState} from "react";
@@ -158,26 +159,8 @@ export default function Page({params}: {params: {id: string}}) {
                             </button>
                         </div>
                     </div>
+                    <div className="mb-2"><MobAioLink path="/shows" label="Create in MOB AIO"/></div>
                     <ul className="list-group">
-                        <li className="list-group-item">
-                            <TextInputAction value={newName} setNewValue={setNewName} placeholder={'Enter new name...'}
-                                             action={() => {
-                                                 const body = {
-                                                     name: newName,
-                                                     channel_id: channelId,
-                                                 };
-                                                 post(getEndpoints().stream_add, body)
-                                                     .then(response => {
-                                                         setNewName('')
-                                                         if (page === 1) {
-                                                             fetchStreams()
-                                                         } else {
-                                                             setPage(1)
-                                                         }
-                                                     })
-                                             }
-                                             } actionLabel='Add'/>
-                        </li>
                         {
                             streams.map(
                                 (stream: StreamResponse, index: number, arr: StreamResponse[]) => {

@@ -12,9 +12,12 @@ npm run dev   # http://localhost:3000
 Requires `.env.local`:
 ```
 BACKEND_HOST=http://localhost:5555
+NEXT_PUBLIC_MOBWEBAPP_URL=http://localhost:3000
 ```
 
 `BACKEND_HOST` is exposed to the browser via the server-side route `pages/api/get-env-var.ts` — do not access `process.env.BACKEND_HOST` directly from client components.
+
+`NEXT_PUBLIC_MOBWEBAPP_URL` (optional) is the base URL of mobwebapp (MOB AIO), where streams and breaks are created; the "Create in MOB AIO" links (`component/mobAioLink.tsx`) render nothing when it is unset.
 
 ## Architecture
 
